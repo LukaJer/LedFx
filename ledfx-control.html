@@ -146,6 +146,9 @@
   .gcell:hover{border-color:var(--amber)}
   .gcell.filled{border-style:solid;border-color:var(--amber);background:var(--panel2);color:var(--text)}
   .gcell .gdir{font-size:11px;color:var(--amber);font-weight:700}
+  .preview-wrap{background:#090a0c;border:1px solid var(--line);border-radius:12px;padding:10px}
+  .section.collapsed .preview-wrap{display:none}
+  #tubePreviewCanvas{display:block;width:100%;height:150px;border-radius:8px}
 </style>
 </head>
 <body>
@@ -171,19 +174,12 @@
   <div class="stc"><small>Modes</small><b id="stMode" style="font-size:13px">—</b></div>
 </div>
 <div id="pane-main" class="pane">
-  <div class="section">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
-      <h2 style="margin:0">Stage Layout <span style="text-transform:none;font-weight:400">— remaps virtual segments &amp; filters tagged scenes</span></h2>
-      <span class="status" id="layoutStatus">no layout selected</span>
+  <div class="section" id="tubePreviewSec">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+      <h2 class="fold" id="tubePreviewToggle" role="button" tabindex="0" aria-expanded="true" style="margin:0"><span class="tri">&#9662;</span> Live Tube Preview <span class="fold-count" id="previewMeta"></span></h2>
+      <button class="tgl on" id="previewLiveBtn">Live</button>
     </div>
-    <div class="row2" style="margin:0">
-      <select id="layoutSel" style="min-width:170px"><option value="">No layout active</option></select>
-      <button class="btn" id="applyLayoutBtn">Apply Layout</button>
-      <button class="btn" id="delLayoutBtn" title="Delete selected layout">Delete</button>
-      <input id="layoutNameIn" placeholder="New layout name" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;width:150px">
-      <input id="layoutTagIn" placeholder="scene_tag (opt)" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;width:120px">
-      <button class="btn" id="saveLayoutBtn" title="Snapshot current virtual segments &amp; rows as a layout">Save Current Layout</button>
-    </div>
+    <div class="preview-wrap"><canvas id="tubePreviewCanvas"></canvas></div>
   </div>
   <div class="section"><h2>Vibe Macros <span style="text-transform:none;font-weight:400">— palette + speed + sensitivity</span></h2><div class="macros" id="macros"></div></div>
   <div class="section">
@@ -312,6 +308,27 @@
 </div>
 <div id="pane-layout" class="pane" hidden>
   <div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+      <h2 style="margin:0">Stage Layout <span style="text-transform:none;font-weight:400">— remaps virtual segments &amp; filters tagged scenes</span></h2>
+      <span class="status" id="layoutStatus">no layout selected</span>
+    </div>
+    <div class="row2" style="margin:0">
+      <select id="layoutSel" style="min-width:170px"><option value="">No layout active</option></select>
+      <button class="btn" id="applyLayoutBtn">Apply Layout</button>
+      <button class="btn" id="delLayoutBtn" title="Delete selected layout">Delete</button>
+      <input id="layoutNameIn" placeholder="New layout name" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;width:150px">
+      <input id="layoutTagIn" placeholder="scene_tag (opt)" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;width:120px">
+      <button class="btn" id="saveLayoutBtn" title="Snapshot current virtual segments &amp; rows as a layout">Save Current Layout</button>
+    </div>
+  </div>
+  <div class="section" id="layoutPreviewSec">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+      <h2 style="margin:0">Current Layout Preview <span style="text-transform:none;font-weight:400">— active virtual geometry &amp; live pixel mapping</span></h2>
+      <span class="status" id="layoutPreviewMeta">—</span>
+    </div>
+    <div class="preview-wrap"><canvas id="layoutPreviewCanvas" style="width:100%;height:190px;display:block"></canvas></div>
+  </div>
+  <div class="section">
     <h2>Graphical Stage Grid <span style="text-transform:none;font-weight:400">— select a tube, click cells to place, click again to rotate (H/V/flip), right-click to clear</span></h2>
     <div class="arr-grid">
       <label>Cols <input type="number" id="gridCols" min="1" max="12" value="5"></label>
@@ -434,9 +451,28 @@ function escHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+const LEDFX_GRADIENTS = {
+  Rainbow: 'linear-gradient(90deg, rgb(255,0,0) 0%, rgb(255,120,0) 14%, rgb(255,200,0) 28%, rgb(0,255,0) 42%, rgb(0,199,140) 56%, rgb(0,0,255) 70%, rgb(128,0,128) 84%, rgb(255,0,178) 98%)',
+  Dancefloor: 'linear-gradient(90deg, rgb(255,0,0) 0%, rgb(255,0,178) 50%, rgb(0,0,255) 100%)',
+  Plasma: 'linear-gradient(90deg, rgb(0,0,255) 0%, rgb(128,0,128) 25%, rgb(255,0,0) 50%, rgb(255,40,0) 75%, rgb(255,200,0) 100%)',
+  Ocean: 'linear-gradient(90deg, rgb(0,255,255) 0%, rgb(0,0,255) 100%)',
+  Viridis: 'linear-gradient(90deg, rgb(128,0,128) 0%, rgb(0,0,255) 25%, rgb(0,128,128) 50%, rgb(0,255,0) 75%, rgb(255,200,0) 100%)',
+  Jungle: 'linear-gradient(90deg, rgb(0,255,0) 0%, rgb(34,139,34) 50%, rgb(255,120,0) 100%)',
+  Spring: 'linear-gradient(90deg, rgb(255,0,178) 0%, rgb(255,40,0) 50%, rgb(255,200,0) 100%)',
+  Winter: 'linear-gradient(90deg, rgb(0,199,140) 0%, rgb(0,255,50) 100%)',
+  Frost: 'linear-gradient(90deg, rgb(0,0,255) 0%, rgb(0,255,255) 33%, rgb(128,0,128) 66%, rgb(255,0,178) 99%)',
+  Sunset: 'linear-gradient(90deg, rgb(0,0,128) 0%, rgb(255,120,0) 50%, rgb(255,0,0) 100%)',
+  Borealis: 'linear-gradient(90deg, rgb(255,40,0) 0%, rgb(128,0,128) 33%, rgb(0,199,140) 66%, rgb(0,255,0) 99%)',
+  Rust: 'linear-gradient(90deg, rgb(255,40,0) 0%, rgb(255,0,0) 100%)',
+  Winamp: 'linear-gradient(90deg, rgb(0,255,0) 0%, rgb(255,200,0) 25%, rgb(255,120,0) 50%, rgb(255,40,0) 75%, rgb(255,0,0) 100%)'
+};
+
 function sceneSegmentStyle(eff){
   const c = eff?.config || {};
-  if(c.gradient) return `background:${c.gradient}`;
+  if(typeof c.gradient === 'string'){
+    const g = LEDFX_GRADIENTS[c.gradient] || c.gradient.trim();
+    if(/^(#|rgb|hsl|linear-gradient|radial-gradient)/i.test(g)) return `background:${g}`;
+  }
   const colors = [];
   for(const [k, v] of Object.entries(c)){
     if(k === 'background_color' || typeof v !== 'string') continue;
@@ -596,8 +632,9 @@ function renderScenes(){
     const summary = types.length
       ? (types.length <= 2 ? types.join(' + ') : `${types[0]} +${types.length - 1}`) + ` · ${activeEffs.length}v`
       : 'no active effects';
-    const strip = activeEffs.length
-      ? activeEffs.map(([,eff]) => `<span style="${sceneSegmentStyle(eff)}"></span>`).join('')
+    const segStyles = [...new Set(activeEffs.map(([,eff]) => sceneSegmentStyle(eff)))];
+    const strip = segStyles.length
+      ? segStyles.map(st => `<span style="${st}"></span>`).join('')
       : '<span style="background:var(--panel2);opacity:.4"></span>';
     const tip = activeEffs.length
       ? activeEffs.map(([vid, eff]) => `${vid}: ${eff.preset ? `${eff.type} (${eff.preset})` : eff.type}`).join('\n')
@@ -681,6 +718,7 @@ async function loadVirtuals(){
     el.innerHTML = ids.map(id => virtualCard(id, virtuals[id])).join('');
     ids.forEach(id => wireVirtual(id, virtuals[id]));
     refreshArranger();
+    if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview();
   }catch(e){ el.innerHTML = `<div class="empty">Failed to load virtuals: ${e.message}</div>`; }
 }
 
@@ -903,6 +941,39 @@ function quantWait(mode){
 // live audio strip + energy meter (LedFx websocket, graph_update events)
 const live=$('#live'); for(let i=0;i<48;i++) live.appendChild(document.createElement('span'));
 let ws=null, wsReconnectT=null, wsWasDropped=false, lastAudio=0, runMax=0.0001, wsSeen=0, levels=null, energy=0;
+let previewLive = true, visFrames = {}, visFrameAt = {}, virtualFrames = {}, virtualFrameAt = {}, previewRaf = 0;
+function decodeVisPixels(px){
+  if(typeof px === 'string'){
+    try{
+      const bin = atob(px);
+      const n = Math.floor(bin.length / 3);
+      const out = new Array(n);
+      for(let i = 0; i < n; i++){
+        const o = i * 3;
+        out[i] = [bin.charCodeAt(o), bin.charCodeAt(o + 1), bin.charCodeAt(o + 2)];
+      }
+      return out;
+    }catch(e){ return null; }
+  }
+  if(Array.isArray(px)){
+    if(px.length === 3 && Array.isArray(px[0]) && px[0].length !== 3){
+      const n = px[0].length;
+      const out = new Array(n);
+      for(let i = 0; i < n; i++) out[i] = [px[0][i], px[1][i], px[2][i]];
+      return out;
+    }
+    return px;
+  }
+  return null;
+}
+function syncVisSubscription(){
+  if(!ws || ws.readyState !== 1) return;
+  if(previewLive){
+    ws.send(JSON.stringify({id:2,type:'subscribe_event',event_type:'visualisation_update',event_filter:{}}));
+  }else{
+    ws.send(JSON.stringify({id:2,type:'unsubscribe_event',event_type:'visualisation_update'}));
+  }
+}
 function findArr(o,d=0){
   if(Array.isArray(o)&&o.length>3&&typeof o[0]==='number') return o;
   if(o&&typeof o==='object'&&d<4) for(const k in o){ const r=findArr(o[k],d+1); if(r) return r; }
@@ -918,6 +989,7 @@ function connectWS(){
     setConnected(true);
     sock.send(JSON.stringify({id:1,type:'subscribe_event',event_type:'graph_update',event_filter:{}}));
     logCall('subscribe graph_update','WS','sent',0);
+    if(previewLive) syncVisSubscription();
     if(wsWasDropped){
       wsWasDropped=false;
       Promise.all([loadSchema(), loadLayouts(), loadScenes(), loadVirtuals(), loadAudioConfig(), loadDevices()]).catch(()=>{});
@@ -925,6 +997,21 @@ function connectWS(){
   };
   sock.onmessage=ev=>{
     let m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+    const evtType = m.event_type || m.data?.event_type;
+    if(evtType === 'visualisation_update'){
+      const visId = m.vis_id ?? m.data?.vis_id;
+      const isDev = m.is_device ?? m.data?.is_device;
+      const rawPx = m.pixels ?? m.data?.pixels;
+      const px = decodeVisPixels(rawPx);
+      if(visId && px){
+        const now = performance.now();
+        if(isDev === false){ virtualFrames[visId] = px; virtualFrameAt[visId] = now; }
+        else{ visFrames[visId] = px; visFrameAt[visId] = now; }
+        if(previewLive && typeof scheduleTubePreview === 'function') scheduleTubePreview();
+        if(previewLive && typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview();
+      }
+      return;
+    }
     if(wsSeen<8){ wsSeen++; logCall(ev.data.slice(0,160),'WS','msg',0); }
     const arr=findArr(m); if(!arr) return;
     runMax=Math.max(runMax*0.999,...arr,0.0001);
@@ -994,7 +1081,9 @@ $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!=='pane-'+b.dataset.t);
   if(b.dataset.t==='diag') $('#log').textContent=callLog.join('\n')||'no calls yet';
-  if(b.dataset.t==='eq') requestAnimationFrame(drawSpectrum); });
+  if(b.dataset.t==='eq') requestAnimationFrame(drawSpectrum);
+  if(b.dataset.t==='main' && typeof scheduleTubePreview === 'function') scheduleTubePreview();
+  if(b.dataset.t==='layout' && typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview(); });
 $('#resync').addEventListener('click',()=>connect());
 // collapsible virtuals section
 function setVirtualsCollapsed(collapsed){
@@ -1091,6 +1180,8 @@ async function loadDevices(){
     const devs = data.devices || {};
     devicesCache = devs;
     refreshArranger();
+    if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview();
+    if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
     const offline = Object.entries(devs).filter(([,d]) => d && d.online === false);
     offlineDeviceIds = offline.map(([id]) => id);
     if(btn) btn.textContent = offline.length ? `Connect Offline (${offline.length})` : 'All Tubes Online';
@@ -1711,8 +1802,299 @@ $('#gridApplyBtn').addEventListener('click', async ()=>{
   }
 });
 
+// === LIVE TUBE EFFECT PREVIEW ===
+function isPreviewVisible(){
+  const sec = $('#tubePreviewSec');
+  const pane = $('#pane-main');
+  return sec && !sec.classList.contains('collapsed') && pane && !pane.hidden;
+}
+
+function isLayoutPreviewVisible(){
+  const pane = $('#pane-layout');
+  return pane && !pane.hidden && !!$('#layoutPreviewCanvas');
+}
+
+function setPreviewCollapsed(collapsed){
+  const sec = $('#tubePreviewSec');
+  if(!sec) return;
+  sec.classList.toggle('collapsed', collapsed);
+  try{ localStorage.setItem('ledfx_preview_collapsed', collapsed ? '1' : '0'); }catch(e){}
+  if(!collapsed) scheduleTubePreview();
+}
+
+$('#tubePreviewToggle').addEventListener('click', ()=>{
+  setPreviewCollapsed(!$('#tubePreviewSec').classList.contains('collapsed'));
+});
+
+try{
+  if(localStorage.getItem('ledfx_preview_collapsed') === '1') setPreviewCollapsed(true);
+}catch(e){}
+
+$('#previewLiveBtn').addEventListener('click', ()=>{
+  previewLive = !previewLive;
+  const btn = $('#previewLiveBtn');
+  btn.textContent = previewLive ? 'Live' : 'Paused';
+  btn.classList.toggle('on', previewLive);
+  syncVisSubscription();
+  if(previewLive) scheduleTubePreview();
+  else $('#previewMeta').textContent = 'paused';
+});
+
+function scheduleTubePreview(){
+  if(previewRaf || !isPreviewVisible()) return;
+  previewRaf = requestAnimationFrame(()=>{
+    previewRaf = 0;
+    drawTubePreview();
+  });
+}
+
+function drawTubePreview(){
+  const canvas = $('#tubePreviewCanvas');
+  if(!canvas || !isPreviewVisible()) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = canvas.clientWidth || 640;
+  const h = canvas.clientHeight || 168;
+  if(canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)){
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const devs = Object.entries(devicesCache).sort((a, b) =>
+    (a[1]?.config?.name || a[0]).localeCompare(b[1]?.config?.name || b[0])
+  );
+  const meta = $('#previewMeta');
+  if(!devs.length){
+    if(meta) meta.textContent = 'no devices';
+    ctx.fillStyle = '#74748c';
+    ctx.font = '12px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Connect to LedFx to preview live tube pixels', w / 2, h / 2);
+    return;
+  }
+
+  function getTubePixelsFromVirtuals(devId, pixelCount){
+    const ordered = Object.entries(virtualsCache).sort((a, b) => {
+      const dt = (virtualFrameAt[b[0]] || 0) - (virtualFrameAt[a[0]] || 0);
+      if(Math.abs(dt) > 500) return dt;
+      return (b[1]?.active ? 1 : 0) - (a[1]?.active ? 1 : 0) || dt;
+    });
+    for(const [vid, virt] of ordered){
+      const vFrame = virtualFrames[vid];
+      if(!vFrame?.length || (now - (virtualFrameAt[vid] || 0) > 2000) || !Array.isArray(virt?.segments) || !virt.segments.length) continue;
+      let totalPhys = 0;
+      for(const seg of virt.segments) totalPhys += Math.max(0, (Number(seg[2]) || 0) - (Number(seg[1]) || 0) + 1);
+      if(!totalPhys) continue;
+      let offset = 0;
+      let out = null;
+      for(const seg of virt.segments){
+        const sDev = seg[0], start = Number(seg[1]) || 0, end = Number(seg[2]) || 0, inv = !!seg[3];
+        const segLen = Math.max(0, end - start + 1);
+        if(sDev === devId && segLen > 0){
+          if(!out) out = Array.from({length: pixelCount}, () => [20, 20, 32]);
+          for(let k = 0; k < segLen; k++){
+            const dst = inv ? (end - k) : (start + k);
+            if(dst >= 0 && dst < pixelCount){
+              const fIdx = Math.min(vFrame.length - 1, Math.floor((offset + k) * vFrame.length / totalPhys));
+              out[dst] = vFrame[fIdx];
+            }
+          }
+        }
+        offset += segLen;
+      }
+      if(out) return out;
+    }
+    return null;
+  }
+
+  const now = performance.now();
+  let streaming = 0, viaVirt = 0;
+  const resolvedPixels = {};
+  for(const [id, dev] of devs){
+    const n = dev?.config?.pixel_count || 36;
+    const directFresh = visFrames[id]?.length && (dev?.online !== false || (now - (visFrameAt[id] || 0) < 1500));
+    if(directFresh){
+      resolvedPixels[id] = visFrames[id];
+      streaming++;
+    }else{
+      const fallback = getTubePixelsFromVirtuals(id, n);
+      if(fallback){
+        resolvedPixels[id] = fallback;
+        viaVirt++;
+      }
+    }
+  }
+  if(meta){
+    if(!previewLive) meta.textContent = 'paused';
+    else if(streaming) meta.textContent = `${streaming}/${devs.length} streaming`;
+    else if(viaVirt) meta.textContent = `${viaVirt}/${devs.length} simulated (tubes offline)`;
+    else meta.textContent = `0/${devs.length} streaming`;
+  }
+
+  const padX = 14, padTop = 10, padBot = 24;
+  const usableW = Math.max(40, w - padX * 2);
+  const slotW = usableW / devs.length;
+  const tubeW = Math.max(14, Math.min(36, slotW * 0.56));
+  const tubeH = Math.max(30, h - padTop - padBot);
+
+  devs.forEach(([id, dev], idx) => {
+    const cx = padX + slotW * (idx + 0.5);
+    const x = Math.round(cx - tubeW / 2);
+    const y = padTop;
+    const online = dev?.online !== false;
+    const pixels = resolvedPixels[id];
+    const n = pixels?.length || dev?.config?.pixel_count || 36;
+
+    // Tube housing
+    ctx.fillStyle = '#0e0e16';
+    ctx.strokeStyle = online ? '#34344a' : '#6b2334';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x - 2, y - 2, tubeW + 4, tubeH + 4, 5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Segments
+    const segH = tubeH / n;
+    const gap = segH > 3.5 ? 0.8 : 0;
+    for(let i = 0; i < n; i++){
+      const px = pixels?.[i];
+      const r = px ? px[0] : 24;
+      const g = px ? px[1] : 24;
+      const b = px ? px[2] : 38;
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y + i * segH, tubeW, Math.max(1, segH - gap));
+    }
+
+    // Label
+    const label = (dev?.config?.name || id).slice(0, 14);
+    ctx.fillStyle = online ? '#b6b6ca' : '#ff6b86';
+    ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(online ? label : `${label} (off)`, cx, y + tubeH + 6);
+  });
+}
+
+let layoutPreviewRaf = 0;
+function scheduleLayoutPreview(){
+  if(layoutPreviewRaf || !isLayoutPreviewVisible()) return;
+  layoutPreviewRaf = requestAnimationFrame(()=>{
+    layoutPreviewRaf = 0;
+    drawLayoutPreview();
+  });
+}
+
+function drawLayoutPreview(){
+  const canvas = $('#layoutPreviewCanvas');
+  if(!canvas || !isLayoutPreviewVisible()) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = canvas.clientWidth || 640;
+  const h = canvas.clientHeight || 190;
+  if(canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)){
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const selId = $('#arrVirtSel')?.value || Object.keys(virtualsCache)[0] || '';
+  const virt = virtualsCache[selId];
+  const meta = $('#layoutPreviewMeta');
+  if(!virt){
+    if(meta) meta.textContent = 'no virtual selected';
+    ctx.fillStyle = '#74748c';
+    ctx.font = '12px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Connect to LedFx to preview the active virtual layout', w / 2, h / 2);
+    return;
+  }
+
+  const segs = Array.isArray(virt.segments) ? virt.segments : [];
+  const rows = Math.max(1, Number(virt.config?.rows) || 1);
+  const grouping = Math.max(1, Number(virt.config?.grouping) || 1);
+  if(meta) meta.textContent = `${selId} · ${rows} row${rows>1?'s':''} · grouping=${grouping} · ${segs.length} seg${segs.length!==1?'s':''}`;
+
+  if(!segs.length){
+    ctx.fillStyle = '#74748c';
+    ctx.font = '12px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`Virtual "${selId}" has no segments mapped`, w / 2, h / 2);
+    return;
+  }
+
+  const perRow = Math.max(1, Math.ceil(segs.length / rows));
+  const padX = 12, padY = 10, gapX = 10, gapY = 10;
+  const cellW = Math.max(40, (w - padX * 2 - gapX * (perRow - 1)) / perRow);
+  const cellH = Math.max(24, (h - padY * 2 - gapY * (rows - 1)) / rows);
+
+  const totalPhys = segs.reduce((acc, s) => acc + Math.max(0, (Number(s[2]) || 0) - (Number(s[1]) || 0) + 1), 0) || 1;
+  const vFrame = virtualFrames[selId];
+  let vOffset = 0;
+
+  segs.forEach((seg, i) => {
+    const devId = seg[0], start = Number(seg[1]) || 0, end = Number(seg[2]) || 0, inv = !!seg[3];
+    const r = Math.floor(i / perRow), c = i % perRow;
+    const x = padX + c * (cellW + gapX);
+    const y = padY + r * (cellH + gapY);
+
+    ctx.fillStyle = '#10101a';
+    ctx.strokeStyle = inv ? '#8c6b2f' : '#2d2d42';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, cellW, cellH, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    const stripY = y + 6;
+    const stripH = Math.max(6, cellH - 24);
+    const stripX = x + 6;
+    const stripW = Math.max(12, cellW - 12);
+    const frame = visFrames[devId];
+    const count = Math.max(1, end - start + 1);
+    const pxW = stripW / count;
+    for(let k = 0; k < count; k++){
+      let px;
+      if(frame?.length){
+        const srcIdx = inv ? (end - k) : (start + k);
+        px = frame[srcIdx];
+      }else if(vFrame?.length){
+        const fIdx = Math.min(vFrame.length - 1, Math.floor((vOffset + k) * vFrame.length / totalPhys));
+        px = vFrame[fIdx];
+      }
+      const cr = px ? px[0] : 24;
+      const cg = px ? px[1] : 24;
+      const cb = px ? px[2] : 38;
+      ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+      ctx.fillRect(stripX + k * pxW, stripY, Math.max(1, pxW - (pxW > 3 ? 0.6 : 0)), stripH);
+    }
+    vOffset += count;
+
+    const name = (devicesCache[devId]?.config?.name || devId).slice(0, 12);
+    ctx.fillStyle = '#c5c5d8';
+    ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`${name} [${start}-${end}]${inv ? ' ◀' : ' ▶'}`, x + 6, y + cellH - 4);
+  });
+}
+
+$('#arrVirtSel')?.addEventListener('change', () => scheduleLayoutPreview());
+
+window.addEventListener('resize', () => {
+  if(isPreviewVisible()) scheduleTubePreview();
+  if(isLayoutPreviewVisible()) scheduleLayoutPreview();
+});
+
 renderMacros();
 renderPalettes();
+scheduleTubePreview();
 if(HOST) connect();
 </script>
 </body>

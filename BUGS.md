@@ -8,6 +8,8 @@ Severity: **M** = medium (real user-visible breakage), **L** = low (edge case / 
 
 - **Audio Auto-Gain (AGC) improvements** — `ledfx/effects/audio.py`, `ledfx/effects/melbank.py`, `ledfx-control.html`:
   - Review and tune incoming audio auto-gain / `mel_gain` / `volume_threshold` behavior for live DJ levels (prevent pumping during breakdowns, fast attack / controlled release, manual gain/AGC toggle + live readout in the **EQ & Spectrum** tab).
+- **Speed & Sensitivity controls** — `ledfx-control.html` (`#speedSlider`, `#sensSlider`, Vibe Macros, Global target group):
+  - Fix and improve how global Speed and Sensitivity map onto heterogeneous effect config schemas (not all effects use the same `speed` / `sensitivity` / `reactivity` keys or ranges, and relative scaling vs. overwriting per-effect values should be handled cleanly).
 
 ## Open
 
