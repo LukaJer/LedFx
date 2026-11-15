@@ -152,7 +152,13 @@
 </div>
 <div id="pane-main" class="pane">
   <div class="section"><h2>Vibe Macros <span style="text-transform:none;font-weight:400">— palette + speed + sensitivity</span></h2><div class="macros" id="macros"></div></div>
-  <div class="section"><h2>Scenes</h2><div class="scenes" id="scenes"><div class="empty">Connect to LedFx to load scenes.</div></div></div>
+  <div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
+      <h2 style="margin:0">Scenes</h2>
+      <button class="btn" id="updateSceneBtn" title="Snapshot current live virtual effects back into the selected scene">Update Scene</button>
+    </div>
+    <div class="scenes" id="scenes"><div class="empty">Connect to LedFx to load scenes.</div></div>
+  </div>
   <div class="section"><h2>Palette</h2><div class="palette" id="palette"></div></div>
   <div class="section"><h2>Global <span style="text-transform:none;font-weight:400">— applies to the target group</span></h2>
     <div class="globalRow">
@@ -278,7 +284,8 @@
 <div class="toast" id="toast"></div>
 
 <script>
-let HOST = localStorage.getItem('ledfx_host') || '';
+const IS_SERVED_FROM_LEDFX = location.protocol.startsWith('http') && (location.pathname === '/control' || location.pathname === '/dj');
+let HOST = IS_SERVED_FROM_LEDFX ? location.host : (localStorage.getItem('ledfx_host') || '');
 let effectTypes = [];
 let virtualsCache = {};
 document.getElementById('host').value = HOST;
@@ -294,17 +301,24 @@ function setConnected(on){
 }
 async function api(path, opts){
   const t0=performance.now();
-  const res = await fetch(`http://${HOST}/api${path}`, {
-    headers: {'Content-Type':'application/json'},
-    ...opts
-  });
+  let res;
+  try{
+    res = await fetch(`http://${HOST}/api${path}`, {
+      headers: {'Content-Type':'application/json'},
+      ...opts
+    });
+  }catch(err){
+    setConnected(false);
+    logCall(path, opts?.method||'GET', 'NET', Math.round(performance.now()-t0));
+    throw err;
+  }
   const raw = await res.text();
   logCall(path, opts?.method||'GET', res.status, Math.round(performance.now()-t0));
   let data = {};
   try{ data = raw ? JSON.parse(raw) : {}; }catch(e){ console.error('Non-JSON response from', path, raw); }
   if(!res.ok || data.status === 'failed'){
     console.error('LedFx API error', path, opts?.method||'GET', res.status, data);
-    throw new Error(data.reason || data.error || `${res.status} ${res.statusText}`);
+    throw new Error(data.payload?.reason || data.reason || data.error || `${res.status} ${res.statusText}`);
   }
   return data;
 }
@@ -344,9 +358,43 @@ function escHtml(s){
 
 function sceneSegmentStyle(eff){
   const c = eff?.config || {};
-  const bg = c.gradient || c.color || c.background_color;
-  if(bg) return `background:${bg}`;
-  return eff?.type ? 'background:var(--amber);opacity:.5' : 'background:var(--panel2);opacity:.35';
+  if(c.gradient) return `background:${c.gradient}`;
+  const colors = [];
+  for(const [k, v] of Object.entries(c)){
+    if(k === 'background_color' || typeof v !== 'string') continue;
+    if(/^#[0-9a-f]{3,8}$/i.test(v) || /^rgb/i.test(v) || /^linear-gradient/i.test(v)) colors.push(v);
+  }
+  if(colors.length === 1) return `background:${colors[0]}`;
+  if(colors.length > 1) return `background:linear-gradient(90deg,${colors.join(',')})`;
+  if(c.background_color && c.background_color !== '#000000') return `background:${c.background_color}`;
+  return 'background:linear-gradient(90deg,var(--amber),var(--amber2));opacity:.55';
+}
+
+let scenesCache = {};
+
+function extractSceneColors(s){
+  const cols = [];
+  for(const eff of Object.values(s?.virtuals || {})){
+    if(!eff || !eff.type || !eff.config) continue;
+    for(const [k, v] of Object.entries(eff.config)){
+      if(k === 'background_color' || typeof v !== 'string') continue;
+      const matches = v.match(/#[0-9a-f]{3,8}|rgba?\([^)]+\)/gi);
+      if(matches) cols.push(...matches);
+    }
+  }
+  return cols.length ? cols : null;
+}
+
+function syncSceneDisplay(id){
+  const s = scenesCache[id];
+  const label = s?.name || id;
+  lastScene = id;
+  $('#stScene').textContent = label;
+  const cols = extractSceneColors(s);
+  if(cols){
+    curPalette = {name: label, colors: cols};
+    $('#stPal').textContent = label;
+  }
 }
 
 async function loadScenes(){
@@ -354,22 +402,37 @@ async function loadScenes(){
   try{
     const data = await api('/scenes');
     const scenes = data.scenes || data;
-    const ids = Object.keys(scenes || {});
+    scenesCache = scenes || {};
+    const ids = Object.keys(scenesCache);
     if(!ids.length){ el.innerHTML = '<div class="empty">No scenes saved in LedFx yet.</div>'; return; }
+    const activeIds = ids.filter(id => scenesCache[id]?.active);
+    let chosenActive = null;
+    if(activeIds.includes(lastScene)){
+      chosenActive = lastScene;
+    }else if(activeIds.length){
+      chosenActive = activeIds.sort((a,b)=>{
+        const ca = Object.values(scenesCache[a]?.virtuals||{}).filter(e=>e&&e.type).length;
+        const cb = Object.values(scenesCache[b]?.virtuals||{}).filter(e=>e&&e.type).length;
+        return cb - ca;
+      })[0];
+    }
+    if(chosenActive) syncSceneDisplay(chosenActive);
     el.innerHTML = ids.map(id => {
-      const s = scenes[id];
+      const s = scenesCache[id];
       const vEntries = Object.entries(s.virtuals || {});
       const activeEffs = vEntries.filter(([,eff]) => eff && eff.type);
       const types = [...new Set(activeEffs.map(([,eff]) => eff.type))];
       const summary = types.length
         ? (types.length <= 2 ? types.join(' + ') : `${types[0]} +${types.length - 1}`) + ` · ${activeEffs.length}v`
-        : `${vEntries.length} virtuals`;
-      const strip = vEntries.length
-        ? vEntries.map(([,eff]) => `<span style="${sceneSegmentStyle(eff)}"></span>`).join('')
-        : '<span></span>';
-      const tip = vEntries.map(([vid, eff]) => `${vid}: ${eff?.type ? (eff.preset ? `${eff.type} (${eff.preset})` : eff.type) : 'off'}`).join('\n');
-      if(s.active){ lastScene = id; $('#stScene').textContent = s.name || id; }
-      return `<button class="scene ${s.active?'cur':''}" data-id="${escHtml(id)}" title="${escHtml(tip)}">
+        : 'no active effects';
+      const strip = activeEffs.length
+        ? activeEffs.map(([,eff]) => `<span style="${sceneSegmentStyle(eff)}"></span>`).join('')
+        : '<span style="background:var(--panel2);opacity:.4"></span>';
+      const tip = activeEffs.length
+        ? activeEffs.map(([vid, eff]) => `${vid}: ${eff.preset ? `${eff.type} (${eff.preset})` : eff.type}`).join('\n')
+        : 'No active effects in this scene';
+      const isCur = id === chosenActive;
+      return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(id)}" title="${escHtml(tip)}">
         <div class="scene-head"><span class="scene-name">${escHtml(s.name || id)}</span></div>
         <div class="scene-meta">${escHtml(summary)}</div>
         <div class="scene-strip">${strip}</div>
@@ -382,11 +445,29 @@ async function loadScenes(){
 async function activateScene(id){
   if(guardLock()) return;
   await quantWait(S.trans==='Quantize'?(S.qnt==='Now'?'Bar':S.qnt):'Now');
-  lastScene=id; $('#stScene').textContent=id;
+  syncSceneDisplay(id);
   document.querySelectorAll('.scene').forEach(b=>b.classList.toggle('cur',b.dataset.id===id));
-  try{ await api('/scenes', {method:'PUT', body: JSON.stringify({id, action:'activate'})}); toast('Scene activated'); }
-  catch(e){ toast('Scene failed: ' + e.message, true); }
+  try{
+    await api('/scenes', {method:'PUT', body: JSON.stringify({id, action:'activate'})});
+    toast('Scene activated');
+    loadVirtuals();
+  }catch(e){ toast('Scene failed: ' + e.message, true); }
 }
+
+$('#updateSceneBtn').addEventListener('click', async ()=>{
+  if(guardLock()) return;
+  if(!lastScene || lastScene === '—' || !scenesCache[lastScene]){
+    toast('Select or activate a scene first', true);
+    return;
+  }
+  try{
+    await api('/scenes', {method:'POST', body: JSON.stringify({id:lastScene, snapshot:true})});
+    toast(`Updated scene "${scenesCache[lastScene].name || lastScene}"`);
+    await loadScenes();
+  }catch(e){
+    toast('Update scene failed: ' + e.message, true);
+  }
+});
 
 async function loadVirtuals(){
   const el = $('#virtuals');
@@ -619,7 +700,7 @@ function quantWait(mode){
 }
 // live audio strip + energy meter (LedFx websocket, graph_update events)
 const live=$('#live'); for(let i=0;i<48;i++) live.appendChild(document.createElement('span'));
-let ws=null, wsReconnectT=null, lastAudio=0, runMax=0.0001, wsSeen=0, levels=null, energy=0;
+let ws=null, wsReconnectT=null, wsWasDropped=false, lastAudio=0, runMax=0.0001, wsSeen=0, levels=null, energy=0;
 function findArr(o,d=0){
   if(Array.isArray(o)&&o.length>3&&typeof o[0]==='number') return o;
   if(o&&typeof o==='object'&&d<4) for(const k in o){ const r=findArr(o[k],d+1); if(r) return r; }
@@ -631,7 +712,15 @@ function connectWS(){
   if(!HOST) return;
   const sock=new WebSocket(`ws://${HOST}/api/websocket`);
   ws=sock;
-  sock.onopen=()=>{ sock.send(JSON.stringify({id:1,type:'subscribe_event',event_type:'graph_update',event_filter:{}})); logCall('subscribe graph_update','WS','sent',0); };
+  sock.onopen=()=>{
+    setConnected(true);
+    sock.send(JSON.stringify({id:1,type:'subscribe_event',event_type:'graph_update',event_filter:{}}));
+    logCall('subscribe graph_update','WS','sent',0);
+    if(wsWasDropped){
+      wsWasDropped=false;
+      Promise.all([loadSchema(), loadScenes(), loadVirtuals(), loadAudioConfig(), loadDevices()]).catch(()=>{});
+    }
+  };
   sock.onmessage=ev=>{
     let m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
     if(wsSeen<8){ wsSeen++; logCall(ev.data.slice(0,160),'WS','msg',0); }
@@ -643,7 +732,13 @@ function connectWS(){
     updateSpectrumData(arr, freqs);
   };
   sock.onerror=()=>logCall('websocket error','WS','err',0);
-  sock.onclose=()=>{ if(ws===sock && HOST){ logCall('websocket closed, reconnecting','WS','close',0); wsReconnectT=setTimeout(connectWS, 2500); } };
+  sock.onclose=()=>{
+    if(ws===sock){
+      setConnected(false);
+      wsWasDropped=true;
+      if(HOST){ logCall('websocket closed, reconnecting','WS','close',0); wsReconnectT=setTimeout(connectWS, 2500); }
+    }
+  };
 }
 setInterval(()=>{
   const cs=curPalette.colors, on=Date.now()-lastAudio<2000;

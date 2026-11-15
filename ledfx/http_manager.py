@@ -3,6 +3,7 @@ import os
 import ssl
 import sys
 import time
+from pathlib import Path
 
 from aiohttp import web
 
@@ -66,6 +67,14 @@ class HttpServer:
             name="fonts",
         )
         self.app.router.add_route("get", "/fonts.css", self.fonts_css)
+        self.app.router.add_route("get", "/control", self.dj_control)
+        self.app.router.add_route("get", "/dj", self.dj_control)
+
+    async def dj_control(self, request):
+        path = Path(__file__).resolve().parent.parent / "ledfx-control.html"
+        if not path.is_file():
+            return web.Response(status=404, text="ledfx-control.html not found")
+        return web.FileResponse(path=str(path), status=200)
 
     async def fonts_css(self, response):
         return web.FileResponse(path=ledfx_frontend.where() + "/fonts.css", status=200)

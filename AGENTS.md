@@ -88,3 +88,9 @@ uv run ledfx --dump-openapi openapi/ledfx-v2.json
 - **Pyrefly (`pyproject.toml`)**: Configured with `preset = "strict"`, `python-platform = "linux"`, and `explicit-any = "error"`. Use `object` or concrete types instead of `Any`. Existing diagnostics are ratcheted in `pyrefly_errors.json`; new errors fail CI.
 - **ClassVar Audit**: `tools/classvar_audit.py` verifies `ClassVar` annotations match their literal values.
 - **Vendored/Generated Files**: Do not manually edit `ledfx_frontend/` or `ledfx/api/v2/docs/scalar.standalone.js` (use `python tools/update_scalar.py --sync` if `SCALAR_VERSION` changes).
+
+## Custom DJ / Fork Additions
+
+- **DJ Controller (`ledfx-control.html`)**: Standalone live controller served directly by `HttpServer` (`ledfx/http_manager.py`) at `/control` and `/dj` (auto-connects to `location.host` when served over HTTP). Includes Vibe Macros, Scene previews + live **Update Scene** (`POST /api/scenes` with `snapshot: true`), Hits (`/api/virtuals_tools`), collapsible Virtuals + manual offline tube reconnect (`POST /api/devices/{id}`), and an **EQ & Spectrum** tab.
+- **Zero-Latency 5-Band Audio EQ (`ledfx/effects/audio.py`, `ledfx/configuration/models.py`)**: `AudioInputConfig` exposes `eq_enabled`, `eq_low` (60 Hz), `eq_low_mid` (250 Hz), `eq_mid` (1 kHz), `eq_high_mid` (4 kHz), and `eq_high` (12 kHz) (`-24.0` to `+24.0` dB, permitted in `PERMITTED_KEYS["audio"]`), applied directly in the frequency domain in `pre_process_audio()` before melbank/beat analysis.
+- **Device Auto-Reconnect Toggle (`auto_reconnect_devices`)**: `LedFxConfig.auto_reconnect_devices` (default `True`, permitted in `PERMITTED_KEYS["core"]`) controls whether `NativePacketDevice` (`ledfx/devices/native_packet.py`) and `WLED` (`ledfx/devices/wled.py`) automatically schedule background retries for offline devices.
