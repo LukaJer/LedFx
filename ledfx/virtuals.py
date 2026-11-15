@@ -699,12 +699,21 @@ class Virtual:
             delay = (
                 0 if self.fallback_suppress_transition else self._config.transition_time
             )
-            self.clear_handle = self._ledfx.loop.call_later(delay, self.clear_frame)
+            loop = self._ledfx.loop
+            if not loop.is_closed():
+
+                def _arm_clear() -> None:
+                    self.clear_handle = loop.call_later(delay, self.clear_frame)
+
+                loop.call_soon_threadsafe(_arm_clear)
 
     def flush_pending_clear_frame(self):
-        if self.clear_handle is not None:
-            self.clear_handle.cancel()
-            self.clear_handle = None
+        handle = self.clear_handle
+        self.clear_handle = None
+        if handle is not None:
+            loop = self._ledfx.loop
+            if not loop.is_closed():
+                loop.call_soon_threadsafe(handle.cancel)
 
     def clear_transition_effect(self):
         effect, self._transition_effect = self._transition_effect, None
@@ -899,8 +908,11 @@ class Virtual:
                 # Get and process transition effect frame
                 self._transition_effect._render()
                 transition_frame = self._transition_effect.get_pixels()
-                transition_frame[transition_frame > 255] = 255
-                transition_frame[transition_frame < 0] = 0
+                if transition_frame is None:
+                    transition_frame = np.zeros_like(frame)
+                else:
+                    transition_frame[transition_frame > 255] = 255
+                    transition_frame[transition_frame < 0] = 0
 
                 if self._config.center_offset:
                     transition_frame = np.roll(

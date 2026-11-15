@@ -102,6 +102,8 @@ class WLEDDevice(NetworkedDevice):
         with self.device_lock:
             if self.subdevice is None or self._output_changed():
                 self.setup_subdevice()
+                if self._requested and self._destination is None:
+                    self._schedule_wled_resolution()
 
     def setup_subdevice(self):
         with self.device_lock:
@@ -114,7 +116,7 @@ class WLEDDevice(NetworkedDevice):
             candidate = device(self._ledfx, device.Config.model_validate(config))
             candidate._destination = self._destination
             try:
-                if self._requested:
+                if self._requested and self._destination is not None:
                     candidate.activate()
             except Exception:
                 candidate.deactivate()
@@ -126,12 +128,25 @@ class WLEDDevice(NetworkedDevice):
             if old is not None:
                 old.deactivate()
 
+    def _schedule_wled_resolution(self) -> None:
+        loop = self._ledfx.loop
+        if not loop.is_closed():
+            loop.call_soon_threadsafe(
+                lambda: loop.create_task(self.resolve_address(success_callback=self.activate))
+            )
+
+    @override
+    def is_online(self) -> bool:
+        if self.subdevice is not None:
+            return self._online and self.subdevice.is_online()
+        return self._online
+
     def activate(self):
         with self.device_lock:
             self._requested = True
             if self.subdevice is None:
                 self.setup_subdevice()
-            else:
+            elif self._destination is not None:
                 self.subdevice.activate()
             super().activate()
 
@@ -154,10 +169,25 @@ class WLEDDevice(NetworkedDevice):
                 self._ledfx.loop, self._ledfx.thread_executor, address
             )
         except ValueError as error:
+            retry = False
             with self.device_lock:
                 if generation == self._generation and address == self.config.ip_address:
                     self._online = False
                     _LOGGER.warning("Device %s: %s", self.name, error)
+                    retry = self._requested
+            if retry and not self._ledfx.loop.is_closed():
+                self._ledfx.loop.call_later(
+                    NativePacketDevice.RETRY_INTERVAL_SECONDS,
+                    lambda: (
+                        self._ledfx.loop.create_task(
+                            self.resolve_address(success_callback=success_callback)
+                        )
+                        if self._requested
+                        and generation == self._generation
+                        and address == self.config.ip_address
+                        else None
+                    ),
+                )
             return
         with self.device_lock:
             if generation != self._generation or address != self.config.ip_address:
@@ -191,6 +221,8 @@ class WLEDDevice(NetworkedDevice):
         _LOGGER.debug("Doing post creation things for WLED...")
         if self.config.create_segments or self._ledfx.config.create_segments:
             segments = await self.wled.get_segments()
+            if not segments:
+                return
             isMatrix = segments[0].get("stopY", 0) > 0
             if len(segments) > 1 or isMatrix:
                 for seg in segments:
@@ -207,26 +239,35 @@ class WLEDDevice(NetworkedDevice):
 
     async def async_initialize(self):
         await super().async_initialize()
-        # if not self._destination:
-        #     self.setup_subdevice()
-        #     return
+        if not self._destination:
+            self.setup_subdevice()
+            return
         self.wled = WLED(self._destination)
-        wled_config = await self.wled.get_config()
+        try:
+            wled_config = await self.wled.get_config()
 
-        led_info = wled_config["leds"]
-        wled_count = led_info["count"]
-        wled_rgbmode = led_info["rgbw"]
-        wled_build = wled_config["vid"]
+            led_info = wled_config["leds"]
+            wled_count = led_info["count"]
+            wled_rgbmode = led_info["rgbw"]
+            wled_build = wled_config["vid"]
 
-        # Not the firmware name: the stored name is the user's choice.
-        self._set_config_values(pixel_count=wled_count, rgbw_led=wled_rgbmode)
-        self.setup_subdevice()
+            # Not the firmware name: the stored name is the user's choice.
+            self._set_config_values(pixel_count=wled_count, rgbw_led=wled_rgbmode)
 
-        # Currently *assuming* that this PR gets released in 0.13
-        # https://github.com/Aircoookie/WLED/pull/1944
-        if wled_support_DDP(wled_build):
-            _LOGGER.info("WLED Build Supports Sync Setting API: %s", wled_build)
-            await self.wled.get_sync_settings()
+            # Currently *assuming* that this PR gets released in 0.13
+            # https://github.com/Aircoookie/WLED/pull/1944
+            if wled_support_DDP(wled_build):
+                _LOGGER.info("WLED Build Supports Sync Setting API: %s", wled_build)
+                await self.wled.get_sync_settings()
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning(
+                "Device %s: Failed to fetch WLED config from %s: %s",
+                self.name,
+                self._destination,
+                err,
+            )
+        finally:
+            self.setup_subdevice()
         # self.wled.enable_realtime_gamma()
         # self.wled.set_inactivity_timeout(self.config.timeout)
         # self.wled.first_universe()

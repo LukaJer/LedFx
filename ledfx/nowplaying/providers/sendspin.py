@@ -99,20 +99,25 @@ class SendspinNowPlayingProvider:
             artwork_url=self._artwork_url,
         )
 
-        # Forward to Now Playing Service
+        # Forward to Now Playing Service on the main event loop thread
+        loop = getattr(self._ledfx, "loop", None)
+        if loop is not None and not loop.is_closed():
+            loop.call_soon_threadsafe(self._apply_metadata, track_metadata)
+        else:
+            self._apply_metadata(track_metadata)
+
+    def _apply_metadata(self, track_metadata: TrackMetadata) -> None:
         now_playing = getattr(self._ledfx, "now_playing", None)
         if now_playing is None:
             return
         now_playing.set_metadata(SOURCE_ID, track_metadata)
 
         # Handle artwork URL changes
-        if (
-            self._artwork_url is not None
-            and self._artwork_url != self._last_artwork_url
-        ):
-            self._last_artwork_url = self._artwork_url
-            now_playing.set_artwork_url(SOURCE_ID, self._artwork_url)
-        elif self._artwork_url is None and self._last_artwork_url is not None:
+        artwork_url = track_metadata.artwork_url
+        if artwork_url is not None and artwork_url != self._last_artwork_url:
+            self._last_artwork_url = artwork_url
+            now_playing.set_artwork_url(SOURCE_ID, artwork_url)
+        elif artwork_url is None and self._last_artwork_url is not None:
             # Artwork cleared by server
             self._last_artwork_url = None
             now_playing.clear_artwork(SOURCE_ID)

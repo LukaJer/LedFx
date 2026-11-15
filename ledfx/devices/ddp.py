@@ -83,5 +83,6 @@ class DDPDevice(NativePacketDevice):
                     self.connection_warning = True
                     self._online = False
                     event = True
+                self.trigger_reconnect()
         if event:
             self._ledfx.events.fire_event(DevicesUpdatedEvent(self.id))

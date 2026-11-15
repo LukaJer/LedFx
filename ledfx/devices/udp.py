@@ -12,6 +12,7 @@ from ledfx.configuration.fields import X_REQUIRED, OneOf
 from ledfx.configuration.plugin import TypedConfig
 from ledfx.devices import NetworkedDevice
 from ledfx.devices.native_packet import NativePacketDevice
+from ledfx.events import DevicesUpdatedEvent
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,6 +72,10 @@ class UDPRealtimeDevice(NativePacketDevice):
         "refresh_rate",
     )
 
+    def __init__(self, ledfx, config):
+        super().__init__(ledfx, config)
+        self.connection_warning = False
+
     @override
     def _validate_configuration(self) -> None:
         if not 1 <= self.config.pixel_count <= 65536:
@@ -95,6 +100,25 @@ class UDPRealtimeDevice(NativePacketDevice):
 
     @override
     def flush(self, data: NDArray[np.generic]) -> None:
+        event = False
         with self.device_lock:
-            if isinstance(self._sender, UDPRealtimeSender):
+            if not isinstance(self._sender, UDPRealtimeSender):
+                return
+            try:
                 self._sender.send(data, now=time.monotonic())
+                if self.connection_warning:
+                    _LOGGER.info("UDP connection to %s re-established.", self.name)
+                    self.connection_warning = False
+                    self._online = True
+                    event = True
+            except OSError as error:
+                if not self.connection_warning:
+                    _LOGGER.warning(
+                        "Error in UDP connection to %s: %s", self.name, error
+                    )
+                    self.connection_warning = True
+                    self._online = False
+                    event = True
+                self.trigger_reconnect()
+        if event:
+            self._ledfx.events.fire_event(DevicesUpdatedEvent(self.id))

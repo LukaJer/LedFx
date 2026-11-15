@@ -949,25 +949,30 @@ class AudioInputSource:
 
     def subscribe(self, callback):
         """Registers a callback with the input source"""
-        self._callbacks.append(callback)
-        if len(self._callbacks) > 0 and not AudioInputSource._audio_stream_active:
+        with self.lock:
+            self._callbacks.append(callback)
+            should_activate = (
+                len(self._callbacks) > 0 and not AudioInputSource._audio_stream_active
+            )
+            if self._timer is not None:
+                self._timer.cancel()
+                self._timer = None
+        if should_activate:
             self.activate()
-        if self._timer is not None:
-            self._timer.cancel()
-            self._timer = None
 
     def unsubscribe(self, callback):
         """Unregisters a callback with the input source"""
-        if callback in self._callbacks:
-            self._callbacks.remove(callback)
-        if (
-            len(self._callbacks) <= self._subscriber_threshold
-            and AudioInputSource._audio_stream_active
-        ):
-            if self._timer is not None:
-                self._timer.cancel()
-            self._timer = threading.Timer(5.0, self.check_and_deactivate)
-            self._timer.start()
+        with self.lock:
+            if callback in self._callbacks:
+                self._callbacks.remove(callback)
+            if (
+                len(self._callbacks) <= self._subscriber_threshold
+                and AudioInputSource._audio_stream_active
+            ):
+                if self._timer is not None:
+                    self._timer.cancel()
+                self._timer = threading.Timer(5.0, self.check_and_deactivate)
+                self._timer.start()
 
     def check_and_deactivate(self):
         if self._timer is not None:
@@ -1072,7 +1077,9 @@ class AudioInputSource:
 
     def _invoke_callbacks(self):
         """Notifies all clients of the new data"""
-        for callback in self._callbacks:
+        with self.lock:
+            callbacks = list(self._callbacks)
+        for callback in callbacks:
             callback()
 
     def _invalidate_caches(self):
@@ -1085,6 +1092,9 @@ class AudioInputSource:
         should be done here. Everything else should be deferred until
         queried by an effect.
         """
+        # Copy read-only buffers (e.g. bytes views) before in-place NaN cleanup.
+        if not self._raw_audio_sample.flags.writeable:
+            self._raw_audio_sample = self._raw_audio_sample.copy()
         # clean up nans that have been mysteriously appearing..
         self._raw_audio_sample[np.isnan(self._raw_audio_sample)] = 0
 

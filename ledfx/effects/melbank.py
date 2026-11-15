@@ -308,7 +308,7 @@ class Melbank:
             "matt_mel",
         ):
             coeffs = self.filterbank.get_coeffs()
-            coeffs /= np.max(coeffs, axis=-1)[:, None]
+            coeffs /= np.maximum(np.max(coeffs, axis=-1)[:, None], 1e-6)
             self.filterbank.set_coeffs(coeffs)
 
         # Find the indexes for each of the frequency ranges
@@ -344,7 +344,8 @@ class Melbank:
         )
 
         self.mel_gain.update(np.max(fast_blur_array(filter_banks, sigma=1.0)))
-        filter_banks /= self.mel_gain.value
+        gain = max(float(self.mel_gain.value), 1e-6)
+        filter_banks /= gain
         filter_banks[:] = self.mel_smoothing.update(filter_banks)
 
         self.common_filter.update(filter_banks)

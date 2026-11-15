@@ -573,7 +573,7 @@ async def resolve_destination(loop, executor, destination, port=7777, timeout=3)
 
     Returns:
         On success: string containing the resolved IP address.
-        On failure: boolean false.
+        Raises ValueError on failure.
     """
     try:
         ipaddress.ip_address(destination)
@@ -581,16 +581,24 @@ async def resolve_destination(loop, executor, destination, port=7777, timeout=3)
 
     except ValueError:
         cleaned_dest = destination.rstrip(".")
-        try:
-            dest = await loop.run_in_executor(
-                executor, socket.gethostbyname, cleaned_dest
-            )
-            _LOGGER.debug("Resolved %s to %s", cleaned_dest, dest)
-            return dest
-            # dest = await loop.getaddrinfo(cleaned_dest, port)
-            # return dest[0][4][0]
-        except socket.gaierror:
-            raise ValueError(f"Failed to resolve destination {cleaned_dest}")
+        attempts = 2 if cleaned_dest.endswith(".local") else 1
+        for attempt in range(attempts):
+            try:
+                dest = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        executor, socket.gethostbyname, cleaned_dest
+                    ),
+                    timeout=timeout,
+                )
+                _LOGGER.debug("Resolved %s to %s", cleaned_dest, dest)
+                return dest
+            except (socket.gaierror, TimeoutError):
+                if attempt + 1 < attempts:
+                    await asyncio.sleep(0.25)
+                    continue
+                raise ValueError(
+                    f"Failed to resolve destination {cleaned_dest}"
+                ) from None
 
 
 def read_ledfx_dotenv():

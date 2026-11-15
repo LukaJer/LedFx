@@ -194,49 +194,56 @@ class Device(BaseRegistry):
         return self._online
 
     def update_pixels(self, virtual_id, data):
-        # update each segment from this virtual
-        if not self._active:
-            _LOGGER.warning("Cannot update pixels of inactive device %s", self.name)
-            return
+        frame = None
+        should_flush = False
+        with self.lock:
+            # update each segment from this virtual
+            if not self._active or self._pixels is None:
+                _LOGGER.warning(
+                    "Cannot update pixels of inactive device %s", self.name
+                )
+                return
 
-        for item in data:
-            if len(item) == 2:
-                # New scatter mode: (pixels, dst_indices)
-                pixels, dst_indices = item
-                if pixels.shape[0] != 0:
-                    try:
-                        self._pixels[dst_indices] = pixels
-                    except (IndexError, ValueError, TypeError) as e:
-                        _LOGGER.warning(
-                            "Device %s: scatter assignment failed - "
-                            "dst_indices shape: %s, "
-                            "pixels shape: %s, error: %s",
-                            self.name,
-                            np.shape(dst_indices),
-                            pixels.shape,
-                            e,
-                        )
+            for item in data:
+                if len(item) == 2:
+                    # New scatter mode: (pixels, dst_indices)
+                    pixels, dst_indices = item
+                    if pixels.shape[0] != 0:
+                        try:
+                            self._pixels[dst_indices] = pixels
+                        except (IndexError, ValueError, TypeError) as e:
+                            _LOGGER.warning(
+                                "Device %s: scatter assignment failed - "
+                                "dst_indices shape: %s, "
+                                "pixels shape: %s, error: %s",
+                                self.name,
+                                np.shape(dst_indices),
+                                pixels.shape,
+                                e,
+                            )
+                else:
+                    # Legacy range mode: (pixels, start, end)
+                    pixels, start, end = item
+                    # protect against an empty race condition
+                    if pixels.shape[0] != 0 and (
+                        np.shape(pixels) == (3,)
+                        or np.shape(self._pixels[start : end + 1]) == np.shape(pixels)
+                    ):
+                        self._pixels[start : end + 1] = pixels
+
+            # Only the priority virtual should flush to prevent multiple virtuals
+            # from fighting over the device buffer
+            if self.priority_virtual:
+                if virtual_id == self.priority_virtual.id:
+                    # Priority virtual flushes after all virtuals have updated their pixels
+                    frame = self.assemble_frame()
+                    should_flush = True
             else:
-                # Legacy range mode: (pixels, start, end)
-                pixels, start, end = item
-                # protect against an empty race condition
-                if pixels.shape[0] != 0 and (
-                    np.shape(pixels) == (3,)
-                    or np.shape(self._pixels[start : end + 1]) == np.shape(pixels)
-                ):
-                    self._pixels[start : end + 1] = pixels
+                _LOGGER.warning("Flush skipped as %s has no priority_virtual", self.id)
 
-        # Only the priority virtual should flush to prevent multiple virtuals
-        # from fighting over the device buffer
-        if self.priority_virtual:
-            if virtual_id == self.priority_virtual.id:
-                # Priority virtual flushes after all virtuals have updated their pixels
-                frame = self.assemble_frame()
-                self.flush(frame)
-
-                self._ledfx.events.fire_event(DeviceUpdateEvent(self.id, frame))
-        else:
-            _LOGGER.warning("Flush skipped as %s has no priority_virtual", self.id)
+        if should_flush and frame is not None:
+            self.flush(frame)
+            self._ledfx.events.fire_event(DeviceUpdateEvent(self.id, frame))
 
     def assemble_frame(self):
         """
@@ -246,17 +253,19 @@ class Device(BaseRegistry):
         """
         frame = self._pixels
 
-        if self.config.center_offset:
+        if frame is not None and self.config.center_offset:
             frame = np.roll(frame, self.config.center_offset, axis=0)
         return frame
 
     def activate(self):
-        self._pixels = np.zeros((self.pixel_count, 3))
-        self._active = True
+        with self.lock:
+            self._pixels = np.zeros((self.pixel_count, 3))
+            self._active = True
 
     def deactivate(self):
-        self._pixels = None
-        self._active = False
+        with self.lock:
+            self._pixels = None
+            self._active = False
         # self.flush(np.zeros((self.pixel_count, 3)))
 
     async def async_shutdown(self) -> None:
@@ -473,18 +482,24 @@ class Device(BaseRegistry):
             self.invalidate_cached_props()
 
     def clear_virtual_segments(self, virtual_id):
-        new_segments = []
-        for segment in self._segments:
-            if segment[0] != virtual_id:
-                new_segments.append(segment)
-            else:
-                if self._pixels is not None and self._ledfx.config.flush_on_deactivate:
-                    # A scalar fill: the buffer may already be resized to a
-                    # pixel count the old segment no longer fits.
-                    self._pixels[segment[1] : segment[2] + 1] = 0
-        self._segments = new_segments
+        with self.lock:
+            new_segments = []
+            removed = False
+            for segment in self._segments:
+                if segment[0] != virtual_id:
+                    new_segments.append(segment)
+                else:
+                    removed = True
+                    if (
+                        self._pixels is not None
+                        and self._ledfx.config.flush_on_deactivate
+                    ):
+                        # A scalar fill: the buffer may already be resized to a
+                        # pixel count the old segment no longer fits.
+                        self._pixels[segment[1] : segment[2] + 1] = 0
+            self._segments = new_segments
 
-        if self.priority_virtual and virtual_id == self.priority_virtual.id:
+        if removed:
             self.invalidate_cached_props()
 
     def clear_segments(self):
