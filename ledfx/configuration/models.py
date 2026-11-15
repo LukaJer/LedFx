@@ -652,6 +652,10 @@ class LedFxConfig(LedFxModel):
     allow_null_origin: bool = Field(
         False, description='Accept browser requests whose Origin is "null"'
     )
+    auto_reconnect_devices: bool = Field(
+        True,
+        description="Automatically retry connecting to offline devices",
+    )
     # Keys older builds only tolerated via ALLOW_EXTRA; not in the legacy schema.
     debug_asyncio: bool = Field(
         False, json_schema_extra={**_RO, X_LEGACY: {"omit": True}}

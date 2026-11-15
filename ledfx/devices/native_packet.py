@@ -104,6 +104,8 @@ class NativePacketDevice(NetworkedDevice):
             )
 
     def _schedule_retry(self, address: str, generation: int) -> None:
+        if not self._ledfx.config.auto_reconnect_devices:
+            return
         loop = self._ledfx.loop
         if loop.is_closed():
             return
@@ -127,6 +129,8 @@ class NativePacketDevice(NetworkedDevice):
 
     def trigger_reconnect(self) -> None:
         """Rate-limited re-resolution when an active sender hits send errors."""
+        if not self._ledfx.config.auto_reconnect_devices:
+            return
         now = time.monotonic()
         with self.device_lock:
             if not self._requested:

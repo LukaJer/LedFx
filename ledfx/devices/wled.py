@@ -174,7 +174,10 @@ class WLEDDevice(NetworkedDevice):
                 if generation == self._generation and address == self.config.ip_address:
                     self._online = False
                     _LOGGER.warning("Device %s: %s", self.name, error)
-                    retry = self._requested
+                    retry = (
+                        self._requested
+                        and self._ledfx.config.auto_reconnect_devices
+                    )
             if retry and not self._ledfx.loop.is_closed():
                 self._ledfx.loop.call_later(
                     NativePacketDevice.RETRY_INTERVAL_SECONDS,

@@ -54,5 +54,6 @@ PERMITTED_KEYS = {
         "allowed_origins",
         "allowed_hosts",
         "allow_null_origin",
+        "auto_reconnect_devices",
     ),
 }

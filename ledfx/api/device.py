@@ -96,7 +96,7 @@ class DeviceEndpoint(RestEndpoint):
             return await self.invalid_request(error_message)
 
         try:
-            if device.type == "wled":
+            if device.type == "wled" or hasattr(device, "resolve_address"):
                 await device.resolve_address()
 
             response = {"status": "success", "virtuals": {}}
