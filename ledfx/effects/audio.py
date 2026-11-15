@@ -11,6 +11,7 @@ import aubio
 import numpy as np
 import samplerate
 import sounddevice as sd
+from numpy.typing import NDArray
 
 import ledfx.api.websocket
 from ledfx.api.websocket import WEB_AUDIO_CLIENTS, WebAudioStream
@@ -31,6 +32,33 @@ from ledfx.sendspin.config import is_always_on as is_sendspin_always_on
 SENDSPIN_SERVERS = {}
 
 _LOGGER = logging.getLogger(__name__)
+
+_LOG_EQ_BAND_FREQS = np.log10(
+    np.array([60.0, 250.0, 1000.0, 4000.0, 12000.0], dtype=np.float64)
+)
+
+
+def _build_eq_curve(config: AudioConfig) -> NDArray[np.float32] | None:
+    """Precompute a zero-latency FFT magnitude gain curve for the 5-band EQ."""
+    if not config.eq_enabled:
+        return None
+    band_dbs = np.array(
+        [
+            config.eq_low,
+            config.eq_low_mid,
+            config.eq_mid,
+            config.eq_high_mid,
+            config.eq_high,
+        ],
+        dtype=np.float64,
+    )
+    if not np.any(band_dbs):
+        return None
+    freqs = np.fft.rfftfreq(config.fft_size, 1.0 / config.mic_rate)
+    log_freqs = np.log10(np.maximum(freqs, 20.0))
+    db_curve = np.interp(log_freqs, _LOG_EQ_BAND_FREQS, band_dbs)
+    return np.power(10.0, db_curve / 20.0).astype(np.float32)
+
 
 MIN_MIDI = 21
 MAX_MIDI = 108
@@ -447,6 +475,7 @@ class AudioInputSource:
         self._has_volume_measurement = False
         # We must not inherit legacy _callbacks from prior instances
         self._callbacks = []
+        self._eq_curve: NDArray[np.float32] | None = None
         self.update_config(config)
 
         def shutdown_event(e):
@@ -585,6 +614,7 @@ class AudioInputSource:
             self.deactivate()
 
         self._config = new_config
+        self._eq_curve = _build_eq_curve(self._config)
         # Resolve device by name if available (handles index drift across restarts)
         self._resolve_device_from_name()
 
@@ -1119,6 +1149,11 @@ class AudioInputSource:
 
             # Pass into the phase vocoder to get a windowed FFT
             self._frequency_domain = self._phase_vocoder(self._processed_audio_sample)
+            eq_curve = self._eq_curve
+            if eq_curve is not None and len(eq_curve) == len(
+                self._frequency_domain.norm
+            ):
+                self._frequency_domain.norm *= eq_curve
         else:
             self._frequency_domain = self._frequency_domain_null
 

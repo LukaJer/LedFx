@@ -130,6 +130,24 @@ class AudioInputConfig(LedFxModel):
         le=5000,
         description="Add a delay to LedFx's output to sync with your audio. Useful for Bluetooth devices which typically have a short audio lag.",
     )
+    eq_enabled: bool = Field(
+        False, description="Enable zero-latency 5-band incoming audio equalizer"
+    )
+    eq_low: CoercedFloat = Field(
+        0.0, ge=-24.0, le=24.0, description="Low band gain in dB (60 Hz)"
+    )
+    eq_low_mid: CoercedFloat = Field(
+        0.0, ge=-24.0, le=24.0, description="Low-mid band gain in dB (250 Hz)"
+    )
+    eq_mid: CoercedFloat = Field(
+        0.0, ge=-24.0, le=24.0, description="Mid band gain in dB (1 kHz)"
+    )
+    eq_high_mid: CoercedFloat = Field(
+        0.0, ge=-24.0, le=24.0, description="High-mid band gain in dB (4 kHz)"
+    )
+    eq_high: CoercedFloat = Field(
+        0.0, ge=-24.0, le=24.0, description="High band gain in dB (12 kHz)"
+    )
 
 
 class AudioAnalysisConfig(LedFxModel):
