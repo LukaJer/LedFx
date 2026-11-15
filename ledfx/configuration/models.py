@@ -437,6 +437,22 @@ class OneshotParams:
             )
 
 
+class LayoutVirtualMapping(LedFxModel):
+    """Segment, row, and grouping mapping for a single virtual in a layout profile."""
+
+    rows: CoercedInt = Field(1, ge=1)
+    grouping: CoercedInt = Field(1, ge=1)
+    segments: list[list[object]] = Field(default_factory=list)
+
+
+class LayoutProfile(LedFxModel):
+    """Named physical arrangement profile remapping logical virtuals."""
+
+    name: str
+    scene_tag: str = ""
+    virtuals: dict[str, LayoutVirtualMapping] = Field(default_factory=dict)
+
+
 @dataclass(frozen=True)
 class Highlight:
     """A device's pixel range (inclusive) to light on a calibrating virtual."""
@@ -656,6 +672,11 @@ class LedFxConfig(LedFxModel):
         True,
         description="Automatically retry connecting to offline devices",
     )
+    layout_profiles: dict[str, LayoutProfile] = Field(
+        dict[str, LayoutProfile](),
+        json_schema_extra=_legacy_type("dict", {}),
+    )
+    active_layout_id: str = ""
     # Keys older builds only tolerated via ALLOW_EXTRA; not in the legacy schema.
     debug_asyncio: bool = Field(
         False, json_schema_extra={**_RO, X_LEGACY: {"omit": True}}

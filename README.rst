@@ -1,152 +1,104 @@
-=====================================================
-   Welcome to LedFx ✨ *Making music come alive!*
-=====================================================
-|Build Status| |License| |Build Status Docs| |Discord|
-|Contributor Covenant|
+==========================================
+LedFx DJ Fork — Live Tube & Audio Control
+==========================================
 
-.. image:: https://raw.githubusercontent.com/LedFx/LedFx/main/ledfx_assets/banner.png
+Custom LedFx fork tailored for live DJ sets with 36-segment RGBW WLED tubes
+(4 segments per side, 9 rings per tube) on Linux and macOS.
 
-What is LedFx?
-----------------
-LedFx makes your LEDs dance to audio!
-What LedFx offers is the ability to take audio input, and instantaneously processes the audio into realtime light show to multiple LED strips/matrix.
-No need to spend hours on end to program one song to program your LEDs, as LedFx will do this all for you!
+Quick Start
+===========
 
-LedFx real-time LED strip music visualization effect controller using is a network based devices (ESP8266/ESP32/Raspberry Pi 4) with support for advanced real-time audio effects! LedFx can control multiple devices and works great with cheap ESP8266/ESP32 nodes allowing for cost effective synchronized effects across your entire house!
+.. code-block:: bash
 
-Ledfx comes with a browser based front end for configuration, control and live visualisation on port 8888 by default.
+   # Install dependencies
+   uv sync --all-extras --dev
 
-| http://localhost:8888
-| http://127.0.0.1:8888
+   # Run LedFx from source
+   uv run ledfx
 
+Once running, open the live DJ controller directly from LedFx (works from any
+laptop, phone, or tablet on the same network with zero CORS/origin setup):
 
-Demos
--------
+- ``http://127.0.0.1:8888/dj`` (or ``/control``)
+- ``http://<your-lan-ip>:8888/dj``
 
-Visit and join our `Discord`_ where community members show off their projects. Check out the #projects or #show-and-tell channels.
+What Was Added
+==============
 
-📑 Quick start guide and documentation📖
-------------------------------------------
+1. Live DJ Controller (``ledfx-control.html`` at ``/dj`` & ``/control``)
+-----------------------------------------------------------------------
 
-Head over to `releases`_ to get the latest releases for Windows and Mac. For linux, use pip.
+Served directly by ``HttpServer`` (``ledfx/http_manager.py``) and auto-connects
+to ``location.host`` over HTTP/WebSocket:
 
-**Bleeding edge (Experimental)**
+- **Stage Layout & Scene Filtering:** 1-click switching between saved physical
+  tube layouts, filtering scenes by ``scene_tags`` (with an **All Scenes**
+  override).
+- **Scenes & Safe Update:** Multi-tube color/gradient previews, active scene
+  highlight, hover breakdown, and **Update Scene** (updates tracked active
+  virtuals while preserving ``ignore`` / ``stop`` / ``forceblack`` actions).
+- **Vibe Macros, Palettes & Palette Lab:** Instant palette + speed + sensitivity
+  macros and custom palette creation.
+- **Global Controls & Hits:** Master Brightness, Speed, Sensitivity, **Blackout**
+  toggle, Tap Tempo, Quantize/Beat modes, Auto-pilot, Strobe Guard,
+  Perform-Lock, and momentary **Hits** (``/api/virtuals_tools``).
+- **Collapsible Virtuals & Tube Reconnect:** IDE-style collapsible Virtuals list,
+  **Auto-Connect ON/OFF** toggle, and manual **Connect Offline** buttons.
+- **Keyboard Shortcuts:** ``1``–``9`` (scenes), ``B`` (blackout), ``T`` (tap
+  tempo), ``E`` (EQ & Spectrum tab), ``M`` (Main tab).
 
-If you want the absolute bleeding edge and are not afraid of using the terminal, take a look at the detailed installation instructions here: `Installation documentation`_.
+2. Zero-Latency 5-Band Incoming Audio EQ & Spectrum Analyzer
+------------------------------------------------------------
 
-**Documentation**
+- **Backend (``ledfx/effects/audio.py``, ``ledfx/configuration/models.py``):**
+  5-band frequency-domain EQ (``60 Hz``, ``250 Hz``, ``1 kHz``, ``4 kHz``,
+  ``12 kHz``, ``-24.0`` to ``+24.0 dB``) applied directly to the FFT magnitude
+  spectrum in ``pre_process_audio()`` before melbank and beat analysis—zero
+  added sample-buffer latency.
+- **UI (**EQ & Spectrum** tab):** High-DPI log-frequency spectrum analyzer with
+  decaying peak-hold markers, live EQ response curve overlay, DJ EQ presets
+  (``Flat``, ``Bass Cut``, ``Sub Boost``, ``Scoop``, ``Crisp Highs``), and an
+  audio input device selector (``/api/audio/devices``).
 
-Documentation for the latest release can be found here: `Stable documentation`_
+3. Physical Layout Profiles & Tube Arranger (``/api/layouts``)
+--------------------------------------------------------------
 
-Documentation built against this repository can be found here: `Latest documentation`_
+- **Layout Profiles (``ledfx/api/layouts.py``, ``ledfx/configuration/models.py``):**
+  Named ``layout_profiles`` stored in ``config.json`` (``GET/POST/PUT/DELETE /api/layouts``)
+  capturing ``segments``, ``rows``, ``grouping``, and an optional ``scene_tag``
+  so all logical scenes work across different stage arrangements and tube counts.
+- **Visual Tube Arranger (**Layouts & Tubes** tab):** Include/exclude tubes,
+  reorder (▲/▼), invert direction, set ``rows``, and switch between
+  **Ring-Grouped** (``grouping=4``, 9 rings/tube) and **Full 36px**
+  (``grouping=1`` for spirals/2D effects).
 
+4. Device Auto-Reconnect Toggle & Stability Fixes
+-------------------------------------------------
 
-😍 Show me how to make one!
------------------------------
+- **``auto_reconnect_devices`` (``LedFxConfig``):** Disables automatic
+  background retries for offline WLED / ``NativePacketDevice`` tubes when you
+  only bring a subset of tubes, paired with manual ``POST /api/devices/{id}``
+  reconnect.
+- **WLED / mDNS / Audio / Thread-Safety Fixes:** Timeout-enforced DNS/mDNS
+  resolution with transient ``.local`` retries, safe ``Device._pixels`` locking,
+  ``AudioInputSource._callbacks`` locking, ``Melbank`` NaN-latching guards,
+  read-only audio buffer copy before NaN cleanup, and event-loop marshaling for
+  ``Virtual`` / ``Sendspin`` callbacks.
 
-The below image describes a basic setup - LedFx running on PC, communicating with a WLED Device controlling an LED strip.
+Testing & Project Notes
+=======================
 
-.. image:: https://raw.githubusercontent.com/LedFx/LedFx/main/docs/_static/topology.png
+.. code-block:: bash
 
-.. list-table::
-   :widths: 75 75
-   :header-rows: 1
+   # Run unit tests for fork additions & device/audio fixes
+   .venv/bin/pytest -v --noconftest \
+     tests/test_audio_eq.py \
+     tests/test_layouts.py \
+     tests/test_wled_native_destination.py \
+     tests/test_device_lifecycle_regressions.py \
+     tests/test_device_config_locking.py \
+     tests/test_virtual_clear_effect.py \
+     tests/test_melbank_config.py
 
-   * - Component
-     - Example
-   * - Computer running LedFx
-     - Windows 10, `LedFx.exe`_
-   * - Browser to access the LedFx web interface
-     - Chrome/Edge/Firefox/Safari
-
-       http://127.0.0.1:8888
-   * - Networked device controlling LED Strip
-     - ESP8266 NODEMCU v3 running `WLED`_
-   * - Addressable LED strip
-     - DC5V WS2812B 5 meters 60LED/m IP67
-   * - Power supply for LED Strip and ESP
-     - 5V 10 amps LED Power Supply
-   * - Something to connect the wires together!
-     - Soldering iron/solder
-
-#. **Build your networked LED Strip.**
-      - For most, this is the difficult step. Don't worry! There's guides here and online, and plenty of people able to help on WLED and LedFx Discord.
-      - Follow the `WLED guide to connect the LED strip and ESP together <https://kno.wled.ge/basics/getting-started/>`_.
-      - `Flash WLED to the ESP device <https://kno.wled.ge/basics/install-binary/>`_.
-      - Ensure all WLED devices are powered on, and connected to your Wi-Fi.
-      - Test you can access the WLED web interface from your PC. If so, then you're good to go!
-
-#. **Install LedFx.**
-      - For PC and Mac, see our `releases`_, or see the `installation documentation`_ for more information.
-      - For linux, you can use pip to install ledfx - however you may need to install some dependencies first. See the `installation documentation`_ for more information.
-
-#. **Direct computer audio output to LedFx.**
-      - By default on Windows LedFx will attempt to listen to your system audio.
-      - More information for `Linux and macOS users here <https://ledfx.readthedocs.io/en/latest/settings/directing_audio.html>`_.
-      - Play some music in the background.
-
-#. **Start LedFx.**
-      - With any desired launch options. See `Command Line Options <https://ledfx.readthedocs.io/en/latest/launch.html>`_.
-      - Use --open-ui to open the web interface automatically in your default browser, or navigate to http://127.0.0.1:8888 directly.
-      - Your WLED devices should appear in LedFx, automagically configured and ready to go! 🎆🔥
-      - If not, on the bottom click Home,  -> ``Scan for WLED devices`` button, or click on the big plus sign and ``Add Device`` to add them manually.
-      - If they're still not showing up, make sure they're powered on and properly connected to your WiFi.
-
-#. **Start using effects!**
-      - Click on the device, select an effect eg ``scroll`` under Classic
-      - Your lights should now be reacting realtime to your music! Enjoy the show 🌈
-
-
-🧑‍💻 Join the LedFx Community
-------------------------------
-
-Join the Discord server to discuss everything about LedFx!  |Discord|
-
-To join, click on the Discord button below:
-
-.. image:: https://discordapp.com/api/guilds/469985374052286474/widget.png?style=banner2
-   :width: 30%
-   :target: https://discord.com/invite/xyyHEquZKQ
-
-Contributing
---------------
-Pull requests are welcome. Once tested, contact LedFx developer community on Discord to discuss the next step.
-
-Please read our `Contributing Guidelines <https://ledfx.readthedocs.io/en/latest/contributing.html>`_ for detailed information on contribution expectations, code quality requirements, and community standards.
-
-We expect and require all contributors to read, understand and follow our `Code of Conduct <https://github.com/LedFx/LedFx/blob/main/CODE_OF_CONDUCT.md>`_.
-
-Credits: `Contributors-&-About`_
-
-License
----------
-`GPL-3`_
-
-
-.. _`GPL-3`: https://choosealicense.com/licenses/gpl-3.0/
-.. _`LedFx.exe`: https://github.com/LedFx/LedFx/releases/latest
-.. _`LedFx Guide`: https://ledfx.readthedocs.io/en/latest/index.html
-.. _`WLED`: https://kno.wled.ge
-.. _`releases`: https://github.com/LedFx/LedFx/releases/latest
-.. _`Installation documentation`: https://ledfx.readthedocs.io/en/latest/installing.html
-.. _`Stable documentation`: https://ledfx.readthedocs.io/en/stable/
-.. _`Latest documentation`: https://ledfx.readthedocs.io/en/latest/
-.. _`our website`: https://ledfx.app
-.. _`Discord`: https://discord.gg/xyyHEquZKQ
-.. _`Contributors-&-About`: https://ledfx.app/about/
-.. _`How to: Enable Stereo Mix in Windows 10`: https://thegeekpage.com/stereo-mix/
-
-
-.. |Build Status| image:: https://github.com/LedFx/LedFx/actions/workflows/ci.yml/badge.svg
-   :target: https://github.com/LedFx/LedFx/actions/workflows/ci.yml
-   :alt: Build Status
-.. |Build Status Docs| image:: https://readthedocs.org/projects/ledfx/badge/?version=main
-   :target: https://ledfx.readthedocs.io/
-   :alt: Documentation Status
-.. |License| image:: https://img.shields.io/badge/license-GPL3-blue.svg
-   :alt: License
-.. |Discord| image:: https://img.shields.io/badge/chat-on%20discord-7289da.svg
-   :target: https://discord.gg/xyyHEquZKQ
-   :alt: Discord
-.. |Contributor Covenant| image:: https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg
-   :target: CODE_OF_CONDUCT.md
+- ``AGENTS.md`` — Repo conventions and fork architecture summary.
+- ``BUGS.md`` — Known open issues and resolved bug log.

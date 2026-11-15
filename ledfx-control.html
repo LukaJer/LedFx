@@ -126,6 +126,26 @@
   .section.collapsed h2.fold .tri{transform:rotate(-90deg)}
   .section.collapsed #virtuals{display:none}
   .fold-count{font-weight:400;font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0}
+  .tube-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+  .tube-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;flex-wrap:wrap}
+  .tube-row.excluded{opacity:.48}
+  .tube-row .tube-main{display:flex;align-items:center;gap:10px;min-width:190px}
+  .tube-row .tube-name{font-weight:650;font-size:13px}
+  .tube-badge{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .tube-badge.on{border-color:var(--ok);color:var(--ok)}
+  .tube-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .arr-grid{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px}
+  .arr-grid label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .arr-grid input[type=number]{width:68px;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px;border-radius:8px}
+  .ggrid-palette{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+  .gchip{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer}
+  .gchip.sel{border-color:var(--amber);background:rgba(240,163,54,.14);color:var(--amber)}
+  .gchip.placed{opacity:.55}
+  .stage-grid{display:grid;gap:8px;margin:12px 0;background:#0e1013;border:1px solid var(--line);border-radius:12px;padding:12px;overflow:auto}
+  .gcell{min-height:64px;border:1px dashed var(--line);border-radius:8px;background:var(--panel);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px;cursor:pointer;user-select:none;font-size:12px;text-align:center}
+  .gcell:hover{border-color:var(--amber)}
+  .gcell.filled{border-style:solid;border-color:var(--amber);background:var(--panel2);color:var(--text)}
+  .gcell .gdir{font-size:11px;color:var(--amber);font-weight:700}
 </style>
 </head>
 <body>
@@ -140,7 +160,7 @@
   </div>
 </header>
 
-<nav class="tabs" id="tabs"><button data-t="main" class="on">Main</button><button data-t="eq">EQ &amp; Spectrum</button><button data-t="auto">Auto</button><button data-t="lab">Palette Lab</button><button data-t="diag">Diagnostics</button></nav>
+<nav class="tabs" id="tabs"><button data-t="main" class="on">Main</button><button data-t="eq">EQ &amp; Spectrum</button><button data-t="layout">Layouts &amp; Tubes</button><button data-t="auto">Auto</button><button data-t="lab">Palette Lab</button><button data-t="diag">Diagnostics</button></nav>
 <main>
 <div class="statusbar">
   <div class="stc"><small>Active scene</small><b id="stScene">—</b></div>
@@ -151,11 +171,28 @@
   <div class="stc"><small>Modes</small><b id="stMode" style="font-size:13px">—</b></div>
 </div>
 <div id="pane-main" class="pane">
+  <div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+      <h2 style="margin:0">Stage Layout <span style="text-transform:none;font-weight:400">— remaps virtual segments &amp; filters tagged scenes</span></h2>
+      <span class="status" id="layoutStatus">no layout selected</span>
+    </div>
+    <div class="row2" style="margin:0">
+      <select id="layoutSel" style="min-width:170px"><option value="">No layout active</option></select>
+      <button class="btn" id="applyLayoutBtn">Apply Layout</button>
+      <button class="btn" id="delLayoutBtn" title="Delete selected layout">Delete</button>
+      <input id="layoutNameIn" placeholder="New layout name" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;width:150px">
+      <input id="layoutTagIn" placeholder="scene_tag (opt)" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;width:120px">
+      <button class="btn" id="saveLayoutBtn" title="Snapshot current virtual segments &amp; rows as a layout">Save Current Layout</button>
+    </div>
+  </div>
   <div class="section"><h2>Vibe Macros <span style="text-transform:none;font-weight:400">— palette + speed + sensitivity</span></h2><div class="macros" id="macros"></div></div>
   <div class="section">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
       <h2 style="margin:0">Scenes</h2>
-      <button class="btn" id="updateSceneBtn" title="Snapshot current live virtual effects back into the selected scene">Update Scene</button>
+      <div class="row2" style="margin:0">
+        <button class="tgl" id="allScenesBtn" title="Show scenes from all layout tags">All Scenes</button>
+        <button class="btn" id="updateSceneBtn" title="Snapshot current live virtual effects back into the selected scene">Update Scene</button>
+      </div>
     </div>
     <div class="scenes" id="scenes"><div class="empty">Connect to LedFx to load scenes.</div></div>
   </div>
@@ -273,6 +310,47 @@
     </div>
   </div>
 </div>
+<div id="pane-layout" class="pane" hidden>
+  <div class="section">
+    <h2>Graphical Stage Grid <span style="text-transform:none;font-weight:400">— select a tube, click cells to place, click again to rotate (H/V/flip), right-click to clear</span></h2>
+    <div class="arr-grid">
+      <label>Cols <input type="number" id="gridCols" min="1" max="12" value="5"></label>
+      <label>Rows <input type="number" id="gridRows" min="1" max="12" value="2"></label>
+      <button class="btn" id="gridPre10x1">10×1 Pillars</button>
+      <button class="btn" id="gridPre5x2">5×2 Overhead</button>
+      <button class="btn" id="gridPre2x5">2×5 Stack</button>
+      <button class="btn" id="gridClearBtn">Clear Grid</button>
+      <button class="btn primary" id="gridApplyBtn">Apply Grid to Virtual</button>
+    </div>
+    <div class="ggrid-palette" id="gridPalette"></div>
+    <div class="stage-grid" id="stageGrid"></div>
+    <div class="status" id="gridInfo">Click a tube chip above, then click grid cells to place it.</div>
+  </div>
+  <div class="section">
+    <h2>Tube Arranger <span style="text-transform:none;font-weight:400">— include/exclude, reorder, invert, and ring-group tubes per logical virtual</span></h2>
+    <div class="arr-grid">
+      <label>Target Virtual
+        <select id="arrVirtSel" style="min-width:170px"><option value="">Connect to load virtuals…</option></select>
+      </label>
+      <label>Rows <input type="number" id="arrRows" min="1" max="32" value="1"></label>
+      <label>Tube Mode
+        <select id="arrGrouping">
+          <option value="4">Ring-Grouped (grouping=4 · 9 rings/tube)</option>
+          <option value="1">Full 36px (grouping=1 · spirals/2D)</option>
+        </select>
+      </label>
+      <button class="btn primary" id="arrApplyBtn">Apply to Virtual</button>
+    </div>
+    <div class="row2" style="margin:0">
+      <button class="btn" id="arrPreRow">1×N Row</button>
+      <button class="btn" id="arrPre2x5">2×5 Grid</button>
+      <button class="btn" id="arrIncludeOnline">Include Online Only</button>
+      <button class="btn" id="arrIncludeAll">Include All</button>
+      <button class="btn" id="arrInvertAlt">Snake Invert (Alt)</button>
+    </div>
+    <div class="tube-list" id="arrTubes"><div class="empty">Connect to LedFx to arrange tubes.</div></div>
+  </div>
+</div>
 <div id="pane-diag" class="pane" hidden>
   <div class="section"><h2>Diagnostics</h2>
     <div class="row2"><span class="status" id="diagInfo">—</span><button class="btn" id="resync">Re-sync from LedFx</button></div>
@@ -335,7 +413,7 @@ async function connect(){
     const info = await api('/info');
     setConnected(true); wsSeen=0; connectWS();
     toast(`Connected to ${info.name} ${info.version}`);
-    await Promise.all([loadSchema(), loadScenes(), loadVirtuals(), loadAudioConfig(), loadDevices()]);
+    await Promise.all([loadSchema(), loadLayouts(), loadScenes(), loadVirtuals(), loadAudioConfig(), loadDevices()]);
   }catch(e){
     setConnected(false);
     toast('Could not reach LedFx: ' + e.message, true);
@@ -397,48 +475,150 @@ function syncSceneDisplay(id){
   }
 }
 
+let layoutsCache = {};
+let activeLayoutId = '';
+let showAllScenes = false;
+
+function sceneMatchesLayout(s){
+  if(showAllScenes || !activeLayoutId) return true;
+  const tag = (layoutsCache[activeLayoutId]?.scene_tag || '').trim().toLowerCase();
+  if(!tag) return true;
+  const raw = String(s?.scene_tags || '').trim().toLowerCase();
+  if(!raw) return true;
+  const tags = raw.split(',').map(x=>x.trim()).filter(Boolean);
+  return !tags.length || tags.includes('all') || tags.includes(tag);
+}
+
+function syncLayoutUI(){
+  const sel = $('#layoutSel');
+  if(!sel) return;
+  const entries = Object.entries(layoutsCache);
+  sel.innerHTML = `<option value="">No layout active</option>` + entries.map(([id, p]) =>
+    `<option value="${escHtml(id)}" ${id===activeLayoutId?'selected':''}>${escHtml(p.name || id)}${p.scene_tag?` [${escHtml(p.scene_tag)}]`:''}</option>`
+  ).join('');
+  const cur = layoutsCache[activeLayoutId];
+  $('#layoutStatus').textContent = cur
+    ? `active: ${cur.name}${cur.scene_tag ? ` · tag "${cur.scene_tag}"` : ''}`
+    : `${entries.length} saved layout(s)`;
+}
+
+async function loadLayouts(){
+  try{
+    const data = await api('/layouts');
+    layoutsCache = data.layouts || {};
+    activeLayoutId = data.active_layout_id || '';
+    syncLayoutUI();
+    renderScenes();
+  }catch(e){
+    logCall('loadLayouts: '+e.message, 'GET', 'err', 0);
+  }
+}
+
+$('#applyLayoutBtn').addEventListener('click', async ()=>{
+  const id = $('#layoutSel').value;
+  if(!id){ activeLayoutId=''; syncLayoutUI(); renderScenes(); return; }
+  try{
+    const res = await api('/layouts', {method:'PUT', body:JSON.stringify({id})});
+    activeLayoutId = res.active_layout_id || id;
+    syncLayoutUI();
+    renderScenes();
+    await loadVirtuals();
+    toast(`Layout "${layoutsCache[id]?.name || id}" applied`);
+  }catch(e){
+    toast('Apply layout failed: '+e.message, true);
+  }
+});
+
+$('#saveLayoutBtn').addEventListener('click', async ()=>{
+  const name = $('#layoutNameIn').value.trim();
+  const scene_tag = $('#layoutTagIn').value.trim();
+  if(!name){ toast('Enter a layout name', true); return; }
+  try{
+    const res = await api('/layouts', {method:'POST', body:JSON.stringify({name, scene_tag, snapshot:true})});
+    $('#layoutNameIn').value = '';
+    $('#layoutTagIn').value = '';
+    if(res.layout){
+      layoutsCache[res.layout.id] = res.layout;
+      activeLayoutId = res.layout.id;
+    }
+    await loadLayouts();
+    toast(`Saved layout "${name}"`);
+  }catch(e){
+    toast('Save layout failed: '+e.message, true);
+  }
+});
+
+$('#delLayoutBtn').addEventListener('click', async ()=>{
+  const id = $('#layoutSel').value;
+  if(!id) return;
+  try{
+    await api('/layouts', {method:'DELETE', body:JSON.stringify({id})});
+    if(activeLayoutId === id) activeLayoutId = '';
+    await loadLayouts();
+    toast('Layout deleted');
+  }catch(e){
+    toast('Delete layout failed: '+e.message, true);
+  }
+});
+
+$('#allScenesBtn').addEventListener('click', ()=>{
+  showAllScenes = !showAllScenes;
+  $('#allScenesBtn').classList.toggle('on', showAllScenes);
+  renderScenes();
+});
+
+function renderScenes(){
+  const el = $('#scenes');
+  const allIds = Object.keys(scenesCache);
+  if(!allIds.length){ el.innerHTML = '<div class="empty">No scenes saved in LedFx yet.</div>'; return; }
+  const ids = allIds.filter(id => sceneMatchesLayout(scenesCache[id]));
+  if(!ids.length){
+    el.innerHTML = '<div class="empty">No scenes match this layout tag. Click "All Scenes" to show everything.</div>';
+    return;
+  }
+  const activeIds = ids.filter(id => scenesCache[id]?.active);
+  let chosenActive = null;
+  if(activeIds.includes(lastScene)){
+    chosenActive = lastScene;
+  }else if(activeIds.length){
+    chosenActive = activeIds.sort((a,b)=>{
+      const ca = Object.values(scenesCache[a]?.virtuals||{}).filter(e=>e&&e.type).length;
+      const cb = Object.values(scenesCache[b]?.virtuals||{}).filter(e=>e&&e.type).length;
+      return cb - ca;
+    })[0];
+  }
+  if(chosenActive) syncSceneDisplay(chosenActive);
+  el.innerHTML = ids.map(id => {
+    const s = scenesCache[id];
+    const vEntries = Object.entries(s.virtuals || {});
+    const activeEffs = vEntries.filter(([,eff]) => eff && eff.type);
+    const types = [...new Set(activeEffs.map(([,eff]) => eff.type))];
+    const summary = types.length
+      ? (types.length <= 2 ? types.join(' + ') : `${types[0]} +${types.length - 1}`) + ` · ${activeEffs.length}v`
+      : 'no active effects';
+    const strip = activeEffs.length
+      ? activeEffs.map(([,eff]) => `<span style="${sceneSegmentStyle(eff)}"></span>`).join('')
+      : '<span style="background:var(--panel2);opacity:.4"></span>';
+    const tip = activeEffs.length
+      ? activeEffs.map(([vid, eff]) => `${vid}: ${eff.preset ? `${eff.type} (${eff.preset})` : eff.type}`).join('\n')
+      : 'No active effects in this scene';
+    const isCur = id === chosenActive;
+    return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(id)}" title="${escHtml(tip)}">
+      <div class="scene-head"><span class="scene-name">${escHtml(s.name || id)}</span></div>
+      <div class="scene-meta">${escHtml(summary)}</div>
+      <div class="scene-strip">${strip}</div>
+    </button>`;
+  }).join('');
+  el.querySelectorAll('.scene').forEach(b => b.addEventListener('click', () => activateScene(b.dataset.id)));
+}
+
 async function loadScenes(){
   const el = $('#scenes');
   try{
     const data = await api('/scenes');
     const scenes = data.scenes || data;
     scenesCache = scenes || {};
-    const ids = Object.keys(scenesCache);
-    if(!ids.length){ el.innerHTML = '<div class="empty">No scenes saved in LedFx yet.</div>'; return; }
-    const activeIds = ids.filter(id => scenesCache[id]?.active);
-    let chosenActive = null;
-    if(activeIds.includes(lastScene)){
-      chosenActive = lastScene;
-    }else if(activeIds.length){
-      chosenActive = activeIds.sort((a,b)=>{
-        const ca = Object.values(scenesCache[a]?.virtuals||{}).filter(e=>e&&e.type).length;
-        const cb = Object.values(scenesCache[b]?.virtuals||{}).filter(e=>e&&e.type).length;
-        return cb - ca;
-      })[0];
-    }
-    if(chosenActive) syncSceneDisplay(chosenActive);
-    el.innerHTML = ids.map(id => {
-      const s = scenesCache[id];
-      const vEntries = Object.entries(s.virtuals || {});
-      const activeEffs = vEntries.filter(([,eff]) => eff && eff.type);
-      const types = [...new Set(activeEffs.map(([,eff]) => eff.type))];
-      const summary = types.length
-        ? (types.length <= 2 ? types.join(' + ') : `${types[0]} +${types.length - 1}`) + ` · ${activeEffs.length}v`
-        : 'no active effects';
-      const strip = activeEffs.length
-        ? activeEffs.map(([,eff]) => `<span style="${sceneSegmentStyle(eff)}"></span>`).join('')
-        : '<span style="background:var(--panel2);opacity:.4"></span>';
-      const tip = activeEffs.length
-        ? activeEffs.map(([vid, eff]) => `${vid}: ${eff.preset ? `${eff.type} (${eff.preset})` : eff.type}`).join('\n')
-        : 'No active effects in this scene';
-      const isCur = id === chosenActive;
-      return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(id)}" title="${escHtml(tip)}">
-        <div class="scene-head"><span class="scene-name">${escHtml(s.name || id)}</span></div>
-        <div class="scene-meta">${escHtml(summary)}</div>
-        <div class="scene-strip">${strip}</div>
-      </button>`;
-    }).join('');
-    el.querySelectorAll('.scene').forEach(b => b.addEventListener('click', () => activateScene(b.dataset.id)));
+    renderScenes();
   }catch(e){ el.innerHTML = `<div class="empty">Failed to load scenes: ${e.message}</div>`; }
 }
 
@@ -460,9 +640,30 @@ $('#updateSceneBtn').addEventListener('click', async ()=>{
     toast('Select or activate a scene first', true);
     return;
   }
+  const sceneName = scenesCache[lastScene].name || lastScene;
   try{
-    await api('/scenes', {method:'POST', body: JSON.stringify({id:lastScene, snapshot:true})});
-    toast(`Updated scene "${scenesCache[lastScene].name || lastScene}"`);
+    const existing = scenesCache[lastScene].virtuals || {};
+    const hasTracked = Object.values(existing).some(e => e && (e.type || e.action === 'activate'));
+    if(!hasTracked){
+      await api('/scenes', {method:'POST', body: JSON.stringify({id:lastScene, snapshot:true})});
+    }else{
+      const vData = await api('/virtuals');
+      const liveV = vData.virtuals || {};
+      const merged = {};
+      for(const [vid, oldEntry] of Object.entries(existing)){
+        const act = oldEntry?.action;
+        if(act === 'ignore' || act === 'stop' || act === 'forceblack' || (!act && !oldEntry?.type)){
+          merged[vid] = oldEntry;
+          continue;
+        }
+        const eff = liveV[vid]?.effect;
+        merged[vid] = eff && eff.type
+          ? {action:'activate', type:eff.type, config:eff.config || {}}
+          : {action:'stop'};
+      }
+      await api('/scenes', {method:'POST', body: JSON.stringify({id:lastScene, virtuals:merged})});
+    }
+    toast(`Updated scene "${sceneName}"`);
     await loadScenes();
   }catch(e){
     toast('Update scene failed: ' + e.message, true);
@@ -479,6 +680,7 @@ async function loadVirtuals(){
     if(!ids.length){ el.innerHTML = '<div class="empty">No virtuals configured in LedFx yet.</div>'; return; }
     el.innerHTML = ids.map(id => virtualCard(id, virtuals[id])).join('');
     ids.forEach(id => wireVirtual(id, virtuals[id]));
+    refreshArranger();
   }catch(e){ el.innerHTML = `<div class="empty">Failed to load virtuals: ${e.message}</div>`; }
 }
 
@@ -546,7 +748,7 @@ async function loadEffectSliders(id, card){
       const input = wrap.querySelector('input');
       input.addEventListener('change', async () => {
         try{
-          await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({[key]: Number(input.value)})});
+          await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{[key]: Number(input.value)}})});
           wrap.querySelector('span:last-child').textContent = input.value;
         }catch(err){ toast('Update failed: ' + err.message, true); }
       });
@@ -590,8 +792,8 @@ async function applyPalette(p){
   for(const id of targets()){
     const v = virtualsCache[id];
     if(!v.active) continue;
-    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({gradient})}); ok++; continue; }catch(e){}
-    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({color:p.colors[p.colors.length-1]})}); ok++; }
+    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{gradient}})}); ok++; continue; }catch(e){}
+    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{color:p.colors[p.colors.length-1]}})}); ok++; }
     catch(e){ fail++; }
   }
   toast(fail ? `Palette applied to ${ok} virtual(s), ${fail} effect(s) don't support color` : `${p.name} applied`);
@@ -610,7 +812,7 @@ $('#sensSlider').addEventListener('input', e=>{
 async function setSpeed(val){
   for(const id of targets()){
     if(!virtualsCache[id].active) continue;
-    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({speed:val})}); }catch(e){}
+    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{speed:val}})}); }catch(e){}
   }
 }
 async function setSensitivity(val){
@@ -718,7 +920,7 @@ function connectWS(){
     logCall('subscribe graph_update','WS','sent',0);
     if(wsWasDropped){
       wsWasDropped=false;
-      Promise.all([loadSchema(), loadScenes(), loadVirtuals(), loadAudioConfig(), loadDevices()]).catch(()=>{});
+      Promise.all([loadSchema(), loadLayouts(), loadScenes(), loadVirtuals(), loadAudioConfig(), loadDevices()]).catch(()=>{});
     }
   };
   sock.onmessage=ev=>{
@@ -764,7 +966,7 @@ $('#bpmDn').addEventListener('click',()=>{ if(bpm){bpm--; updateStatus();} });
 $('#bpmUp').addEventListener('click',()=>{ if(bpm){bpm++; updateStatus();} });
 // brightness
 let briT; $('#briSlider').addEventListener('input',e=>{ $('#briVal').textContent=e.target.value+'%'; clearTimeout(briT); briT=setTimeout(async()=>{
-  for(const id of targets()){ if(!virtualsCache[id].active) continue; try{ await api(`/virtuals/${id}/effects`,{method:'PUT',body:JSON.stringify({brightness:e.target.value/100})}); }catch(err){} } },150); });
+  for(const id of targets()){ if(!virtualsCache[id].active) continue; try{ await api(`/virtuals/${id}/effects`,{method:'PUT',body:JSON.stringify({config:{brightness:e.target.value/100}})}); }catch(err){} } },150); });
 // groups
 $('#virtuals').addEventListener('change',e=>{ if(e.target.dataset.role==='group'){ const id=e.target.closest('.vcard').dataset.id; groups[id]=e.target.value; localStorage.setItem('ledfx_groups',JSON.stringify(groups)); } });
 // macros
@@ -880,12 +1082,15 @@ function syncAutoConnBtn(){
   b.textContent = autoReconnectDevices ? 'Auto-Connect ON' : 'Auto-Connect OFF';
 }
 
+let devicesCache = {};
 async function loadDevices(){
   const holder = $('#offlineDevices');
   const btn = $('#connOfflineBtn');
   try{
     const data = await api('/devices');
     const devs = data.devices || {};
+    devicesCache = devs;
+    refreshArranger();
     const offline = Object.entries(devs).filter(([,d]) => d && d.online === false);
     offlineDeviceIds = offline.map(([id]) => id);
     if(btn) btn.textContent = offline.length ? `Connect Offline (${offline.length})` : 'All Tubes Online';
@@ -1183,7 +1388,7 @@ async function toggleBlackout(){
   const bVal = (Number($('#briSlider').value) || 0) / 100;
   for(const id of targets()){
     if(!virtualsCache[id]?.active) continue;
-    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body:JSON.stringify({brightness:bVal})}); }catch(e){}
+    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body:JSON.stringify({config:{brightness:bVal}})}); }catch(e){}
   }
   toast(blackoutOn ? 'Blackout ON' : 'Blackout OFF');
 }
@@ -1205,6 +1410,304 @@ document.addEventListener('keydown', e => {
     document.querySelector('#tabs button[data-t="eq"]')?.click();
   }else if(e.key === 'm' || e.key === 'M'){
     document.querySelector('#tabs button[data-t="main"]')?.click();
+  }
+});
+
+// tube arranger
+let arrState = [];
+function refreshArranger(){
+  const sel = $('#arrVirtSel');
+  if(!sel) return;
+  const prev = sel.value;
+  const entries = Object.entries(virtualsCache).filter(([,v]) => v && !v.is_device);
+  const list = entries.length ? entries : Object.entries(virtualsCache);
+  if(!list.length){
+    sel.innerHTML = '<option value="">No virtuals loaded</option>';
+    return;
+  }
+  sel.innerHTML = list.map(([id, v]) => `<option value="${escHtml(id)}">${escHtml(v.config?.name || id)} (${escHtml(id)})</option>`).join('');
+  sel.value = (prev && virtualsCache[prev]) ? prev : list[0][0];
+  loadArrangerFromVirtual(sel.value);
+  if(typeof renderStageGrid === 'function') renderStageGrid();
+}
+
+function loadArrangerFromVirtual(vid){
+  const v = virtualsCache[vid];
+  if(!v) return;
+  $('#arrRows').value = v.config?.rows || 1;
+  const grp = String(v.config?.grouping || 1);
+  const gSel = $('#arrGrouping');
+  if(![...gSel.options].some(o => o.value === grp)){
+    gSel.insertAdjacentHTML('beforeend', `<option value="${escHtml(grp)}">Custom (grouping=${escHtml(grp)})</option>`);
+  }
+  gSel.value = grp;
+
+  const segs = Array.isArray(v.segments) ? v.segments : [];
+  const seen = new Set();
+  const next = [];
+  segs.forEach(s => {
+    const devId = s[0];
+    if(!devicesCache[devId] || seen.has(devId)) return;
+    seen.add(devId);
+    const d = devicesCache[devId];
+    next.push({
+      deviceId: devId,
+      name: d.config?.name || devId,
+      online: d.online !== false,
+      pixelCount: d.config?.pixel_count || ((Number(s[2]) - Number(s[1]) + 1) || 36),
+      included: true,
+      invert: Boolean(s[3]),
+    });
+  });
+  Object.entries(devicesCache).forEach(([devId, d]) => {
+    if(seen.has(devId)) return;
+    next.push({
+      deviceId: devId,
+      name: d.config?.name || devId,
+      online: d.online !== false,
+      pixelCount: d.config?.pixel_count || 36,
+      included: false,
+      invert: false,
+    });
+  });
+  arrState = next;
+  renderArrangerTubes();
+}
+
+function renderArrangerTubes(){
+  const holder = $('#arrTubes');
+  if(!holder) return;
+  if(!arrState.length){
+    holder.innerHTML = '<div class="empty">No devices loaded yet.</div>';
+    return;
+  }
+  holder.innerHTML = arrState.map((t, i) => `
+    <div class="tube-row ${t.included?'':'excluded'}" data-idx="${i}">
+      <div class="tube-main">
+        <input type="checkbox" data-act="inc" ${t.included?'checked':''}>
+        <span class="tube-name">${escHtml(t.name)}</span>
+        <span class="tube-badge ${t.online?'on':''}">${t.online?'online':'offline'} · ${t.pixelCount}px</span>
+      </div>
+      <div class="tube-controls">
+        <button class="tgl ${t.invert?'on':''}" data-act="inv">${t.invert?'Inverted':'Normal'}</button>
+        <button class="btn" data-act="up" ${i===0?'disabled':''}>&#9650;</button>
+        <button class="btn" data-act="dn" ${i===arrState.length-1?'disabled':''}>&#9660;</button>
+      </div>
+    </div>`).join('');
+}
+
+$('#arrVirtSel').addEventListener('change', e => loadArrangerFromVirtual(e.target.value));
+$('#arrTubes').addEventListener('click', e => {
+  const row = e.target.closest('.tube-row');
+  if(!row) return;
+  const i = Number(row.dataset.idx);
+  const act = e.target.dataset.act;
+  if(!act) return;
+  if(act === 'inc') arrState[i].included = e.target.checked;
+  else if(act === 'inv') arrState[i].invert = !arrState[i].invert;
+  else if(act === 'up' && i > 0){ [arrState[i-1], arrState[i]] = [arrState[i], arrState[i-1]]; }
+  else if(act === 'dn' && i < arrState.length - 1){ [arrState[i], arrState[i+1]] = [arrState[i+1], arrState[i]]; }
+  renderArrangerTubes();
+});
+$('#arrPreRow').addEventListener('click', ()=>{ $('#arrRows').value = 1; });
+$('#arrPre2x5').addEventListener('click', ()=>{ $('#arrRows').value = 2; });
+$('#arrIncludeOnline').addEventListener('click', ()=>{ arrState.forEach(t => t.included = t.online); renderArrangerTubes(); });
+$('#arrIncludeAll').addEventListener('click', ()=>{ arrState.forEach(t => t.included = true); renderArrangerTubes(); });
+$('#arrInvertAlt').addEventListener('click', ()=>{
+  let k = 0;
+  arrState.forEach(t => { if(t.included){ t.invert = (k % 2 === 1); k++; } });
+  renderArrangerTubes();
+});
+
+$('#arrApplyBtn').addEventListener('click', async ()=>{
+  const vid = $('#arrVirtSel').value;
+  if(!vid) return;
+  const chosen = arrState.filter(t => t.included);
+  if(!chosen.length){ toast('Select at least one tube', true); return; }
+  const rows = Math.max(1, Number($('#arrRows').value) || 1);
+  const grouping = Math.max(1, Number($('#arrGrouping').value) || 1);
+  const segments = chosen.map(t => [t.deviceId, 0, Math.max(0, t.pixelCount - 1), t.invert]);
+  try{
+    await api('/virtuals', {method:'POST', body:JSON.stringify({id:vid, config:{rows, grouping}})});
+    await api(`/virtuals/${vid}`, {method:'PUT', body:JSON.stringify({segments})});
+    toast(`Updated "${vid}" (${chosen.length} tubes, rows=${rows}, grouping=${grouping})`);
+    await loadVirtuals();
+  }catch(e){
+    toast('Apply arrangement failed: '+e.message, true);
+  }
+});
+
+// graphical stage grid
+const GRID_DIRS = [
+  {id:'H+', label:'H →', horiz:true,  inv:false},
+  {id:'H-', label:'H ←', horiz:true,  inv:true},
+  {id:'V+', label:'V ↓', horiz:false, inv:false},
+  {id:'V-', label:'V ↑', horiz:false, inv:true},
+];
+let gridCols = 5, gridRows = 2, gridCells = {}, gridBrush = '';
+
+function renderStageGrid(){
+  const pal = $('#gridPalette'), grid = $('#stageGrid');
+  if(!pal || !grid) return;
+  const devs = Object.entries(devicesCache);
+  if(!gridBrush && devs.length) gridBrush = devs[0][0];
+  const placedDevs = new Set(Object.values(gridCells).map(c => c.deviceId));
+  pal.innerHTML = `<button class="gchip ${gridBrush==='__ERASE__'?'sel':''}" data-dev="__ERASE__">Eraser</button>` +
+    devs.map(([id, d]) => `<button class="gchip ${gridBrush===id?'sel':''} ${placedDevs.has(id)?'placed':''}" data-dev="${escHtml(id)}">${escHtml(d.config?.name || id)}</button>`).join('');
+
+  grid.style.gridTemplateColumns = `repeat(${gridCols}, minmax(84px, 1fr))`;
+  let html = '';
+  for(let r=0; r<gridRows; r++){
+    for(let c=0; c<gridCols; c++){
+      const key = `${r},${c}`;
+      const cell = gridCells[key];
+      if(cell){
+        const d = devicesCache[cell.deviceId];
+        const name = d?.config?.name || cell.deviceId;
+        const dir = GRID_DIRS.find(x=>x.id===cell.dir) || GRID_DIRS[0];
+        html += `<div class="gcell filled" data-key="${key}"><span>${escHtml(name)}</span><span class="gdir">${dir.label}</span></div>`;
+      }else{
+        html += `<div class="gcell" data-key="${key}">+</div>`;
+      }
+    }
+  }
+  grid.innerHTML = html;
+  $('#gridInfo').textContent = `${placedDevs.size} tube(s) placed on ${gridCols}×${gridRows} grid`;
+}
+
+$('#gridPalette').addEventListener('click', e => {
+  const btn = e.target.closest('.gchip');
+  if(!btn) return;
+  gridBrush = btn.dataset.dev;
+  renderStageGrid();
+});
+
+$('#stageGrid').addEventListener('click', e => {
+  const cellEl = e.target.closest('.gcell');
+  if(!cellEl) return;
+  const key = cellEl.dataset.key;
+  if(gridBrush === '__ERASE__'){
+    delete gridCells[key];
+  }else if(gridCells[key]){
+    const curIdx = GRID_DIRS.findIndex(x=>x.id===gridCells[key].dir);
+    gridCells[key].dir = GRID_DIRS[(curIdx + 1) % GRID_DIRS.length].id;
+  }else if(gridBrush){
+    for(const [k, v] of Object.entries(gridCells)){
+      if(v.deviceId === gridBrush) delete gridCells[k];
+    }
+    gridCells[key] = {deviceId:gridBrush, dir: gridCols >= 6 && gridRows === 1 ? 'V+' : 'H+'};
+  }
+  renderStageGrid();
+});
+
+$('#stageGrid').addEventListener('contextmenu', e => {
+  const cellEl = e.target.closest('.gcell');
+  if(!cellEl) return;
+  e.preventDefault();
+  delete gridCells[cellEl.dataset.key];
+  renderStageGrid();
+});
+
+function setGridPreset(cols, rows, defaultDir){
+  gridCols = cols; gridRows = rows;
+  $('#gridCols').value = cols; $('#gridRows').value = rows;
+  gridCells = {};
+  const devs = Object.keys(devicesCache);
+  let idx = 0;
+  for(let r=0; r<rows; r++){
+    for(let c=0; c<cols; c++){
+      if(idx < devs.length) gridCells[`${r},${c}`] = {deviceId:devs[idx++], dir:defaultDir};
+    }
+  }
+  renderStageGrid();
+}
+
+$('#gridCols').addEventListener('change', e => { gridCols = Math.max(1, Math.min(12, Number(e.target.value)||1)); renderStageGrid(); });
+$('#gridRows').addEventListener('change', e => { gridRows = Math.max(1, Math.min(12, Number(e.target.value)||1)); renderStageGrid(); });
+$('#gridPre10x1').addEventListener('click', () => setGridPreset(10, 1, 'V+'));
+$('#gridPre5x2').addEventListener('click', () => setGridPreset(5, 2, 'H+'));
+$('#gridPre2x5').addEventListener('click', () => setGridPreset(2, 5, 'H+'));
+$('#gridClearBtn').addEventListener('click', () => { gridCells = {}; renderStageGrid(); });
+
+function buildSegmentsFromStageGrid(grouping){
+  const colW = new Array(gridCols).fill(0);
+  const rowH = new Array(gridRows).fill(0);
+  for(let r=0; r<gridRows; r++){
+    for(let c=0; c<gridCols; c++){
+      const cell = gridCells[`${r},${c}`];
+      if(!cell) continue;
+      const px = devicesCache[cell.deviceId]?.config?.pixel_count || 36;
+      const units = Math.max(1, Math.floor(px / grouping));
+      const dir = GRID_DIRS.find(x=>x.id===cell.dir) || GRID_DIRS[0];
+      const w = dir.horiz ? units : 1;
+      const h = dir.horiz ? 1 : units;
+      colW[c] = Math.max(colW[c], w);
+      rowH[r] = Math.max(rowH[r], h);
+    }
+  }
+  const activeCols = colW.map(w => w || 0);
+  const activeRows = rowH.map(h => h || 0);
+  const totalW = activeCols.reduce((a,b)=>a+b, 0);
+  const totalH = activeRows.reduce((a,b)=>a+b, 0);
+  if(!totalW || !totalH) return null;
+
+  const colX = []; let cx = 0;
+  for(let c=0; c<gridCols; c++){ colX.push(cx); cx += activeCols[c]; }
+  const rowY = []; let ry = 0;
+  for(let r=0; r<gridRows; r++){ rowY.push(ry); ry += activeRows[r]; }
+
+  const canvas = Array.from({length:totalH}, () => new Array(totalW).fill(null));
+  for(let r=0; r<gridRows; r++){
+    for(let c=0; c<gridCols; c++){
+      const cell = gridCells[`${r},${c}`];
+      if(!cell) continue;
+      const px = devicesCache[cell.deviceId]?.config?.pixel_count || 36;
+      const units = Math.max(1, Math.floor(px / grouping));
+      const dir = GRID_DIRS.find(x=>x.id===cell.dir) || GRID_DIRS[0];
+      for(let u=0; u<units; u++){
+        const unitIdx = dir.inv ? (units - 1 - u) : u;
+        const x = colX[c] + (dir.horiz ? u : 0);
+        const y = rowY[r] + (dir.horiz ? 0 : u);
+        if(y < totalH && x < totalW){
+          canvas[y][x] = {dev:cell.deviceId, start:unitIdx*grouping, end:unitIdx*grouping + grouping - 1, inv:dir.inv};
+        }
+      }
+    }
+  }
+
+  const rawRuns = [];
+  for(let y=0; y<totalH; y++){
+    for(let x=0; x<totalW; x++){
+      const p = canvas[y][x];
+      if(!p) continue;
+      const prev = rawRuns[rawRuns.length - 1];
+      if(prev && prev[0] === p.dev && prev[3] === p.inv && (
+        (!p.inv && prev[2] + 1 === p.start) ||
+        (p.inv && prev[1] - 1 === p.end)
+      )){
+        if(!p.inv) prev[2] = p.end;
+        else prev[1] = p.start;
+      }else{
+        rawRuns.push([p.dev, p.start, p.end, p.inv]);
+      }
+    }
+  }
+  return {rows:totalH, segments:rawRuns};
+}
+
+$('#gridApplyBtn').addEventListener('click', async ()=>{
+  const vid = $('#arrVirtSel').value;
+  if(!vid){ toast('Select a target virtual first', true); return; }
+  const grouping = Math.max(1, Number($('#arrGrouping').value) || 1);
+  const built = buildSegmentsFromStageGrid(grouping);
+  if(!built || !built.segments.length){ toast('Place at least one tube on the grid', true); return; }
+  try{
+    await api('/virtuals', {method:'POST', body:JSON.stringify({id:vid, config:{rows:built.rows, grouping}})});
+    await api(`/virtuals/${vid}`, {method:'PUT', body:JSON.stringify({segments:built.segments})});
+    toast(`Grid applied to "${vid}" (${built.rows} rows, ${built.segments.length} segments)`);
+    await loadVirtuals();
+  }catch(e){
+    toast('Apply grid failed: '+e.message, true);
   }
 });
 
