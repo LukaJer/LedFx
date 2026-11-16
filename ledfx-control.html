@@ -43,6 +43,19 @@
   .scene-meta{font-size:11px;font-weight:400;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .scene-strip{display:flex;height:6px;border-radius:3px;overflow:hidden;gap:1px;background:var(--panel2);margin-top:2px}
   .scene-strip span{flex:1;min-width:2px;height:100%}
+  .tag-bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+  .tag-pill{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;text-transform:capitalize}
+  .tag-pill:hover{border-color:var(--amber);color:var(--text)}
+  .tag-pill.on{background:var(--amber);border-color:var(--amber);color:#1a0f02}
+  .scene-tags{display:flex;flex-wrap:wrap;gap:4px}
+  .stag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 6px;border-radius:999px;background:rgba(255,255,255,.07);color:var(--muted)}
+  .stag-chill{background:rgba(56,189,248,.16);color:#7dd3fc}
+  .stag-house{background:rgba(69,212,131,.16);color:#6ee7b7}
+  .stag-dynamic{background:rgba(240,163,54,.18);color:#fcd34d}
+  .stag-trippy{background:rgba(168,85,247,.20);color:#d8b4fe}
+  .scene-tag-edit{font-size:11px;line-height:1;padding:2px 5px;border-radius:5px;color:var(--muted);opacity:.45;cursor:pointer;flex:none}
+  .scene:hover .scene-tag-edit{opacity:1}
+  .scene-tag-edit:hover{background:rgba(255,255,255,.12);color:var(--amber)}
   .empty{color:var(--muted);font-size:13px;padding:18px;border:1px dashed var(--line);border-radius:10px}
   .virtuals{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
   .vcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
@@ -643,6 +656,36 @@ function extractSceneColors(s){
   return cols.length ? cols : null;
 }
 
+const deckTagFilter = {};
+function getSceneTags(s){
+  if(!s || !s.scene_tags) return [];
+  return String(s.scene_tags).split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+}
+function renderTagBadges(tags){
+  if(!tags.length) return '';
+  return `<div class="scene-tags">${tags.map(t => `<span class="stag stag-${escHtml(t)}">${escHtml(t)}</span>`).join('')}</div>`;
+}
+function applyDeckTagFilter(card, tag){
+  card.querySelectorAll('.tag-bar .tag-pill').forEach(b => b.classList.toggle('on', (b.dataset.tag || '') === tag));
+  card.querySelectorAll('.lprev-scenes .scene').forEach(btn => {
+    const tags = (btn.dataset.tags || '').split(',').filter(Boolean);
+    btn.hidden = !!(tag && !tags.includes(tag));
+  });
+}
+async function editSceneTags(sid){
+  const s = scenesCache[sid];
+  if(!s) return;
+  const cur = getSceneTags(s).join(', ');
+  const input = prompt(`Edit tags for "${s.name || sid}" (comma-separated, e.g. chill, house, dynamic, trippy):`, cur);
+  if(input === null) return;
+  const cleaned = [...new Set(input.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))].join(',');
+  try{
+    await api('/scenes', {method:'POST', body: JSON.stringify({id: sid, scene_tags: cleaned})});
+    s.scene_tags = cleaned;
+    renderScenes();
+    toast(cleaned ? `Tags saved: ${cleaned}` : 'Tags cleared');
+  }catch(e){ toast('Failed to save tags: ' + e.message, true); }
+}
 function syncSceneDisplay(id){
   const s = scenesCache[id];
   const label = s?.name || id;
@@ -671,15 +714,14 @@ function sceneMatchesLayoutFor(s, lid){
   const tag = (layout.scene_tag || '').trim().toLowerCase();
   const raw = String(s?.scene_tags || '').trim().toLowerCase();
   const tags = raw ? raw.split(',').map(x=>x.trim()).filter(Boolean) : [];
-  if(tags.length){
-    if(tags.includes('all')) return true;
-    if(tag) return tags.includes(tag);
-  }
+  if(tags.includes('all')) return true;
   const layoutVirts = new Set(Object.keys(layout.virtuals || {}));
-  if(!layoutVirts.size) return !tag;
   const sceneVirts = Object.entries(s?.virtuals || {}).filter(([,e]) => e && e.type).map(([vid]) => vid);
-  if(!sceneVirts.length) return !tag;
-  return sceneVirts.some(vid => layoutVirts.has(vid));
+  if(layoutVirts.size && sceneVirts.length){
+    return sceneVirts.some(vid => layoutVirts.has(vid));
+  }
+  if(tag) return tags.includes(tag);
+  return !layoutVirts.size && !sceneVirts.length;
 }
 
 function sceneMatchesLayout(s){
@@ -1039,13 +1081,22 @@ function renderScenes(){
       ? activeEffs.map(([vid, eff]) => `${vid}: ${eff.preset ? `${eff.type} (${eff.preset})` : eff.type}`).join('\n')
       : 'No active effects in this scene';
     const isCur = id === chosenActive;
-    return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(id)}" title="${escHtml(tip)}">
-      <div class="scene-head"><span class="scene-name">${escHtml(s.name || id)}</span></div>
+    const tags = getSceneTags(s);
+    return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(id)}" data-tags="${escHtml(tags.join(','))}" title="${escHtml(tip)}">
+      <div class="scene-head"><span class="scene-name">${escHtml(s.name || id)}</span><span class="scene-tag-edit" data-edit-tags="${escHtml(id)}" title="Edit tags (or right-click)">&#9998;</span></div>
       <div class="scene-meta">${escHtml(summary)}</div>
+      ${renderTagBadges(tags)}
       <div class="scene-strip">${strip}</div>
     </button>`;
   }).join('');
-  el.querySelectorAll('.scene').forEach(b => b.addEventListener('click', () => activateScene(b.dataset.id)));
+  el.querySelectorAll('.scene').forEach(b => {
+    b.addEventListener('click', e => {
+      const ed = e.target.closest('[data-edit-tags]');
+      if(ed){ e.stopPropagation(); editSceneTags(ed.dataset.editTags); return; }
+      activateScene(b.dataset.id);
+    });
+    b.addEventListener('contextmenu', e => { e.preventDefault(); editSceneTags(b.dataset.id); });
+  });
   multiPreviewKey = '';
   if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
 }
@@ -1537,23 +1588,29 @@ function decodeVisPixels(px){
   if(typeof px === 'string'){
     try{
       const bin = atob(px);
-      const n = Math.floor(bin.length / 3);
-      const out = new Array(n);
-      for(let i = 0; i < n; i++){
-        const o = i * 3;
-        out[i] = [bin.charCodeAt(o), bin.charCodeAt(o + 1), bin.charCodeAt(o + 2)];
-      }
+      const n3 = Math.floor(bin.length / 3) * 3;
+      const out = new Uint8Array(n3);
+      for(let i = 0; i < n3; i++) out[i] = bin.charCodeAt(i);
       return out;
     }catch(e){ return null; }
   }
   if(Array.isArray(px)){
     if(px.length === 3 && Array.isArray(px[0]) && px[0].length !== 3){
       const n = px[0].length;
-      const out = new Array(n);
-      for(let i = 0; i < n; i++) out[i] = [px[0][i], px[1][i], px[2][i]];
+      const out = new Uint8Array(n * 3);
+      for(let i = 0; i < n; i++){
+        const o = i * 3;
+        out[o] = px[0][i]; out[o + 1] = px[1][i]; out[o + 2] = px[2][i];
+      }
       return out;
     }
-    return px;
+    const n = px.length;
+    const out = new Uint8Array(n * 3);
+    for(let i = 0; i < n; i++){
+      const p = px[i], o = i * 3;
+      if(p){ out[o] = p[0] || 0; out[o + 1] = p[1] || 0; out[o + 2] = p[2] || 0; }
+    }
+    return out;
   }
   return null;
 }
@@ -1625,10 +1682,15 @@ function connectWS(){
     }
   };
 }
+let lastEnergyWidth = '', lastAudioText = '';
+const eFillEl = $('#eFill'), stAudioEl = $('#stAudio');
 setInterval(()=>{
+  if(document.hidden) return;
   const on=Date.now()-lastAudio<2000;
-  if($('#eFill')) $('#eFill').style.width=on?Math.min(100,energy*100)+'%':'0%';
-  if($('#stAudio')) $('#stAudio').textContent=on?'live from LedFx':(ws&&ws.readyState===1?'connected, no data':'no stream');
+  const wStr = on ? Math.min(100, Math.round(energy*1000)/10)+'%' : '0%';
+  if(eFillEl && wStr !== lastEnergyWidth){ lastEnergyWidth = wStr; eFillEl.style.width = wStr; }
+  const aTxt = on ? 'live from LedFx' : (ws&&ws.readyState===1 ? 'connected, no data' : 'no stream');
+  if(stAudioEl && aTxt !== lastAudioText){ lastAudioText = aTxt; stAudioEl.textContent = aTxt; }
 },60);
 // segmented controls
 document.querySelectorAll('.seg').forEach(g=>g.addEventListener('click',e=>{
@@ -2189,14 +2251,14 @@ function updateSpectrumData(mel, freqs){
   }
 }
 
-let hdrSpecRaf = 0;
+let hdrSpecRaf = 0, hdrSpecGradW = 0, hdrSpecFillGrad = null, hdrSpecStrokeGrad = null;
 function scheduleHeaderSpectrumDraw(){
-  if(hdrSpecRaf) return;
+  if(hdrSpecRaf || document.hidden) return;
   hdrSpecRaf = requestAnimationFrame(()=>{ hdrSpecRaf = 0; drawHeaderSpectrum(); });
 }
 function drawHeaderSpectrum(){
   const canvas = $('#hdrSpecCanvas');
-  if(!canvas) return;
+  if(!canvas || document.hidden) return;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const cw = canvas.clientWidth || 320;
   const ch = canvas.clientHeight || 40;
@@ -2214,11 +2276,18 @@ function drawHeaderSpectrum(){
   }
   const baseY = ch - 2;
   const maxH = ch - 5;
-  const grad = ctx.createLinearGradient(0, 0, cw, 0);
-  grad.addColorStop(0, 'rgba(69, 212, 131, 0.36)');
-  grad.addColorStop(0.5, 'rgba(240, 163, 54, 0.40)');
-  grad.addColorStop(1, 'rgba(130, 170, 255, 0.36)');
-  ctx.fillStyle = grad;
+  if(hdrSpecGradW !== cw || !hdrSpecFillGrad){
+    hdrSpecGradW = cw;
+    hdrSpecFillGrad = ctx.createLinearGradient(0, 0, cw, 0);
+    hdrSpecFillGrad.addColorStop(0, 'rgba(69, 212, 131, 0.36)');
+    hdrSpecFillGrad.addColorStop(0.5, 'rgba(240, 163, 54, 0.40)');
+    hdrSpecFillGrad.addColorStop(1, 'rgba(130, 170, 255, 0.36)');
+    hdrSpecStrokeGrad = ctx.createLinearGradient(0, 0, cw, 0);
+    hdrSpecStrokeGrad.addColorStop(0, '#45d483');
+    hdrSpecStrokeGrad.addColorStop(0.5, '#f0a336');
+    hdrSpecStrokeGrad.addColorStop(1, '#82aaff');
+  }
+  ctx.fillStyle = hdrSpecFillGrad;
   ctx.beginPath();
   ctx.moveTo(0, baseY);
   for(let i = 0; i < pts; i++){
@@ -2236,11 +2305,7 @@ function drawHeaderSpectrum(){
   ctx.closePath();
   ctx.fill();
 
-  const strokeGrad = ctx.createLinearGradient(0, 0, cw, 0);
-  strokeGrad.addColorStop(0, '#45d483');
-  strokeGrad.addColorStop(0.5, '#f0a336');
-  strokeGrad.addColorStop(1, '#82aaff');
-  ctx.strokeStyle = strokeGrad;
+  ctx.strokeStyle = hdrSpecStrokeGrad;
   ctx.lineWidth = 1.6;
   ctx.beginPath();
   for(let i = 0; i < pts; i++){
@@ -2777,23 +2842,23 @@ if($('#previewLiveBtn')) $('#previewLiveBtn').addEventListener('click', ()=>{
 });
 
 function scheduleTubePreview(){
-  if(previewRaf || !isPreviewVisible()) return;
+  if(previewRaf || document.hidden || !isPreviewVisible()) return;
   previewRaf = requestAnimationFrame(()=>{
     previewRaf = 0;
     drawTubePreview();
   });
 }
 
-let multiPreviewKey = '';
+let multiPreviewKey = '', multiCardRefs = {};
 function drawTubePreview(){
-  if(!isPreviewVisible()) return;
+  if(document.hidden || !isPreviewVisible()) return;
   const singleCanvas = $('#tubePreviewCanvas');
   const multiGrid = $('#multiPreviewGrid');
   const enabledLayouts = Object.entries(layoutsCache).filter(([, p]) => p && p.enabled !== false);
   if(!activeDeckId && enabledLayouts.length && multiGrid && singleCanvas){
     singleCanvas.hidden = true;
     multiGrid.hidden = false;
-    const key = enabledLayouts.map(([id, p]) => `${id}:${p.name}`).join('|') + '::' + Object.keys(scenesCache).join(',');
+    const key = enabledLayouts.map(([id, p]) => `${id}:${p.name}:${p.scene_tag||''}`).join('|') + '::' + Object.keys(scenesCache).map(k => `${k}=${scenesCache[k]?.scene_tags||''}`).join(',');
     if(key !== multiPreviewKey){
       multiPreviewKey = key;
       multiGrid.innerHTML = enabledLayouts.map(([id, p]) => {
@@ -2810,6 +2875,11 @@ function drawTubePreview(){
             return cb - ca;
           })[0];
         }
+        const allTags = [...new Set(zIds.flatMap(sid => getSceneTags(scenesCache[sid])))].sort();
+        const activeTag = allTags.includes(deckTagFilter[id]) ? deckTagFilter[id] : '';
+        const tagBarHtml = allTags.length
+          ? `<div class="tag-bar"><button class="tag-pill ${!activeTag?'on':''}" data-tag="">All</button>${allTags.map(t => `<button class="tag-pill ${activeTag===t?'on':''}" data-tag="${escHtml(t)}">${escHtml(t)}</button>`).join('')}</div>`
+          : '';
         const zHtml = zIds.length
           ? zIds.map(sid => {
               const s = scenesCache[sid];
@@ -2817,7 +2887,9 @@ function drawTubePreview(){
               const segStyles = [...new Set(activeEffs.map(([,eff]) => sceneSegmentStyle(eff)))];
               const strip = segStyles.length ? segStyles.map(st => `<span style="${st}"></span>`).join('') : '<span style="background:var(--panel2);opacity:.4"></span>';
               const isCur = sid === chosenActive;
-              return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(sid)}"><div class="scene-head"><span class="scene-name">${escHtml(s.name || sid)}</span></div><div class="scene-strip">${strip}</div></button>`;
+              const tags = getSceneTags(s);
+              const hide = activeTag && !tags.includes(activeTag);
+              return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(sid)}" data-tags="${escHtml(tags.join(','))}" ${hide?'hidden':''}><div class="scene-head"><span class="scene-name">${escHtml(s.name || sid)}</span><span class="scene-tag-edit" data-edit-tags="${escHtml(sid)}" title="Edit tags (or right-click)">&#9998;</span></div>${renderTagBadges(tags)}<div class="scene-strip">${strip}</div></button>`;
             }).join('')
           : '<span class="status">No scenes for this layout</span>';
         const dc = getDeckCycle(id);
@@ -2840,6 +2912,7 @@ function drawTubePreview(){
           </div>
           <canvas data-open-tab title="Click to open ${escHtml(p.name || id)} tab"></canvas>
           <div class="lprev-sub">Scenes</div>
+          ${tagBarHtml}
           <div class="lprev-scenes">${zHtml}</div>
           <div class="lprev-sub">Palette</div>
           <div class="lprev-pal">${palHtml}</div>
@@ -2871,16 +2944,32 @@ function drawTubePreview(){
           <div class="lprev-hits">${hitsHtml}</div>
         </div>`;
       }).join('');
+      multiCardRefs = {};
       multiGrid.querySelectorAll('.lprev-card').forEach(card => {
         const deckId = card.dataset.deck;
+        multiCardRefs[deckId] = {
+          canvas: card.querySelector('canvas'),
+          meta: card.querySelector('[data-meta]'),
+        };
         card.querySelectorAll('[data-open-tab]').forEach(el => el.addEventListener('click', () => {
           const tabBtn = [...document.querySelectorAll('#tabs button[data-t="main"]')].find(b => (b.dataset.deck || '') === deckId);
           if(tabBtn) tabBtn.click();
         }));
-        card.querySelectorAll('.lprev-scenes .scene').forEach(btn => btn.addEventListener('click', e => {
+        card.querySelectorAll('.tag-bar .tag-pill').forEach(tb => tb.addEventListener('click', e => {
           e.stopPropagation();
-          activateScene(btn.dataset.id, deckId);
+          const tag = tb.dataset.tag || '';
+          deckTagFilter[deckId] = tag;
+          applyDeckTagFilter(card, tag);
         }));
+        card.querySelectorAll('.lprev-scenes .scene').forEach(btn => {
+          btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const ed = e.target.closest('[data-edit-tags]');
+            if(ed){ editSceneTags(ed.dataset.editTags); return; }
+            activateScene(btn.dataset.id, deckId);
+          });
+          btn.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); editSceneTags(btn.dataset.id); });
+        });
         card.querySelectorAll('.lprev-pal .swatch').forEach(sw => sw.addEventListener('click', e => {
           e.stopPropagation();
           if(e.target.closest('.cyc-pick')) return;
@@ -2953,9 +3042,9 @@ function drawTubePreview(){
     const meta = $('#previewMeta');
     if(meta) meta.textContent = `${enabledLayouts.length} layout(s) · click a preview to open tab`;
     enabledLayouts.forEach(([id, p]) => {
-      const card = [...multiGrid.querySelectorAll('.lprev-card')].find(c => c.dataset.deck === id);
-      if(!card) return;
-      renderTubeCanvas(card.querySelector('canvas'), card.querySelector('[data-meta]'), p);
+      const ref = multiCardRefs[id];
+      if(!ref) return;
+      renderTubeCanvas(ref.canvas, ref.meta, p);
     });
     return;
   }
@@ -2996,15 +3085,18 @@ function renderTubeCanvas(canvas, meta, deckLayout){
     return;
   }
 
+  const now = performance.now();
+  const orderedVirtuals = viewMode === 'real' ? null : Object.entries(virtualsCache).sort((a, b) => {
+    const dt = (virtualFrameAt[b[0]] || 0) - (virtualFrameAt[a[0]] || 0);
+    if(Math.abs(dt) > 500) return dt;
+    return (b[1]?.active ? 1 : 0) - (a[1]?.active ? 1 : 0) || dt;
+  });
+
   function getTubePixelsFromVirtuals(devId, pixelCount){
-    const ordered = Object.entries(virtualsCache).sort((a, b) => {
-      const dt = (virtualFrameAt[b[0]] || 0) - (virtualFrameAt[a[0]] || 0);
-      if(Math.abs(dt) > 500) return dt;
-      return (b[1]?.active ? 1 : 0) - (a[1]?.active ? 1 : 0) || dt;
-    });
-    for(const [vid, virt] of ordered){
+    for(const [vid, virt] of orderedVirtuals){
       const vFrame = virtualFrames[vid];
-      if(!vFrame?.length || (now - (virtualFrameAt[vid] || 0) > 2000) || !Array.isArray(virt?.segments) || !virt.segments.length) continue;
+      const vCount = vFrame ? Math.floor(vFrame.length / 3) : 0;
+      if(!vCount || (now - (virtualFrameAt[vid] || 0) > 2000) || !Array.isArray(virt?.segments) || !virt.segments.length) continue;
       let totalPhys = 0;
       for(const seg of virt.segments) totalPhys += Math.max(0, (Number(seg[2]) || 0) - (Number(seg[1]) || 0) + 1);
       if(!totalPhys) continue;
@@ -3012,36 +3104,41 @@ function renderTubeCanvas(canvas, meta, deckLayout){
       const virtRows = Math.max(1, Number(virt?.config?.rows) || 1);
       const virtCols = totalPhys / virtRows;
       const fRows = Array.isArray(vShape) ? (Number(vShape[0]) || 1) : 1;
-      const fCols = Array.isArray(vShape) ? (Number(vShape[1]) || vFrame.length) : vFrame.length;
-      const use2D = virtRows > 1 && fRows > 1 && fRows * fCols === vFrame.length && totalPhys % virtRows === 0;
+      const fCols = Array.isArray(vShape) ? (Number(vShape[1]) || vCount) : vCount;
+      const use2D = virtRows > 1 && fRows > 1 && fRows * fCols === vCount && totalPhys % virtRows === 0;
       let offset = 0;
       let out = null;
       for(const seg of virt.segments){
         const sDev = seg[0], start = Number(seg[1]) || 0, end = Number(seg[2]) || 0, inv = !!seg[3];
         const segLen = Math.max(0, end - start + 1);
         if(sDev === devId && segLen > 0){
-          if(!out) out = Array.from({length: pixelCount}, () => [20, 20, 32]);
+          if(!out){
+            out = new Uint8Array(pixelCount * 3);
+            for(let p = 0; p < out.length; p += 3){ out[p] = 20; out[p + 1] = 20; out[p + 2] = 32; }
+          }
           for(let k = 0; k < segLen; k++){
             const dst = inv ? (end - k) : (start + k);
             if(dst >= 0 && dst < pixelCount){
+              const doff = dst * 3;
               if(use2D){
                 const vIdx = offset + k;
                 const vr = Math.floor(vIdx / virtCols);
                 const vc = vIdx % virtCols;
                 const fr = Math.min(fRows - 1, Math.max(0, Math.round((vr + 0.5) * fRows / virtRows - 0.5)));
                 const fc = Math.min(fCols - 1, Math.max(0, Math.round((vc + 0.5) * fCols / virtCols - 0.5)));
-                out[dst] = vFrame[fr * fCols + fc];
+                const soff = (fr * fCols + fc) * 3;
+                out[doff] = vFrame[soff];
+                out[doff + 1] = vFrame[soff + 1];
+                out[doff + 2] = vFrame[soff + 2];
               }else{
-                const pos = (offset + k + 0.5) * (vFrame.length / totalPhys) - 0.5;
-                const i0 = Math.max(0, Math.min(vFrame.length - 1, Math.floor(pos)));
-                const i1 = Math.max(0, Math.min(vFrame.length - 1, i0 + 1));
+                const pos = (offset + k + 0.5) * (vCount / totalPhys) - 0.5;
+                const i0 = Math.max(0, Math.min(vCount - 1, Math.floor(pos)));
+                const i1 = Math.max(0, Math.min(vCount - 1, i0 + 1));
                 const t = Math.max(0, Math.min(1, pos - i0));
-                const p0 = vFrame[i0], p1 = vFrame[i1];
-                out[dst] = [
-                  Math.round(p0[0] + (p1[0] - p0[0]) * t),
-                  Math.round(p0[1] + (p1[1] - p0[1]) * t),
-                  Math.round(p0[2] + (p1[2] - p0[2]) * t)
-                ];
+                const s0 = i0 * 3, s1 = i1 * 3;
+                out[doff] = (vFrame[s0] + (vFrame[s1] - vFrame[s0]) * t + 0.5) | 0;
+                out[doff + 1] = (vFrame[s0 + 1] + (vFrame[s1 + 1] - vFrame[s0 + 1]) * t + 0.5) | 0;
+                out[doff + 2] = (vFrame[s0 + 2] + (vFrame[s1 + 2] - vFrame[s0 + 2]) * t + 0.5) | 0;
               }
             }
           }
@@ -3053,7 +3150,6 @@ function renderTubeCanvas(canvas, meta, deckLayout){
     return null;
   }
 
-  const now = performance.now();
   let streaming = 0, viaVirt = 0, simVid = '';
   const resolvedPixels = {};
   for(const [id, dev] of devs){
@@ -3122,7 +3218,8 @@ function renderTubeCanvas(canvas, meta, deckLayout){
     const sy = padY + gr * (slotH + gapY);
     const online = dev?.online !== false;
     const pixels = resolvedPixels[id];
-    const n = pixels?.length || dev?.config?.pixel_count || 36;
+    const pCount = pixels ? Math.floor(pixels.length / 3) : 0;
+    const n = pCount || dev?.config?.pixel_count || 36;
     const sides = (n >= 4 && n % 4 === 0) ? 4 : 1;
     const segsPerSide = Math.max(1, Math.floor(n / sides));
     const horiz = !!dir.horiz;
@@ -3155,18 +3252,26 @@ function renderTubeCanvas(canvas, meta, deckLayout){
     // 4x9 (or 9x4 horizontal) segment matrix
     const segGapX = cellW >= 5 ? 1 : 0.4;
     const segGapY = cellH >= 5 ? 1 : 0.4;
+    const drawW = Math.max(1, cellW - segGapX);
+    const drawH = Math.max(1, cellH - segGapY);
+    let lastRgb = -1;
     for(let s = 0; s < sides; s++){
       for(let k = 0; k < segsPerSide; k++){
         const idx = s * segsPerSide + k;
-        const px = pixels?.[idx];
-        const cr = px ? px[0] : 24;
-        const cg = px ? px[1] : 24;
-        const cb = px ? px[2] : 38;
+        let cr = 24, cg = 24, cb = 38;
+        if(idx < pCount){
+          const off = idx * 3;
+          cr = pixels[off]; cg = pixels[off + 1]; cb = pixels[off + 2];
+        }
+        const rgb = (cr << 16) | (cg << 8) | cb;
+        if(rgb !== lastRgb){
+          lastRgb = rgb;
+          ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+        }
         const posAlong = dir.inv ? (segsPerSide - 1 - k) : k;
         const mc = horiz ? posAlong : s;
         const mr = horiz ? s : posAlong;
-        ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
-        ctx.fillRect(bx + mc * cellW + segGapX * 0.5, by + mr * cellH + segGapY * 0.5, Math.max(1, cellW - segGapX), Math.max(1, cellH - segGapY));
+        ctx.fillRect(bx + mc * cellW + segGapX * 0.5, by + mr * cellH + segGapY * 0.5, drawW, drawH);
       }
     }
 
@@ -3269,30 +3374,36 @@ function drawLayoutPreview(){
     const stripX = x + 6;
     const stripW = Math.max(12, cellW - 12);
     const frame = visFrames[devId];
+    const fCount = frame ? Math.floor(frame.length / 3) : 0;
+    const vCount = vFrame ? Math.floor(vFrame.length / 3) : 0;
     const count = Math.max(1, end - start + 1);
     const pxW = stripW / count;
+    const drawPxW = Math.max(1, pxW - (pxW > 3 ? 0.6 : 0));
+    let lastRgb = -1;
     for(let k = 0; k < count; k++){
-      let px;
-      if(frame?.length){
+      let cr = 24, cg = 24, cb = 38;
+      if(fCount){
         const srcIdx = inv ? (end - k) : (start + k);
-        px = frame[srcIdx];
-      }else if(vFrame?.length){
-        const pos = (vOffset + k + 0.5) * (vFrame.length / totalPhys) - 0.5;
-        const i0 = Math.max(0, Math.min(vFrame.length - 1, Math.floor(pos)));
-        const i1 = Math.max(0, Math.min(vFrame.length - 1, i0 + 1));
+        if(srcIdx >= 0 && srcIdx < fCount){
+          const off = srcIdx * 3;
+          cr = frame[off]; cg = frame[off + 1]; cb = frame[off + 2];
+        }
+      }else if(vCount){
+        const pos = (vOffset + k + 0.5) * (vCount / totalPhys) - 0.5;
+        const i0 = Math.max(0, Math.min(vCount - 1, Math.floor(pos)));
+        const i1 = Math.max(0, Math.min(vCount - 1, i0 + 1));
         const t = Math.max(0, Math.min(1, pos - i0));
-        const p0 = vFrame[i0], p1 = vFrame[i1];
-        px = [
-          Math.round(p0[0] + (p1[0] - p0[0]) * t),
-          Math.round(p0[1] + (p1[1] - p0[1]) * t),
-          Math.round(p0[2] + (p1[2] - p0[2]) * t)
-        ];
+        const s0 = i0 * 3, s1 = i1 * 3;
+        cr = (vFrame[s0] + (vFrame[s1] - vFrame[s0]) * t + 0.5) | 0;
+        cg = (vFrame[s0 + 1] + (vFrame[s1 + 1] - vFrame[s0 + 1]) * t + 0.5) | 0;
+        cb = (vFrame[s0 + 2] + (vFrame[s1 + 2] - vFrame[s0 + 2]) * t + 0.5) | 0;
       }
-      const cr = px ? px[0] : 24;
-      const cg = px ? px[1] : 24;
-      const cb = px ? px[2] : 38;
-      ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
-      ctx.fillRect(stripX + k * pxW, stripY, Math.max(1, pxW - (pxW > 3 ? 0.6 : 0)), stripH);
+      const rgb = (cr << 16) | (cg << 8) | cb;
+      if(rgb !== lastRgb){
+        lastRgb = rgb;
+        ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+      }
+      ctx.fillRect(stripX + k * pxW, stripY, drawPxW, stripH);
     }
     vOffset += count;
 

@@ -143,6 +143,11 @@ class Bleeper:
         getattr(self, self.render_func)(
             mask_draw, list_plot_coords_top, list_plot_coords_bot
         )
+        if self.mirror:
+            # PIL line/point rounding + even widths bias +0.5px downward;
+            # enforce exact vertical symmetry around the matrix center.
+            arr = np.asarray(mask_image)
+            mask_image = Image.fromarray(np.maximum(arr, arr[::-1]), mode="L")
         return mask_image
 
     def points_render(self, m_draw, list_plot_coords_top, list_plot_coords_bot):
