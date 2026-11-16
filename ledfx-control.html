@@ -36,7 +36,8 @@
   .section h2{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:0 0 14px;font-weight:650}
   .scenes{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px}
   .scene{background:linear-gradient(180deg,#1d222e,#161a24);border:1px solid #303746;border-left:3px solid #4a5368;border-radius:10px;padding:14px 16px;text-align:left;cursor:pointer;color:var(--text);font-size:14px;font-weight:650;position:relative;transition:border-color .15s,background .15s,transform .1s;display:flex;flex-direction:column;gap:6px}
-  .scene:hover{border-color:var(--amber);background:linear-gradient(180deg,#232938,#191e2a)}
+  .scene:hover{border-color:var(--amber);background:linear-gradient(180deg,#232938,#191e2a);z-index:20}
+  .scene[data-fullname]:hover::after{content:attr(data-fullname);position:absolute;left:0;bottom:calc(100% + 6px);background:#0f1219;color:var(--text);border:1px solid var(--amber);border-radius:7px;padding:4px 9px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.55);pointer-events:none;z-index:30}
   .scene:active{transform:scale(.98)}
   .scene-head{display:flex;justify-content:space-between;align-items:center;gap:6px}
   .scene-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1082,7 +1083,7 @@ function renderScenes(){
       : 'No active effects in this scene';
     const isCur = id === chosenActive;
     const tags = getSceneTags(s);
-    return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(id)}" data-tags="${escHtml(tags.join(','))}" title="${escHtml(tip)}">
+    return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(id)}" data-tags="${escHtml(tags.join(','))}" data-fullname="${escHtml(s.name || id)}" title="${escHtml(tip)}">
       <div class="scene-head"><span class="scene-name">${escHtml(s.name || id)}</span><span class="scene-tag-edit" data-edit-tags="${escHtml(id)}" title="Edit tags (or right-click)">&#9998;</span></div>
       <div class="scene-meta">${escHtml(summary)}</div>
       ${renderTagBadges(tags)}
@@ -2889,7 +2890,7 @@ function drawTubePreview(){
               const isCur = sid === chosenActive;
               const tags = getSceneTags(s);
               const hide = activeTag && !tags.includes(activeTag);
-              return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(sid)}" data-tags="${escHtml(tags.join(','))}" ${hide?'hidden':''}><div class="scene-head"><span class="scene-name">${escHtml(s.name || sid)}</span><span class="scene-tag-edit" data-edit-tags="${escHtml(sid)}" title="Edit tags (or right-click)">&#9998;</span></div>${renderTagBadges(tags)}<div class="scene-strip">${strip}</div></button>`;
+              return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(sid)}" data-tags="${escHtml(tags.join(','))}" data-fullname="${escHtml(s.name || sid)}" title="${escHtml(s.name || sid)}" ${hide?'hidden':''}><div class="scene-head"><span class="scene-name">${escHtml(s.name || sid)}</span><span class="scene-tag-edit" data-edit-tags="${escHtml(sid)}" title="Edit tags (or right-click)">&#9998;</span></div>${renderTagBadges(tags)}<div class="scene-strip">${strip}</div></button>`;
             }).join('')
           : '<span class="status">No scenes for this layout</span>';
         const dc = getDeckCycle(id);
