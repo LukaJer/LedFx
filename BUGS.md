@@ -10,6 +10,8 @@ Severity: **M** = medium (real user-visible breakage), **L** = low (edge case / 
   - Review and tune incoming audio auto-gain / `mel_gain` / `volume_threshold` behavior for live DJ levels (prevent pumping during breakdowns, fast attack / controlled release, manual gain/AGC toggle + live readout in the **EQ & Spectrum** tab).
 - **Speed & Sensitivity controls** — `ledfx-control.html` (`#speedSlider`, `#sensSlider`, Vibe Macros, Global target group):
   - Fix and improve how global Speed and Sensitivity map onto heterogeneous effect config schemas (not all effects use the same `speed` / `sensitivity` / `reactivity` keys or ranges, and relative scaling vs. overwriting per-effect values should be handled cleanly).
+- **Separate Palette / Speed / Brightness controls per layer (Main, Background, Flash)** — `ledfx-control.html`:
+  - Provide independent Palette, Speed, and Brightness controls for **Main elements**, **Background** (`background_color`, `background_brightness`, `bg_reactive_*`), and **Flash / Beat** (`beat_flash`, `flash_color`, `strobe_color`, `sparks_color`, `hit_color`), dynamically adapting the UI controls shown based on the active scene effect's schema.
 
 ## Open
 

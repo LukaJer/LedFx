@@ -153,7 +153,7 @@
   .gcell .gdir{font-size:11px;color:var(--amber);font-weight:700}
   .preview-wrap{background:#090a0c;border:1px solid var(--line);border-radius:12px;padding:10px}
   .section.collapsed .preview-wrap{display:none}
-  #tubePreviewCanvas{display:block;width:100%;height:240px;border-radius:8px}
+  #tubePreviewCanvas{display:block;width:100%;height:300px;border-radius:8px}
   .pal-cyc{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
   .pal-cyc select{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:6px 9px;border-radius:8px;font-size:12px}
   .swatch{position:relative}
@@ -169,6 +169,19 @@
   .lab-tuner{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
   .lab-tuner label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px}
   .lab-tuner input[type=range]{width:100%;accent-color:var(--amber)}
+  .multi-previews{display:grid;grid-template-columns:1fr;gap:14px}
+  .lprev-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;transition:border-color .15s}
+  .lprev-card:hover{border-color:var(--amber)}
+  .lprev-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;font-weight:650}
+  .lprev-head .status{font-weight:400}
+  .lprev-card canvas{display:block;width:100%;height:300px;border-radius:6px;background:#07080a}
+  .layout-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+  .layout-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}
+  .layout-card.on{border-color:var(--amber)}
+  .layout-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .layout-card-title{font-weight:650;font-size:14px}
+  .layout-card-tubes{display:flex;flex-wrap:wrap;gap:4px}
+  .layout-pill{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
 </style>
 </head>
 <body>
@@ -183,7 +196,7 @@
   </div>
 </header>
 
-<nav class="tabs" id="tabs"><button data-t="main" class="on">Main</button><button data-t="eq">EQ &amp; Spectrum</button><button data-t="layout">Layouts &amp; Tubes</button><button data-t="auto">Auto</button><button data-t="lab">Palette Lab</button><button data-t="diag">Diagnostics</button></nav>
+<nav class="tabs" id="tabs"><button data-t="main" data-deck="" class="on">Main</button><span id="deckTabs" style="display:contents"></span><button data-t="virtuals">Virtuals</button><button data-t="eq">EQ &amp; Spectrum</button><button data-t="layout">Layouts &amp; Tubes</button><button data-t="auto">Auto</button><button data-t="lab">Palette Lab</button><button data-t="diag">Diagnostics</button></nav>
 <main>
 <div class="statusbar">
   <div class="stc"><small>Active scene</small><b id="stScene">—</b></div>
@@ -196,12 +209,12 @@
 <div id="pane-main" class="pane">
   <div class="section" id="tubePreviewSec">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
-      <h2 class="fold" id="tubePreviewToggle" role="button" tabindex="0" aria-expanded="true" style="margin:0"><span class="tri">&#9662;</span> Live Tube Preview <span class="fold-count" id="previewMeta"></span></h2>
+      <h2 style="margin:0">Live Tube Preview <span class="fold-count" id="previewMeta"></span></h2>
       <button class="tgl on" id="previewLiveBtn">Live</button>
     </div>
-    <div class="preview-wrap"><canvas id="tubePreviewCanvas"></canvas></div>
+    <div class="preview-wrap"><div id="multiPreviewGrid" class="multi-previews" hidden></div><canvas id="tubePreviewCanvas"></canvas></div>
   </div>
-  <div class="deck-grid">
+  <div class="deck-grid" id="deckGridMain" hidden>
     <div class="deck-col">
       <div class="section"><h2>Vibe Macros <span style="text-transform:none;font-weight:400">— palette + speed + sensitivity</span></h2><div class="macros" id="macros"></div></div>
       <div class="section">
@@ -266,6 +279,8 @@
       </div>
     </div>
   </div>
+</div>
+<div id="pane-virtuals" class="pane" hidden>
   <div class="section" id="virtualsSec">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
       <h2 class="fold" id="virtualsToggle" role="button" tabindex="0" aria-expanded="true" style="margin:0"><span class="tri">&#9662;</span> Virtuals <span class="fold-count" id="virtCount"></span></h2>
@@ -397,17 +412,33 @@
 </div>
 <div id="pane-layout" class="pane" hidden>
   <div class="section">
+    <h2>Saved Layouts Overview <span style="text-transform:none;font-weight:400">— activate/deactivate layouts (tubes cannot belong to two active layouts)</span></h2>
+    <div class="layout-cards" id="layoutsOverview"><div class="empty">Connect to LedFx to load layouts.</div></div>
+  </div>
+  <div class="section">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
       <h2 style="margin:0">Stage Layout <span style="text-transform:none;font-weight:400">— remaps virtual segments &amp; filters tagged scenes</span></h2>
       <span class="status" id="layoutStatus">no layout selected</span>
     </div>
-    <div class="row2" style="margin:0">
-      <select id="layoutSel" style="min-width:170px"><option value="">No layout active</option></select>
+    <div class="row2" style="margin:0 0 10px">
+      <select id="layoutSel" style="min-width:170px"><option value="">No layout selected</option></select>
+      <button class="btn" id="newLayoutBtn" title="Create a new layout profile">+ New</button>
       <button class="btn" id="applyLayoutBtn">Apply Layout</button>
       <button class="btn" id="delLayoutBtn" title="Delete selected layout">Delete</button>
-      <input id="layoutNameIn" placeholder="New layout name" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;width:150px">
+      <input id="layoutNameIn" placeholder="Layout name" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;width:150px">
       <input id="layoutTagIn" placeholder="scene_tag (opt)" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;width:120px">
-      <button class="btn" id="saveLayoutBtn" title="Snapshot current virtual segments &amp; rows as a layout">Save Current Layout</button>
+      <label class="status" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="layoutEnabledChk" checked> Main Tab</label>
+      <button class="btn primary" id="saveLayoutBtn" title="Save layout config, tubes, virtuals &amp; stage grid">Save Layout</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px">
+        <div class="status" style="margin-bottom:6px">Tubes in this Layout (empty = all tubes)</div>
+        <div class="ggrid-palette" id="layoutDevicesBox" style="margin:0"></div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px">
+        <div class="status" style="margin-bottom:6px">Virtuals in this Layout (empty = all virtuals)</div>
+        <div class="ggrid-palette" id="layoutVirtualsBox" style="margin:0"></div>
+      </div>
     </div>
   </div>
   <div class="section" id="layoutPreviewSec">
@@ -529,7 +560,7 @@ async function connect(){
 let effectsSchema = {};
 async function loadSchema(){
   try{
-    const s = await api('/schema/effects');
+    const s = await api('/schema');
     effectsSchema = s.effects || s.schema || s || {};
     effectTypes = Object.keys(effectsSchema).filter(k => !['status','effects'].includes(k));
     if(!effectTypes.length) toast('No effect types found — check console (F12) for the raw schema response', true);
@@ -602,29 +633,229 @@ function syncSceneDisplay(id){
 
 let layoutsCache = {};
 let activeLayoutId = '';
+let activeDeckId = '';
+let layoutEditingId = '';
+let layoutEditDevices = new Set();
+let layoutEditVirtuals = new Set();
 let showAllScenes = false;
 
 function sceneMatchesLayout(s){
-  if(showAllScenes || !activeLayoutId) return true;
-  const tag = (layoutsCache[activeLayoutId]?.scene_tag || '').trim().toLowerCase();
-  if(!tag) return true;
+  const lid = activeDeckId || activeLayoutId;
+  if(showAllScenes || !lid) return true;
+  const layout = layoutsCache[lid];
+  if(!layout) return true;
+  const tag = (layout.scene_tag || '').trim().toLowerCase();
   const raw = String(s?.scene_tags || '').trim().toLowerCase();
-  if(!raw) return true;
-  const tags = raw.split(',').map(x=>x.trim()).filter(Boolean);
-  return !tags.length || tags.includes('all') || tags.includes(tag);
+  const tags = raw ? raw.split(',').map(x=>x.trim()).filter(Boolean) : [];
+  if(tags.length){
+    if(tags.includes('all')) return true;
+    if(tag) return tags.includes(tag);
+  }
+  const layoutVirts = new Set(Object.keys(layout.virtuals || {}));
+  if(!layoutVirts.size) return !tag;
+  const sceneVirts = Object.entries(s?.virtuals || {}).filter(([,e]) => e && e.type).map(([vid]) => vid);
+  if(!sceneVirts.length) return !tag;
+  return sceneVirts.some(vid => layoutVirts.has(vid));
+}
+
+function getLayoutDevices(p){
+  if(!p) return [];
+  if(Array.isArray(p.devices) && p.devices.length) return p.devices;
+  if(p.grid_cells && typeof p.grid_cells === 'object'){
+    return [...new Set(Object.values(p.grid_cells).map(c => c?.deviceId).filter(Boolean))];
+  }
+  return [];
+}
+
+function getUsedActiveDevices(excludeLayoutId){
+  const used = new Map();
+  for(const [id, p] of Object.entries(layoutsCache)){
+    if(!p || p.enabled === false || id === excludeLayoutId) continue;
+    for(const did of getLayoutDevices(p)){
+      if(!used.has(did)) used.set(did, p.name || id);
+    }
+  }
+  return used;
+}
+
+function findLayoutTubeConflict(layoutId, devIds){
+  const used = getUsedActiveDevices(layoutId);
+  for(const did of devIds){
+    if(used.has(did)) return { devId: did, layoutName: used.get(did) };
+  }
+  return null;
+}
+
+function renderDeckTabs(){
+  const holder = $('#deckTabs');
+  if(!holder) return;
+  const enabled = Object.entries(layoutsCache).filter(([, p]) => p && p.enabled !== false);
+  holder.innerHTML = enabled.map(([id, p]) =>
+    `<button data-t="main" data-deck="${escHtml(id)}">${escHtml(p.name || id)}</button>`
+  ).join('');
+  if(activeDeckId && (!layoutsCache[activeDeckId] || layoutsCache[activeDeckId].enabled === false)) activeDeckId = '';
+  const mainVisible = !$('#pane-main').hidden;
+  document.querySelectorAll('#tabs button[data-t="main"]').forEach(b => {
+    b.classList.toggle('on', mainVisible && (b.dataset.deck || '') === activeDeckId);
+  });
+  const deckGrid = $('#deckGridMain');
+  if(deckGrid) deckGrid.hidden = !activeDeckId;
+}
+
+function renderLayoutsOverview(){
+  const box = $('#layoutsOverview');
+  if(!box) return;
+  const entries = Object.entries(layoutsCache);
+  if(!entries.length){
+    box.innerHTML = '<div class="empty">No saved layouts yet. Configure one below and click Save Layout.</div>';
+    return;
+  }
+  box.innerHTML = entries.map(([id, p]) => {
+    const active = p.enabled !== false;
+    const devs = getLayoutDevices(p);
+    const vCount = Object.keys(p.virtuals || {}).length;
+    const conflict = !active ? findLayoutTubeConflict(id, devs) : null;
+    const pills = devs.length
+      ? devs.map(did => `<span class="layout-pill">${escHtml(devicesCache[did]?.config?.name || did)}</span>`).join('')
+      : '<span class="layout-pill">no tubes assigned</span>';
+    return `
+      <div class="layout-card ${active?'on':''}">
+        <div class="layout-card-head">
+          <div>
+            <div class="layout-card-title">${escHtml(p.name || id)}</div>
+            <div class="status">${p.scene_tag ? `tag: ${escHtml(p.scene_tag)} · ` : ''}${devs.length} tube(s) · ${vCount} virtual(s)</div>
+          </div>
+          <button class="tgl ${active?'on':''}" data-ltog="${escHtml(id)}" ${conflict ? `title="Conflict: ${escHtml(conflict.devId)} is active in ${escHtml(conflict.layoutName)}"` : ''}>${active ? 'Active' : 'Inactive'}</button>
+        </div>
+        <div class="layout-card-tubes">${pills}</div>
+        ${conflict ? `<div class="status" style="color:var(--warn)">Blocked: ${escHtml(devicesCache[conflict.devId]?.config?.name || conflict.devId)} active in "${escHtml(conflict.layoutName)}"</div>` : ''}
+        <div class="row2" style="margin:2px 0 0">
+          <button class="btn" data-ledit="${escHtml(id)}" style="padding:5px 10px;font-size:12px">Edit</button>
+          <button class="btn" data-lapply="${escHtml(id)}" style="padding:5px 10px;font-size:12px">Apply</button>
+          <button class="btn" data-ldel="${escHtml(id)}" style="padding:5px 10px;font-size:12px">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+  box.querySelectorAll('[data-ltog]').forEach(b => b.addEventListener('click', async () => {
+    const id = b.dataset.ltog, p = layoutsCache[id];
+    if(!p) return;
+    const nextEnabled = p.enabled === false;
+    if(nextEnabled){
+      const conflict = findLayoutTubeConflict(id, getLayoutDevices(p));
+      if(conflict){
+        const dName = devicesCache[conflict.devId]?.config?.name || conflict.devId;
+        toast(`Cannot activate "${p.name}": ${dName} is already active in "${conflict.layoutName}"`, true);
+        return;
+      }
+    }
+    try{
+      await api('/layouts', {method:'POST', body:JSON.stringify({id, enabled: nextEnabled, snapshot: false})});
+      if(!nextEnabled && activeDeckId === id) activeDeckId = '';
+      await loadLayouts();
+      toast(`${p.name} ${nextEnabled ? 'activated' : 'deactivated'}`);
+    }catch(e){ toast('Toggle layout failed: '+e.message, true); }
+  }));
+  box.querySelectorAll('[data-ledit]').forEach(b => b.addEventListener('click', () => {
+    loadLayoutIntoEditor(b.dataset.ledit);
+    if($('#layoutSel')) $('#layoutSel').value = b.dataset.ledit;
+    toast(`Editing "${layoutsCache[b.dataset.ledit]?.name || b.dataset.ledit}"`);
+  }));
+  box.querySelectorAll('[data-lapply]').forEach(b => b.addEventListener('click', async () => {
+    const id = b.dataset.lapply;
+    try{
+      const res = await api('/layouts', {method:'PUT', body:JSON.stringify({id})});
+      activeLayoutId = res.active_layout_id || id;
+      syncLayoutUI(); renderScenes(); await loadVirtuals();
+      toast(`Layout "${layoutsCache[id]?.name || id}" applied`);
+    }catch(e){ toast('Apply layout failed: '+e.message, true); }
+  }));
+  box.querySelectorAll('[data-ldel]').forEach(b => b.addEventListener('click', async () => {
+    const id = b.dataset.ldel;
+    try{
+      await api('/layouts', {method:'DELETE', body:JSON.stringify({id})});
+      if(activeLayoutId === id) activeLayoutId = '';
+      if(activeDeckId === id) activeDeckId = '';
+      if(layoutEditingId === id) loadLayoutIntoEditor('');
+      await loadLayouts();
+      toast('Layout deleted');
+    }catch(e){ toast('Delete layout failed: '+e.message, true); }
+  }));
+}
+
+function renderLayoutEditorBoxes(){
+  const devBox = $('#layoutDevicesBox'), virtBox = $('#layoutVirtualsBox');
+  if(devBox){
+    const used = getUsedActiveDevices(layoutEditingId);
+    const allTubes = typeof getTubeDevices === 'function' ? getTubeDevices() : Object.entries(devicesCache);
+    const tubes = allTubes.filter(([id]) => !used.has(id) || layoutEditDevices.has(id));
+    devBox.innerHTML = tubes.length
+      ? tubes.map(([id, d]) => `<button type="button" class="gchip ${layoutEditDevices.has(id)?'sel':''}" data-ldev="${escHtml(id)}">${escHtml(d.config?.name || id)}</button>`).join('')
+      : '<span class="status">All tubes are already assigned to active layouts</span>';
+    devBox.querySelectorAll('[data-ldev]').forEach(b => b.addEventListener('click', () => {
+      const id = b.dataset.ldev;
+      if(layoutEditDevices.has(id)) layoutEditDevices.delete(id);
+      else layoutEditDevices.add(id);
+      renderLayoutEditorBoxes();
+    }));
+  }
+  if(virtBox){
+    const virts = Object.entries(virtualsCache).filter(([, v]) => v && !v.is_device);
+    virtBox.innerHTML = virts.length
+      ? virts.map(([id, v]) => `<button type="button" class="gchip ${layoutEditVirtuals.has(id)?'sel':''}" data-lvirt="${escHtml(id)}">${escHtml(v.config?.name || id)}</button>`).join('')
+      : '<span class="status">No virtuals loaded</span>';
+    virtBox.querySelectorAll('[data-lvirt]').forEach(b => b.addEventListener('click', () => {
+      const id = b.dataset.lvirt;
+      if(layoutEditVirtuals.has(id)) layoutEditVirtuals.delete(id);
+      else layoutEditVirtuals.add(id);
+      renderLayoutEditorBoxes();
+    }));
+  }
+}
+
+function loadLayoutIntoEditor(id){
+  layoutEditingId = id || '';
+  const p = layoutsCache[id];
+  if(!p){
+    $('#layoutNameIn').value = '';
+    $('#layoutTagIn').value = '';
+    if($('#layoutEnabledChk')) $('#layoutEnabledChk').checked = true;
+    layoutEditDevices = new Set();
+    layoutEditVirtuals = new Set();
+    renderLayoutEditorBoxes();
+    return;
+  }
+  $('#layoutNameIn').value = p.name || id;
+  $('#layoutTagIn').value = p.scene_tag || '';
+  if($('#layoutEnabledChk')) $('#layoutEnabledChk').checked = p.enabled !== false;
+  layoutEditDevices = new Set(Array.isArray(p.devices) ? p.devices : []);
+  layoutEditVirtuals = new Set(Object.keys(p.virtuals || {}));
+  renderLayoutEditorBoxes();
+  if(p.grid_cols && p.grid_rows && typeof renderStageGrid === 'function'){
+    gridCols = p.grid_cols;
+    gridRows = p.grid_rows;
+    gridCells = (p.grid_cells && typeof p.grid_cells === 'object') ? JSON.parse(JSON.stringify(p.grid_cells)) : {};
+    if($('#gridCols')) $('#gridCols').value = gridCols;
+    if($('#gridRows')) $('#gridRows').value = gridRows;
+    renderStageGrid();
+  }
 }
 
 function syncLayoutUI(){
   const sel = $('#layoutSel');
   if(!sel) return;
   const entries = Object.entries(layoutsCache);
-  sel.innerHTML = `<option value="">No layout active</option>` + entries.map(([id, p]) =>
-    `<option value="${escHtml(id)}" ${id===activeLayoutId?'selected':''}>${escHtml(p.name || id)}${p.scene_tag?` [${escHtml(p.scene_tag)}]`:''}</option>`
+  const curSel = layoutEditingId || activeLayoutId;
+  sel.innerHTML = `<option value="">New / None</option>` + entries.map(([id, p]) =>
+    `<option value="${escHtml(id)}" ${id===curSel?'selected':''}>${escHtml(p.name || id)}${p.scene_tag?` [${escHtml(p.scene_tag)}]`:''}</option>`
   ).join('');
   const cur = layoutsCache[activeLayoutId];
   $('#layoutStatus').textContent = cur
     ? `active: ${cur.name}${cur.scene_tag ? ` · tag "${cur.scene_tag}"` : ''}`
     : `${entries.length} saved layout(s)`;
+  renderDeckTabs();
+  renderLayoutsOverview();
+  renderLayoutEditorBoxes();
+  if(typeof renderStageGrid === 'function') renderStageGrid();
 }
 
 async function loadLayouts(){
@@ -632,12 +863,24 @@ async function loadLayouts(){
     const data = await api('/layouts');
     layoutsCache = data.layouts || {};
     activeLayoutId = data.active_layout_id || '';
+    if(!layoutEditingId && activeLayoutId) loadLayoutIntoEditor(activeLayoutId);
     syncLayoutUI();
     renderScenes();
+    if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
   }catch(e){
     logCall('loadLayouts: '+e.message, 'GET', 'err', 0);
   }
 }
+
+$('#layoutSel')?.addEventListener('change', e => {
+  loadLayoutIntoEditor(e.target.value);
+});
+
+$('#newLayoutBtn')?.addEventListener('click', () => {
+  if($('#layoutSel')) $('#layoutSel').value = '';
+  loadLayoutIntoEditor('');
+  $('#layoutNameIn')?.focus();
+});
 
 $('#applyLayoutBtn').addEventListener('click', async ()=>{
   const id = $('#layoutSel').value;
@@ -658,13 +901,35 @@ $('#saveLayoutBtn').addEventListener('click', async ()=>{
   const name = $('#layoutNameIn').value.trim();
   const scene_tag = $('#layoutTagIn').value.trim();
   if(!name){ toast('Enter a layout name', true); return; }
+  const isEnabled = $('#layoutEnabledChk') ? $('#layoutEnabledChk').checked : true;
+  const placedOnGrid = Object.values(gridCells || {}).map(c => c?.deviceId).filter(Boolean);
+  const devList = layoutEditDevices.size ? [...layoutEditDevices] : [...new Set(placedOnGrid)];
+  if(isEnabled && devList.length){
+    const conflict = findLayoutTubeConflict(layoutEditingId, devList);
+    if(conflict){
+      const dName = devicesCache[conflict.devId]?.config?.name || conflict.devId;
+      toast(`Cannot activate "${name}": ${dName} is already active in "${conflict.layoutName}"`, true);
+      return;
+    }
+  }
+  const payload = {
+    name,
+    scene_tag,
+    enabled: isEnabled,
+    devices: devList,
+    grid_cols: typeof gridCols === 'number' ? gridCols : 5,
+    grid_rows: typeof gridRows === 'number' ? gridRows : 2,
+    grid_cells: typeof gridCells === 'object' ? gridCells : {},
+    snapshot: true,
+  };
+  if(layoutEditingId && layoutsCache[layoutEditingId]) payload.id = layoutEditingId;
+  if(layoutEditVirtuals.size) payload.virtual_ids = [...layoutEditVirtuals];
   try{
-    const res = await api('/layouts', {method:'POST', body:JSON.stringify({name, scene_tag, snapshot:true})});
-    $('#layoutNameIn').value = '';
-    $('#layoutTagIn').value = '';
+    const res = await api('/layouts', {method:'POST', body:JSON.stringify(payload)});
     if(res.layout){
       layoutsCache[res.layout.id] = res.layout;
       activeLayoutId = res.layout.id;
+      layoutEditingId = res.layout.id;
     }
     await loadLayouts();
     toast(`Saved layout "${name}"`);
@@ -756,7 +1021,7 @@ async function activateScene(id){
   try{
     await api('/scenes', {method:'PUT', body: JSON.stringify({id, action:'activate'})});
     toast('Scene activated');
-    loadVirtuals();
+    await loadVirtuals();
   }catch(e){ toast('Scene failed: ' + e.message, true); }
 }
 
@@ -992,13 +1257,18 @@ async function applyPalette(p, quiet){
   if(quiet && S.lock) return;
   curPalette=p; $('#stPal').textContent=p.name;
   let ok=0, skip=0;
-  for(const id of targets()){
+  const targetIds = targets().filter(id => virtualsCache[id]?.effect?.type);
+  const activeIds = targetIds.filter(id => virtualsCache[id]?.active);
+  const runIds = activeIds.length ? activeIds : targetIds;
+  for(const id of runIds){
     const v = virtualsCache[id];
-    if(!v?.active || !v?.effect?.type) continue;
     const patch = buildColorPatch(v.effect.type, v.effect.config, p.colors, p);
     if(!Object.keys(patch).length){ skip++; continue; }
+    const nextCfg = { ...(v.effect.config || {}), ...patch };
     try{
-      await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})});
+      await api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:v.effect.type, config:nextCfg})});
+      v.effect.config = nextCfg;
+      v.active = true;
       ok++;
     }catch(e){ skip++; }
   }
@@ -1071,7 +1341,7 @@ function buildSensPatch(effType, val){
 async function setSpeed(val){
   for(const id of targets()){
     const v = virtualsCache[id];
-    if(!v?.active || !v?.effect?.type) continue;
+    if(!v?.effect?.type) continue;
     const patch = buildSpeedPatch(v.effect.type, val);
     if(!Object.keys(patch).length) continue;
     try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})}); }catch(e){}
@@ -1082,7 +1352,7 @@ async function setSensitivity(val){
   const jobs = [api('/config', {method:'PUT', body: JSON.stringify({audio:{min_volume}})}).catch(e=>{ toast('Sensitivity update failed: '+e.message, true); })];
   for(const id of targets()){
     const v = virtualsCache[id];
-    if(!v?.active || !v?.effect?.type) continue;
+    if(!v?.effect?.type) continue;
     const patch = buildSensPatch(v.effect.type, val);
     if(Object.keys(patch).length){
       jobs.push(api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})}).catch(()=>{}));
@@ -1164,7 +1434,11 @@ function logCall(path,method,status,ms){
   if(callLog.length>60) callLog.pop();
   const el=$('#log'); if(el && !$('#pane-diag').hidden) el.textContent=callLog.join('\n');
 }
-function targets(){ return Object.keys(virtualsCache).filter(id=>S.target==='All'||groups[id]===S.target); }
+function targets(){
+  const deck = activeDeckId ? layoutsCache[activeDeckId] : null;
+  const deckVirts = deck && deck.virtuals && Object.keys(deck.virtuals).length ? new Set(Object.keys(deck.virtuals)) : null;
+  return Object.keys(virtualsCache).filter(id => (!deckVirts || deckVirts.has(id)) && (S.target==='All' || groups[id]===S.target));
+}
 function guardLock(){ if(S.lock){ toast('Perform-Lock is ON — only hits are active', true); return true; } return false; }
 function quantWait(mode){
   if(mode==='Now'||!bpm) return Promise.resolve();
@@ -1521,12 +1795,15 @@ setInterval(() => {
 }, 50);
 // tabs
 $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.t==='main') activeDeckId = b.dataset.deck || '';
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!=='pane-'+b.dataset.t);
+  const deckGrid = $('#deckGridMain');
+  if(deckGrid && b.dataset.t==='main') deckGrid.hidden = !activeDeckId;
   if(b.dataset.t==='diag') $('#log').textContent=callLog.join('\n')||'no calls yet';
   if(b.dataset.t==='eq') requestAnimationFrame(drawSpectrum);
-  if(b.dataset.t==='main' && typeof scheduleTubePreview === 'function') scheduleTubePreview();
-  if(b.dataset.t==='layout' && typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview(); });
+  if(b.dataset.t==='main'){ renderScenes(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
+  if(b.dataset.t==='layout'){ if(typeof renderLayoutEditorBoxes === 'function') renderLayoutEditorBoxes(); if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview(); } });
 $('#resync').addEventListener('click',()=>connect());
 // collapsible virtuals section
 function setVirtualsCollapsed(collapsed){
@@ -2104,8 +2381,9 @@ function getTubeDevices(){
 function renderStageGrid(){
   const pal = $('#gridPalette'), grid = $('#stageGrid');
   if(!pal || !grid) return;
-  const devs = getTubeDevices();
-  if(!gridBrush && devs.length) gridBrush = devs[0][0];
+  const used = typeof getUsedActiveDevices === 'function' ? getUsedActiveDevices(layoutEditingId) : new Map();
+  const devs = getTubeDevices().filter(([id]) => !used.has(id) || layoutEditDevices.has(id));
+  if((!gridBrush || (gridBrush !== '__ERASE__' && !devs.some(([id]) => id === gridBrush))) && devs.length) gridBrush = devs[0][0];
   const placedDevs = new Set(Object.values(gridCells).map(c => c.deviceId));
   pal.innerHTML = `<button class="gchip ${gridBrush==='__ERASE__'?'sel':''}" data-dev="__ERASE__">Eraser</button>` +
     devs.map(([id, d]) => `<button class="gchip ${gridBrush===id?'sel':''} ${placedDevs.has(id)?'placed':''}" data-dev="${escHtml(id)}">${escHtml(d.config?.name || id)}</button>`).join('');
@@ -2130,6 +2408,7 @@ function renderStageGrid(){
   $('#gridInfo').textContent = `${placedDevs.size} tube(s) placed on ${gridCols}×${gridRows} grid`;
   saveStageGrid();
   if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
+  if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview();
 }
 
 $('#gridPalette').addEventListener('click', e => {
@@ -2270,31 +2549,14 @@ $('#gridApplyBtn').addEventListener('click', async ()=>{
 
 // === LIVE TUBE EFFECT PREVIEW ===
 function isPreviewVisible(){
-  const sec = $('#tubePreviewSec');
   const pane = $('#pane-main');
-  return sec && !sec.classList.contains('collapsed') && pane && !pane.hidden;
+  return pane && !pane.hidden;
 }
 
 function isLayoutPreviewVisible(){
   const pane = $('#pane-layout');
   return pane && !pane.hidden && !!$('#layoutPreviewCanvas');
 }
-
-function setPreviewCollapsed(collapsed){
-  const sec = $('#tubePreviewSec');
-  if(!sec) return;
-  sec.classList.toggle('collapsed', collapsed);
-  try{ localStorage.setItem('ledfx_preview_collapsed', collapsed ? '1' : '0'); }catch(e){}
-  if(!collapsed) scheduleTubePreview();
-}
-
-$('#tubePreviewToggle').addEventListener('click', ()=>{
-  setPreviewCollapsed(!$('#tubePreviewSec').classList.contains('collapsed'));
-});
-
-try{
-  if(localStorage.getItem('ledfx_preview_collapsed') === '1') setPreviewCollapsed(true);
-}catch(e){}
 
 $('#previewLiveBtn').addEventListener('click', ()=>{
   previewLive = !previewLive;
@@ -2314,12 +2576,51 @@ function scheduleTubePreview(){
   });
 }
 
+let multiPreviewKey = '';
 function drawTubePreview(){
-  const canvas = $('#tubePreviewCanvas');
-  if(!canvas || !isPreviewVisible()) return;
+  if(!isPreviewVisible()) return;
+  const singleCanvas = $('#tubePreviewCanvas');
+  const multiGrid = $('#multiPreviewGrid');
+  const enabledLayouts = Object.entries(layoutsCache).filter(([, p]) => p && p.enabled !== false);
+  if(!activeDeckId && enabledLayouts.length && multiGrid && singleCanvas){
+    singleCanvas.hidden = true;
+    multiGrid.hidden = false;
+    const key = enabledLayouts.map(([id, p]) => `${id}:${p.name}`).join('|');
+    if(key !== multiPreviewKey){
+      multiPreviewKey = key;
+      multiGrid.innerHTML = enabledLayouts.map(([id, p]) => `
+        <div class="lprev-card" data-deck="${escHtml(id)}" title="Click to open ${escHtml(p.name || id)} tab">
+          <div class="lprev-head"><span>${escHtml(p.name || id)}</span><span class="status" data-meta></span></div>
+          <canvas></canvas>
+        </div>`).join('');
+      multiGrid.querySelectorAll('.lprev-card').forEach(card => card.addEventListener('click', () => {
+        const deckId = card.dataset.deck;
+        const tabBtn = [...document.querySelectorAll('#tabs button[data-t="main"]')].find(b => (b.dataset.deck || '') === deckId);
+        if(tabBtn) tabBtn.click();
+      }));
+    }
+    const meta = $('#previewMeta');
+    if(meta) meta.textContent = `${enabledLayouts.length} layout(s) · click a preview to open tab`;
+    enabledLayouts.forEach(([id, p]) => {
+      const card = [...multiGrid.querySelectorAll('.lprev-card')].find(c => c.dataset.deck === id);
+      if(!card) return;
+      renderTubeCanvas(card.querySelector('canvas'), card.querySelector('[data-meta]'), p);
+    });
+    return;
+  }
+  if(multiGrid) multiGrid.hidden = true;
+  if(singleCanvas){
+    singleCanvas.hidden = false;
+    const deckLayout = activeDeckId ? layoutsCache[activeDeckId] : null;
+    renderTubeCanvas(singleCanvas, $('#previewMeta'), deckLayout);
+  }
+}
+
+function renderTubeCanvas(canvas, meta, deckLayout){
+  if(!canvas) return;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const w = canvas.clientWidth || 640;
-  const h = canvas.clientHeight || 168;
+  const h = canvas.clientHeight || 180;
   if(canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)){
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
@@ -2328,10 +2629,14 @@ function drawTubePreview(){
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  const devs = getTubeDevices();
-  const meta = $('#previewMeta');
+  let devs = getTubeDevices();
+  if(deckLayout){
+    const allowedList = getLayoutDevices(deckLayout);
+    const allowed = new Set(allowedList);
+    devs = devs.filter(([id]) => allowed.has(id));
+  }
   if(!devs.length){
-    if(meta) meta.textContent = 'no tubes';
+    if(meta) meta.textContent = deckLayout ? 'no tubes assigned' : 'no tubes';
     ctx.fillStyle = '#74748c';
     ctx.font = '12px Inter, system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -2392,13 +2697,13 @@ function drawTubePreview(){
         }
         offset += segLen;
       }
-      if(out) return out;
+      if(out) return { pixels: out, vid };
     }
     return null;
   }
 
   const now = performance.now();
-  let streaming = 0, viaVirt = 0;
+  let streaming = 0, viaVirt = 0, simVid = '';
   const resolvedPixels = {};
   for(const [id, dev] of devs){
     const n = dev?.config?.pixel_count || 36;
@@ -2409,7 +2714,8 @@ function drawTubePreview(){
     }else{
       const fallback = getTubePixelsFromVirtuals(id, n);
       if(fallback){
-        resolvedPixels[id] = fallback;
+        resolvedPixels[id] = fallback.pixels;
+        if(!simVid) simVid = fallback.vid;
         viaVirt++;
       }
     }
@@ -2417,15 +2723,16 @@ function drawTubePreview(){
   if(meta){
     if(!previewLive) meta.textContent = 'paused';
     else if(streaming) meta.textContent = `${streaming}/${devs.length} streaming`;
-    else if(viaVirt) meta.textContent = `${viaVirt}/${devs.length} simulated (tubes offline)`;
+    else if(viaVirt) meta.textContent = `${viaVirt}/${devs.length} simulated (${simVid || 'offline'})`;
     else meta.textContent = `0/${devs.length} streaming`;
   }
 
-  // Build physical layout items from Stage Grid if placed, else 1-row vertical tubes
+  // Build physical layout items from active deck's Stage Grid (or global gridCells) if placed
+  const activeGridCells = (deckLayout && deckLayout.grid_cells && Object.keys(deckLayout.grid_cells).length) ? deckLayout.grid_cells : gridCells;
   const tubeMap = Object.fromEntries(devs);
   const placedItems = [];
   const placedIds = new Set();
-  for(const [key, cell] of Object.entries(gridCells)){
+  for(const [key, cell] of Object.entries(activeGridCells)){
     if(!cell || !tubeMap[cell.deviceId]) continue;
     const [rr, cc] = key.split(',').map(Number);
     const dir = GRID_DIRS.find(x => x.id === cell.dir) || GRID_DIRS[0];
@@ -2470,11 +2777,11 @@ function drawTubePreview(){
     const availW = Math.max(24, slotW - 4);
     const availH = Math.max(24, slotH - labelH - 4);
     const cellW = horiz
-      ? Math.max(4, Math.min(38, availW / matCols))
-      : Math.max(3, Math.min(16, availW / matCols, (availH / matRows) * 0.9));
+      ? Math.max(4, Math.min(56, availW / matCols))
+      : Math.max(3, Math.min(22, availW / matCols, (availH / matRows) * 0.9));
     const cellH = horiz
-      ? Math.max(3, Math.min(14, availH / matRows, cellW * 0.65))
-      : Math.max(4, Math.min(26, availH / matRows));
+      ? Math.max(3, Math.min(18, availH / matRows, cellW * 0.65))
+      : Math.max(4, Math.min(36, availH / matRows));
     const bodyW = cellW * matCols;
     const bodyH = cellH * matRows;
     const bx = Math.round(sx + (slotW - bodyW) / 2);
@@ -2529,6 +2836,18 @@ function scheduleLayoutPreview(){
 function drawLayoutPreview(){
   const canvas = $('#layoutPreviewCanvas');
   if(!canvas || !isLayoutPreviewVisible()) return;
+  const meta = $('#layoutPreviewMeta');
+  if(gridCells && Object.keys(gridCells).length){
+    const placedIds = [...new Set(Object.values(gridCells).map(c => c?.deviceId).filter(Boolean))];
+    const previewLayout = {
+      devices: placedIds,
+      grid_cols: gridCols,
+      grid_rows: gridRows,
+      grid_cells: gridCells,
+    };
+    renderTubeCanvas(canvas, meta, previewLayout);
+    return;
+  }
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const w = canvas.clientWidth || 640;
   const h = canvas.clientHeight || 190;
@@ -2542,7 +2861,6 @@ function drawLayoutPreview(){
 
   const selId = $('#arrVirtSel')?.value || Object.keys(virtualsCache)[0] || '';
   const virt = virtualsCache[selId];
-  const meta = $('#layoutPreviewMeta');
   if(!virt){
     if(meta) meta.textContent = 'no virtual selected';
     ctx.fillStyle = '#74748c';

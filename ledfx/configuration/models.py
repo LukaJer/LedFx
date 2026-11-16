@@ -450,6 +450,11 @@ class LayoutProfile(LedFxModel):
 
     name: str
     scene_tag: str = ""
+    enabled: bool = True
+    devices: list[str] = Field(default_factory=list)
+    grid_cols: int = Field(5, ge=1, le=12)
+    grid_rows: int = Field(2, ge=1, le=12)
+    grid_cells: dict[str, dict[str, str]] = Field(default_factory=dict)
     virtuals: dict[str, LayoutVirtualMapping] = Field(default_factory=dict)
 
 

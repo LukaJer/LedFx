@@ -45,6 +45,12 @@ class LayoutsEndpoint(RestEndpoint):
         raw_id = data.get("id")
         raw_name = data.get("name")
         scene_tag = data.get("scene_tag")
+        enabled = data.get("enabled")
+        devices = data.get("devices")
+        grid_cols = data.get("grid_cols")
+        grid_rows = data.get("grid_rows")
+        grid_cells = data.get("grid_cells")
+        virtual_ids = data.get("virtual_ids")
         virtuals_payload = data.get("virtuals")
         snapshot = data.get("snapshot", virtuals_payload is None)
 
@@ -54,6 +60,18 @@ class LayoutsEndpoint(RestEndpoint):
             return await self.invalid_request('"name" must be a string')
         if scene_tag is not None and not isinstance(scene_tag, str):
             return await self.invalid_request('"scene_tag" must be a string')
+        if enabled is not None and not isinstance(enabled, bool):
+            return await self.invalid_request('"enabled" must be a boolean')
+        if devices is not None and (
+            not isinstance(devices, list)
+            or not all(isinstance(d, str) for d in devices)
+        ):
+            return await self.invalid_request('"devices" must be a list of strings')
+        if virtual_ids is not None and (
+            not isinstance(virtual_ids, list)
+            or not all(isinstance(v, str) for v in virtual_ids)
+        ):
+            return await self.invalid_request('"virtual_ids" must be a list of strings')
 
         if raw_id:
             layout_id = generate_id(raw_id)
@@ -76,17 +94,34 @@ class LayoutsEndpoint(RestEndpoint):
             while layout_id in self._ledfx.config.layout_profiles:
                 layout_id = f"{base_id}-{idx}"
                 idx += 1
-            profile_dict = {
+            profile_dict: dict[str, object] = {
                 "name": raw_name.strip(),
-                "scene_tag": scene_tag.strip() if isinstance(scene_tag, str) else "",
-                "virtuals": {},
+                "scene_tag": (scene_tag or "").strip(),
+                "enabled": True if enabled is None else enabled,
+                "devices": list(devices) if devices is not None else list[str](),
+                "grid_cols": 5,
+                "grid_rows": 2,
+                "grid_cells": dict[str, object](),
+                "virtuals": dict[str, object](),
             }
+
+        if enabled is not None:
+            profile_dict["enabled"] = enabled
+        if devices is not None:
+            profile_dict["devices"] = list(devices)
+        if grid_cols is not None:
+            profile_dict["grid_cols"] = grid_cols
+        if grid_rows is not None:
+            profile_dict["grid_rows"] = grid_rows
+        if grid_cells is not None:
+            profile_dict["grid_cells"] = grid_cells
 
         if snapshot:
             non_device = [
                 v for v in self._ledfx.virtuals.values() if not v.is_device
             ]
             targets = non_device or list(self._ledfx.virtuals.values())
+            selected_vids = set(virtual_ids) if virtual_ids is not None else None
             profile_dict["virtuals"] = {
                 v.id: {
                     "rows": v.config.rows,
@@ -94,6 +129,7 @@ class LayoutsEndpoint(RestEndpoint):
                     "segments": [list(seg) for seg in v.segments],
                 }
                 for v in targets
+                if selected_vids is None or v.id in selected_vids
             }
         elif virtuals_payload is not None:
             if not isinstance(virtuals_payload, dict):
@@ -108,6 +144,8 @@ class LayoutsEndpoint(RestEndpoint):
         self._ledfx.config.layout_profiles[layout_id] = profile
         self._ledfx.config.active_layout_id = layout_id
         self._ledfx.config_store.request_save()
+        if hasattr(self._ledfx.config_store, "save_now"):
+            self._ledfx.config_store.save_now()
         _LOGGER.info("Saved layout profile %s (%s)", layout_id, profile.name)
         return await self.bare_request_success(
             {
@@ -172,6 +210,8 @@ class LayoutsEndpoint(RestEndpoint):
 
         self._ledfx.config.active_layout_id = layout_id
         self._ledfx.config_store.request_save()
+        if hasattr(self._ledfx.config_store, "save_now"):
+            self._ledfx.config_store.save_now()
         _LOGGER.info(
             "Applied layout %s (applied=%d, skipped=%d)",
             layout_id,
@@ -208,6 +248,8 @@ class LayoutsEndpoint(RestEndpoint):
         if self._ledfx.config.active_layout_id == layout_id:
             self._ledfx.config.active_layout_id = ""
         self._ledfx.config_store.request_save()
+        if hasattr(self._ledfx.config_store, "save_now"):
+            self._ledfx.config_store.save_now()
         return await self.request_success(
             type="success", message=f"Deleted layout '{layout_id}'"
         )

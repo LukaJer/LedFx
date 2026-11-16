@@ -35,6 +35,7 @@ class TubePistonEffect(TubeEffectBase):
 
     @override
     def config_updated(self, config: object) -> None:
+        super().config_updated(config)
         self._spark_color = parse_color(self.config.sparkle_color)
 
     @override

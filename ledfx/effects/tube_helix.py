@@ -45,11 +45,11 @@ class TubeHelixEffect(TubeEffectBase):
         segs = np.arange(self._segs, dtype=np.float64)[None, None, :] / max(
             1, self._segs
         )
-        tubes = np.arange(self._n_tubes, dtype=np.float64)[:, None, None] * 0.25
+        tubes = self._tube_phase_offsets()[:, None, None] * 0.25
 
         angle = (sides + segs * float(self.config.twist) + tubes - self._phase) * (
             2.0 * np.pi
         )
         wave = 0.5 + 0.5 * np.cos(angle)
-        amp = 0.35 + 0.65 * min(1.0, self._low * (0.6 + float(self.config.reactivity)))
+        amp = 0.5 + 0.5 * min(1.0, self._low * (0.6 + float(self.config.reactivity)))
         self._render_grid((wave**2.2) * amp)

@@ -26,7 +26,7 @@ class TubeLighthouseEffect(TubeEffectBase):
         boost = 1.0 + float(self.config.reactivity) * self._mid * 2.0
         self._phase += dt * float(self.config.speed) * boost
 
-        tubes = np.arange(self._n_tubes, dtype=np.float64)[:, None, None]
+        tubes = self._tube_phase_offsets()[:, None, None]
         sides = np.arange(self._sides, dtype=np.float64)[None, :, None]
         target = (self._phase + tubes * float(self.config.spread)) % max(
             1, self._sides
@@ -34,6 +34,6 @@ class TubeLighthouseEffect(TubeEffectBase):
         diff = np.abs(sides - target)
         circ = np.minimum(diff, self._sides - diff)
         beam = np.clip(1.0 - circ / 1.15, 0.0, 1.0) ** 2.0
-        amp = 0.25 + 0.75 * min(1.0, max(self._low, self._mid) + 0.15)
+        amp = 0.45 + 0.55 * min(1.0, max(self._low, self._mid) + 0.15)
         grid = np.broadcast_to(beam * amp, self._grid.shape).copy()
         self._render_grid(grid)

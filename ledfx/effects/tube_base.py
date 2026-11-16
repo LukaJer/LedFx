@@ -28,6 +28,15 @@ class TubeEffectBase(AudioReactiveEffect, GradientEffect):
         decay: CoercedFloat = Field(
             0.78, description="Trail / envelope persistence", ge=0.1, le=0.98
         )
+        mirror: bool = Field(
+            True, description="Mirror colors and phases symmetrically across tubes"
+        )
+        color_by_intensity: bool = Field(
+            False, description="Map pixel brightness to gradient instead of spatial gradient"
+        )
+        beat_flash: CoercedFloat = Field(
+            0.0, description="Brightness flash / pump on beat transients", ge=0.0, le=1.0
+        )
 
     config = TypedConfig(Config)
 
@@ -37,6 +46,7 @@ class TubeEffectBase(AudioReactiveEffect, GradientEffect):
         self._mid = 0.0
         self._high = 0.0
         self._onset = False
+        self._flash = 0.0
         self._last_time = time.monotonic()
         self._phase = 0.0
         self._grid = np.zeros(
@@ -68,6 +78,17 @@ class TubeEffectBase(AudioReactiveEffect, GradientEffect):
         self._high = max(high, self._high * decay)
         if data.onset():  # type: ignore[attr-defined]
             self._onset = True
+            self._flash = 1.0
+
+    def _tube_phase_offsets(self) -> np.ndarray:
+        idx = np.arange(self._n_tubes, dtype=np.float64)
+        if not self.config.mirror or self._n_tubes <= 1:
+            return idx
+        if self._n_tubes == 6:
+            # 2x3 physical rig: pair top/bottom columns (00<->03, 01<->04, 02<->05)
+            return idx % 3.0
+        mid = (self._n_tubes - 1) / 2.0
+        return np.abs(idx - mid)
 
     def _render_grid(self, intensity: np.ndarray) -> None:
         flat = np.clip(intensity.reshape(-1), 0.0, 1.0)
@@ -76,4 +97,36 @@ class TubeEffectBase(AudioReactiveEffect, GradientEffect):
             n = min(len(flat), self.pixel_count)
             out[:n] = flat[:n]
             flat = out
-        self.pixels = self.apply_gradient(flat)
+        flash_amt = float(self.config.beat_flash) * self._flash
+        self._flash *= 0.84
+        if flash_amt > 0.005:
+            flat = np.clip(flat + (1.0 - flat) * (flash_amt * 0.65), 0.0, 1.0)
+        if self.config.color_by_intensity:
+            self._assert_gradient()
+            cols = self.get_gradient_color_vectorized1d(flat)
+            self.pixels = cols * flat[:, None]
+            self.roll_gradient()
+        elif self.config.mirror and self._n_tubes > 1:
+            self._assert_gradient()
+            per_tube = max(1, self.pixel_count // self._n_tubes)
+            pos = np.zeros(self.pixel_count, dtype=np.float64)
+            offsets = self._tube_phase_offsets()
+            span = 1.0 / max(1.0, float(np.max(offsets)) + 1.0)
+            for t in range(self._n_tubes):
+                s = t * per_tube
+                e = min(self.pixel_count, s + per_tube)
+                start_pos = float(offsets[t]) * span
+                pos[s:e] = np.clip(
+                    np.linspace(start_pos, start_pos + span, e - s, endpoint=False),
+                    0.0,
+                    1.0,
+                )
+            cols = self.get_gradient_color_vectorized1d(pos)
+            self.pixels = cols * flat[:, None]
+            self.roll_gradient()
+        else:
+            self.pixels = self.apply_gradient(flat)
+        if flash_amt > 0.005:
+            self.pixels = np.clip(
+                self.pixels * (1.0 + flash_amt * 0.5) + flash_amt * 65.0, 0.0, 255.0
+            )

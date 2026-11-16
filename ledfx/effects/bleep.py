@@ -1,3 +1,4 @@
+import colorsys
 import itertools
 import logging
 import timeit
@@ -7,6 +8,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 from pydantic import Field
 
+from ledfx.color import parse_color
 from ledfx.configuration.fields import CoercedFloat, CoercedInt, OneOf
 from ledfx.configuration.plugin import TypedConfig
 from ledfx.effects.audio import AudioReactiveEffect
@@ -231,12 +233,20 @@ class Bleep(Twod, GradientEffect):
             64, description="How many historical points to capture", ge=2, le=64
         )
         size: CoercedInt = Field(1, description="Line width only", ge=1, le=8)
+        bg_reactive_brightness: bool = Field(
+            False, description="Modulate background brightness with audio energy"
+        )
+        bg_reactive_color: bool = Field(
+            False, description="Shift background color hue with audio energy and beats"
+        )
 
     config = TypedConfig(Config)
 
     def __init__(self, ledfx, config):
         super().__init__(ledfx, config)
         self.bleeper = Bleeper()
+        self._bg_power = 0.0
+        self._bg_hue = 0.0
 
     def config_updated(self, config):
         super().config_updated(config)
@@ -306,7 +316,13 @@ class Bleep(Twod, GradientEffect):
 
     def audio_data_updated(self, data):
         if not self.init:
-            self.bleeper.update(getattr(data, self.power_func)())
+            pwr = getattr(data, self.power_func)()
+            self.bleeper.update(pwr)
+            self._bg_power = max(float(pwr), self._bg_power * 0.82)
+            if data.onset():
+                self._bg_hue = (self._bg_hue + 0.12) % 1.0
+            else:
+                self._bg_hue = (self._bg_hue + float(pwr) * 0.015) % 1.0
 
     def draw(self):
         # self.matrix is the Image object
@@ -314,6 +330,19 @@ class Bleep(Twod, GradientEffect):
 
         if self.test:
             self.draw_test(self.m_draw)
+
+        if self.config.bg_reactive_brightness or self.config.bg_reactive_color:
+            rgb = parse_color(self.config.background_color)
+            h, s, v = colorsys.rgb_to_hsv(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
+            if self.config.bg_reactive_color:
+                h = (h + self._bg_hue) % 1.0
+                if s < 0.2:
+                    s = 0.85
+            if self.config.bg_reactive_brightness:
+                v *= 0.15 + 0.85 * min(1.0, self._bg_power * 1.4)
+            v *= float(self.config.background_brightness)
+            r, g, b = colorsys.hsv_to_rgb(h, s, min(1.0, v))
+            self.matrix.paste((int(r * 255), int(g * 255), int(b * 255)), (0, 0, self.r_width, self.r_height))
 
         mask = self.bleeper.render(self.m_draw)
         self.matrix = Image.composite(self.gradient_image, self.matrix, mask)
