@@ -26,7 +26,7 @@
   .dot{width:9px;height:9px;border-radius:50%;background:var(--bad)}
   .dot.on{background:var(--ok)}
   .status{font-size:12px;color:var(--muted)}
-  main{max-width:1680px;margin:0 auto;padding:22px 28px}
+  main{max-width:none;width:100%;margin:0 auto;padding:20px 24px}
   .deck-grid{display:grid;grid-template-columns:1fr;gap:0}
   .deck-col{min-width:0}
   @media (min-width:1180px){
@@ -34,14 +34,14 @@
   }
   .section{margin-bottom:34px}
   .section h2{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:0 0 14px;font-weight:650}
-  .scenes{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-  .scene{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;text-align:left;cursor:pointer;color:var(--text);font-size:14px;font-weight:600;position:relative;transition:border-color .15s,transform .1s;display:flex;flex-direction:column;gap:6px}
-  .scene:hover{border-color:var(--amber)}
+  .scenes{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px}
+  .scene{background:linear-gradient(180deg,#1d222e,#161a24);border:1px solid #303746;border-left:3px solid #4a5368;border-radius:10px;padding:14px 16px;text-align:left;cursor:pointer;color:var(--text);font-size:14px;font-weight:650;position:relative;transition:border-color .15s,background .15s,transform .1s;display:flex;flex-direction:column;gap:6px}
+  .scene:hover{border-color:var(--amber);background:linear-gradient(180deg,#232938,#191e2a)}
   .scene:active{transform:scale(.98)}
   .scene-head{display:flex;justify-content:space-between;align-items:center;gap:6px}
   .scene-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .scene-meta{font-size:11px;font-weight:400;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .scene-strip{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:1px;background:var(--panel2);margin-top:2px}
+  .scene-strip{display:flex;height:6px;border-radius:3px;overflow:hidden;gap:1px;background:var(--panel2);margin-top:2px}
   .scene-strip span{flex:1;min-width:2px;height:100%}
   .empty{color:var(--muted);font-size:13px;padding:18px;border:1px dashed var(--line);border-radius:10px}
   .virtuals{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
@@ -62,12 +62,12 @@
   .toast{position:fixed;bottom:18px;right:18px;background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transform:translateY(8px);transition:.2s}
   .toast.show{opacity:1;transform:none}
   .toast.err{border-color:var(--bad);color:#ffb3b3}
-  .palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
-  .swatch{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;color:var(--text);text-align:left}
-  .swatch:hover{border-color:var(--amber)}
-  .swatch .strip2{display:flex;height:20px;border-radius:6px;overflow:hidden;margin-bottom:8px}
+  .palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+  .swatch{background:#0c0e13;border:1px solid #242833;border-radius:16px;padding:8px 10px;cursor:pointer;color:var(--muted);text-align:center;transition:border-color .15s,color .15s}
+  .swatch:hover{border-color:var(--amber);color:var(--text)}
+  .swatch .strip2{display:flex;height:18px;border-radius:999px;overflow:hidden;margin-bottom:6px;border:1px solid rgba(255,255,255,.08)}
   .swatch .strip2 span{flex:1}
-  .swatch .name{font-size:12px;font-weight:600}
+  .swatch .name{font-size:11px;font-weight:600}
   .globalRow{display:grid;grid-template-columns:1fr 1fr;gap:20px}
   .gcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
   .gcard label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
@@ -98,7 +98,7 @@
   .tgl.on{border-color:var(--ok);color:var(--ok)}
   .tgl.warn.on{border-color:var(--bad);color:var(--bad)}
   .locked .scene,.locked .swatch,.locked .macro{opacity:.4}
-  .scene.cur{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+  .scene.cur{border-color:var(--amber);border-left-color:var(--amber);background:linear-gradient(180deg,rgba(240,163,54,.16),rgba(240,163,54,.06));box-shadow:0 0 0 1px var(--amber)}
   .row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
   .globalRow{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
   pre#log{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:11px;max-height:320px;overflow:auto;color:var(--muted)}
@@ -125,11 +125,6 @@
   .eq-band .eq-db.zero{color:var(--muted)}
   .eq-slider-wrap{height:160px;display:flex;align-items:center;justify-content:center}
   .eq-slider{writing-mode:vertical-lr;direction:rtl;height:148px;width:28px;accent-color:var(--amber);cursor:pointer}
-  h2.fold{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
-  h2.fold:hover{color:var(--text)}
-  h2.fold .tri{display:inline-block;font-size:11px;line-height:1;transition:transform .15s ease;color:var(--amber)}
-  .section.collapsed h2.fold .tri{transform:rotate(-90deg)}
-  .section.collapsed #virtuals{display:none}
   .fold-count{font-weight:400;font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0}
   .tube-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
   .tube-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;flex-wrap:wrap}
@@ -169,12 +164,26 @@
   .lab-tuner{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
   .lab-tuner label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px}
   .lab-tuner input[type=range]{width:100%;accent-color:var(--amber)}
-  .multi-previews{display:grid;grid-template-columns:1fr;gap:14px}
-  .lprev-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;transition:border-color .15s}
+  .multi-previews{display:flex;gap:18px;overflow-x:auto;padding-bottom:8px;align-items:stretch;width:100%}
+  .lprev-card{flex:1 1 560px;min-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;transition:border-color .15s}
   .lprev-card:hover{border-color:var(--amber)}
-  .lprev-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;font-weight:650}
-  .lprev-head .status{font-weight:400}
-  .lprev-card canvas{display:block;width:100%;height:300px;border-radius:6px;background:#07080a}
+  .lprev-head{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:16px;font-weight:700;cursor:pointer}
+  .lprev-card canvas{display:block;width:100%;height:260px;border-radius:8px;background:#07080a;cursor:pointer}
+  .lprev-sub{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);margin-top:4px}
+  .lprev-scenes{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px}
+  .lprev-scenes .scene{padding:12px 14px;font-size:13.5px;border-radius:10px}
+  .lprev-scenes .scene-strip{height:6px}
+  .lprev-pal{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px;padding-top:2px}
+  .lprev-pal .swatch{padding:7px 9px;border-radius:14px;cursor:pointer}
+  .lprev-pal .swatch .strip2{height:14px;margin-bottom:0;border-radius:999px}
+  .lprev-pal .swatch .name{font-size:11px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lprev-sliders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .lprev-sliders .gcard{padding:12px 14px}
+  .lprev-sliders .gcard label{font-size:12px;margin-bottom:8px}
+  .lprev-hits{display:flex;flex-wrap:wrap;gap:8px}
+  .lprev-hits .hit-btn{padding:11px 14px;font-size:13px;border-radius:10px}
+  .tabs #deckTabs button{color:#e6c280}
+  .tabs #deckTabs button:last-child{margin-right:8px;border-right:1px solid var(--line);padding-right:20px}
   .layout-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
   .layout-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}
   .layout-card.on{border-color:var(--amber)}
@@ -182,10 +191,12 @@
   .layout-card-title{font-weight:650;font-size:14px}
   .layout-card-tubes{display:flex;flex-wrap:wrap;gap:4px}
   .layout-pill{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+  .top-energy{height:5px;width:100%;background:var(--panel2);overflow:hidden}
+  .top-energy i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--amber),var(--amber2));transition:width 60ms linear}
 </style>
 </head>
 <body>
-<div class="live" id="live"></div>
+<div class="top-energy" title="Audio Energy"><i id="eFill"></i></div>
 <header>
   <h1>Led<span>Fx</span> Control</h1>
   <div class="conn">
@@ -199,25 +210,19 @@
 <nav class="tabs" id="tabs"><button data-t="main" data-deck="" class="on">Main</button><span id="deckTabs" style="display:contents"></span><button data-t="virtuals">Virtuals</button><button data-t="eq">EQ &amp; Spectrum</button><button data-t="layout">Layouts &amp; Tubes</button><button data-t="auto">Auto</button><button data-t="lab">Palette Lab</button><button data-t="diag">Diagnostics</button></nav>
 <main>
 <div class="statusbar">
-  <div class="stc"><small>Active scene</small><b id="stScene">—</b></div>
-  <div class="stc"><small>BPM (tap)</small><b id="stBpm">—</b></div>
-  <div class="stc"><small>Palette</small><b id="stPal">Warm Amber</b></div>
-  <div class="stc"><small>Energy</small><div class="ebar"><i id="eFill"></i></div><span class="status" id="stAudio">no stream</span></div>
-  <div class="stc"><small>Virtuals</small><b id="stVirt">—</b></div>
-  <div class="stc"><small>Modes</small><b id="stMode" style="font-size:13px">—</b></div>
+  <div class="stc" id="stBpmBox" role="button" tabindex="0" title="Click to tap BPM" style="cursor:pointer;user-select:none"><small>BPM (tap)</small><b id="stBpm">—</b></div>
+  <div class="stc"><small>Audio</small><span class="status" id="stAudio">no stream</span></div>
 </div>
 <div id="pane-main" class="pane">
   <div class="section" id="tubePreviewSec">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
-      <h2 style="margin:0">Live Tube Preview <span class="fold-count" id="previewMeta"></span></h2>
-      <button class="tgl on" id="previewLiveBtn">Live</button>
-    </div>
-    <div class="preview-wrap"><div id="multiPreviewGrid" class="multi-previews" hidden></div><canvas id="tubePreviewCanvas"></canvas></div>
+    <div id="multiPreviewGrid" class="multi-previews" hidden></div>
+    <canvas id="tubePreviewCanvas"></canvas>
   </div>
-  <div class="deck-grid" id="deckGridMain" hidden>
+  <div class="deck-grid" id="deckGridMain">
     <div class="deck-col">
+      <div class="row2" id="mainZoneBar" style="margin:0 0 14px" hidden></div>
       <div class="section"><h2>Vibe Macros <span style="text-transform:none;font-weight:400">— palette + speed + sensitivity</span></h2><div class="macros" id="macros"></div></div>
-      <div class="section">
+      <div class="section" id="mainScenesSec">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
           <h2 style="margin:0">Scenes</h2>
           <div class="row2" style="margin:0">
@@ -229,6 +234,7 @@
       </div>
     </div>
     <div class="deck-col">
+      <div class="row2" id="mainZoneBar" style="margin:0 0 14px" hidden></div>
       <div class="section">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
           <h2 style="margin:0">Palette</h2>
@@ -283,7 +289,7 @@
 <div id="pane-virtuals" class="pane" hidden>
   <div class="section" id="virtualsSec">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-      <h2 class="fold" id="virtualsToggle" role="button" tabindex="0" aria-expanded="true" style="margin:0"><span class="tri">&#9662;</span> Virtuals <span class="fold-count" id="virtCount"></span></h2>
+      <h2 style="margin:0">Virtuals <span class="fold-count" id="virtCount"></span></h2>
       <div class="row2" style="margin:0">
         <button class="tgl on" id="autoConnBtn" title="Auto-retry offline tubes in LedFx">Auto-Connect ON</button>
         <button class="btn" id="connOfflineBtn">Connect Offline</button>
@@ -623,24 +629,24 @@ function syncSceneDisplay(id){
   const s = scenesCache[id];
   const label = s?.name || id;
   lastScene = id;
-  $('#stScene').textContent = label;
+  if($('#stScene')) $('#stScene').textContent = label;
   const cols = extractSceneColors(s);
   if(cols){
     curPalette = {name: label, colors: cols};
-    $('#stPal').textContent = label;
+    if($('#stPal')) $('#stPal').textContent = label;
   }
 }
 
 let layoutsCache = {};
 let activeLayoutId = '';
 let activeDeckId = '';
+let mainTargetZone = '';
 let layoutEditingId = '';
 let layoutEditDevices = new Set();
 let layoutEditVirtuals = new Set();
 let showAllScenes = false;
 
-function sceneMatchesLayout(s){
-  const lid = activeDeckId || activeLayoutId;
+function sceneMatchesLayoutFor(s, lid){
   if(showAllScenes || !lid) return true;
   const layout = layoutsCache[lid];
   if(!layout) return true;
@@ -656,6 +662,10 @@ function sceneMatchesLayout(s){
   const sceneVirts = Object.entries(s?.virtuals || {}).filter(([,e]) => e && e.type).map(([vid]) => vid);
   if(!sceneVirts.length) return !tag;
   return sceneVirts.some(vid => layoutVirts.has(vid));
+}
+
+function sceneMatchesLayout(s){
+  return sceneMatchesLayoutFor(s, activeDeckId || activeLayoutId);
 }
 
 function getLayoutDevices(p){
@@ -699,7 +709,24 @@ function renderDeckTabs(){
     b.classList.toggle('on', mainVisible && (b.dataset.deck || '') === activeDeckId);
   });
   const deckGrid = $('#deckGridMain');
-  if(deckGrid) deckGrid.hidden = !activeDeckId;
+  if(deckGrid) deckGrid.hidden = !activeDeckId && enabled.length > 0;
+  const mainScenesSec = $('#mainScenesSec');
+  if(mainScenesSec) mainScenesSec.hidden = !activeDeckId && enabled.length > 0;
+  const zoneBar = $('#mainZoneBar');
+  if(zoneBar){
+    if(!activeDeckId && enabled.length){
+      if(mainTargetZone && !layoutsCache[mainTargetZone]) mainTargetZone = '';
+      zoneBar.hidden = false;
+      zoneBar.innerHTML = `<span class="status">CONTROL ZONE</span><div class="seg" id="zoneSeg"><button data-z="" class="${!mainTargetZone?'on':''}">All Zones</button>` +
+        enabled.map(([id, p]) => `<button data-z="${escHtml(id)}" class="${mainTargetZone===id?'on':''}">${escHtml(p.name || id)}</button>`).join('') + `</div>`;
+      zoneBar.querySelectorAll('#zoneSeg button').forEach(b => b.addEventListener('click', () => {
+        mainTargetZone = b.dataset.z || '';
+        renderDeckTabs();
+      }));
+    }else{
+      zoneBar.hidden = true;
+    }
+  }
 }
 
 function renderLayoutsOverview(){
@@ -1001,6 +1028,8 @@ function renderScenes(){
     </button>`;
   }).join('');
   el.querySelectorAll('.scene').forEach(b => b.addEventListener('click', () => activateScene(b.dataset.id)));
+  multiPreviewKey = '';
+  if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
 }
 
 async function loadScenes(){
@@ -1013,11 +1042,20 @@ async function loadScenes(){
   }catch(e){ el.innerHTML = `<div class="empty">Failed to load scenes: ${e.message}</div>`; }
 }
 
-async function activateScene(id){
+const lastDeckScene = {};
+async function activateScene(id, deckId){
   if(guardLock()) return;
   await quantWait(S.trans==='Quantize'?(S.qnt==='Now'?'Bar':S.qnt):'Now');
   syncSceneDisplay(id);
-  document.querySelectorAll('.scene').forEach(b=>b.classList.toggle('cur',b.dataset.id===id));
+  const targetDeck = deckId || activeDeckId;
+  if(targetDeck) lastDeckScene[targetDeck] = id;
+  document.querySelectorAll('#scenes .scene').forEach(b=>b.classList.toggle('cur',b.dataset.id===id));
+  document.querySelectorAll('.lprev-card').forEach(card=>{
+    const cid = card.dataset.deck;
+    if(targetDeck ? cid === targetDeck : card.querySelector(`.lprev-scenes .scene[data-id="${CSS.escape(id)}"]`)){
+      card.querySelectorAll('.lprev-scenes .scene').forEach(b=>b.classList.toggle('cur',b.dataset.id===id));
+    }
+  });
   try{
     await api('/scenes', {method:'PUT', body: JSON.stringify({id, action:'activate'})});
     toast('Scene activated');
@@ -1252,12 +1290,12 @@ function buildColorPatch(effType, effConfig, colors, opts){
   return patch;
 }
 
-async function applyPalette(p, quiet){
+async function applyPalette(p, quiet, zoneOverride){
   if(!quiet && guardLock()) return;
   if(quiet && S.lock) return;
-  curPalette=p; $('#stPal').textContent=p.name;
+  curPalette=p; if($('#stPal')) $('#stPal').textContent=p.name;
   let ok=0, skip=0;
-  const targetIds = targets().filter(id => virtualsCache[id]?.effect?.type);
+  const targetIds = targets(zoneOverride).filter(id => virtualsCache[id]?.effect?.type);
   const activeIds = targetIds.filter(id => virtualsCache[id]?.active);
   const runIds = activeIds.length ? activeIds : targetIds;
   for(const id of runIds){
@@ -1338,8 +1376,8 @@ function buildSensPatch(effType, val){
   return patch;
 }
 
-async function setSpeed(val){
-  for(const id of targets()){
+async function setSpeed(val, zoneOverride){
+  for(const id of targets(zoneOverride)){
     const v = virtualsCache[id];
     if(!v?.effect?.type) continue;
     const patch = buildSpeedPatch(v.effect.type, val);
@@ -1347,10 +1385,17 @@ async function setSpeed(val){
     try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})}); }catch(e){}
   }
 }
-async function setSensitivity(val){
+async function setZoneBrightness(val, zoneOverride){
+  for(const id of targets(zoneOverride)){
+    const v = virtualsCache[id];
+    if(!v?.effect?.type) continue;
+    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{brightness:val}})}); }catch(e){}
+  }
+}
+async function setSensitivity(val, zoneOverride){
   const min_volume = Number((Math.pow(1 - val, 1.5) * 0.25).toFixed(4));
   const jobs = [api('/config', {method:'PUT', body: JSON.stringify({audio:{min_volume}})}).catch(e=>{ toast('Sensitivity update failed: '+e.message, true); })];
-  for(const id of targets()){
+  for(const id of targets(zoneOverride)){
     const v = virtualsCache[id];
     if(!v?.effect?.type) continue;
     const patch = buildSensPatch(v.effect.type, val);
@@ -1381,45 +1426,46 @@ function renderHits(){
     btn.addEventListener('pointerleave', ()=>hitUp(h, btn));
   });
 }
-async function tool(body, method){
+async function tool(body, method, zoneOverride){
   const m = method || (body?.tool === 'oneshot' ? 'POST' : 'PUT');
-  if(S.target==='All') return api('/virtuals_tools', {method:m, body: JSON.stringify(body)});
-  const ids = targets().filter(id=>virtualsCache[id].active);
+  if(!zoneOverride && !activeDeckId && S.target==='All') return api('/virtuals_tools', {method:m, body: JSON.stringify(body)});
+  const ids = targets(zoneOverride).filter(id=>virtualsCache[id]?.active || virtualsCache[id]?.effect?.type);
   await Promise.all(ids.map(id=>api(`/virtuals_tools/${id}`, {method:m, body: JSON.stringify(body)}).catch(()=>{})));
 }
 async function takeSnapshot(){
   try{ const d = await api('/virtuals'); snapshot = d.virtuals || d; }catch(e){ snapshot = virtualsCache; }
 }
-async function restoreSnapshot(){
+async function restoreSnapshot(zoneOverride){
   if(!snapshot) return;
+  const allow = new Set(targets(zoneOverride));
   for(const id of Object.keys(snapshot)){
-    if(S.target!=='All' && groups[id]!==S.target) continue;
+    if(!allow.has(id)) continue;
     const v = snapshot[id];
     if(v.active && v.effect && v.effect.type){
       try{ await api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:v.effect.type, config:v.effect.config||{}})}); }catch(e){}
     }
   }
 }
-async function hitDown(h, btn){
+async function hitDown(h, btn, zoneOverride){
   btn.classList.add('active');
   if(h.kind==='oneshot'||h.kind==='punch') await quantWait(S.qnt);
   try{
-    if(h.kind==='oneshot'){ const m=INT[S.int]; await tool({tool:'oneshot', color:h.color, ramp:h.ramp, hold:Math.round(h.hold*m), fade:Math.round(h.fade*m)}); }
-    else if(h.kind==='punch'){ const c = curPalette.colors[2]; const m=INT[S.int]; await tool({tool:'oneshot', color:c, ramp:10, hold:Math.round(120*m), fade:Math.round(250*m)}); }
-    else if(h.kind==='build'){ let v=+$('#speedSlider').value/100; buildT=setInterval(()=>{ v=Math.min(1,v+.05); setSpeed(v); },250); }
-    else if(h.kind==='hold'){ await takeSnapshot(); await tool({tool:'force_color', color:h.color}); }
+    if(h.kind==='oneshot'){ const m=INT[S.int]; await tool({tool:'oneshot', color:h.color, ramp:h.ramp, hold:Math.round(h.hold*m), fade:Math.round(h.fade*m)}, undefined, zoneOverride); }
+    else if(h.kind==='punch'){ const c = curPalette.colors[2]; const m=INT[S.int]; await tool({tool:'oneshot', color:c, ramp:10, hold:Math.round(120*m), fade:Math.round(250*m)}, undefined, zoneOverride); }
+    else if(h.kind==='build'){ let v=+$('#speedSlider').value/100; buildT=setInterval(()=>{ v=Math.min(1,v+.05); setSpeed(v, zoneOverride); },250); }
+    else if(h.kind==='hold'){ await takeSnapshot(); await tool({tool:'force_color', color:h.color}, undefined, zoneOverride); }
     else if(h.kind==='strobe'){
       await takeSnapshot();
-      strobeInterval = setInterval(()=>tool({tool:'oneshot', color:'white', ramp:1, hold:30, fade:30}).catch(()=>{}), S.guard?260:110);
+      strobeInterval = setInterval(()=>tool({tool:'oneshot', color:'white', ramp:1, hold:30, fade:30}, undefined, zoneOverride).catch(()=>{}), S.guard?260:110);
     }
   }catch(e){ toast(h.name+' failed: '+e.message, true); }
 }
-async function hitUp(h, btn){
+async function hitUp(h, btn, zoneOverride){
   if(!btn.classList.contains('active')) return;
   btn.classList.remove('active');
-  if(h.kind==='build'){ clearInterval(buildT); setSpeed(+$('#speedSlider').value/100); }
-  if(h.kind==='hold'){ await restoreSnapshot(); }
-  if(h.kind==='strobe'){ clearInterval(strobeInterval); strobeInterval=null; await restoreSnapshot(); }
+  if(h.kind==='build'){ clearInterval(buildT); setSpeed(+$('#speedSlider').value/100, zoneOverride); }
+  if(h.kind==='hold'){ await restoreSnapshot(zoneOverride); }
+  if(h.kind==='strobe'){ clearInterval(strobeInterval); strobeInterval=null; await restoreSnapshot(zoneOverride); }
 }
 
 renderHits();
@@ -1434,8 +1480,9 @@ function logCall(path,method,status,ms){
   if(callLog.length>60) callLog.pop();
   const el=$('#log'); if(el && !$('#pane-diag').hidden) el.textContent=callLog.join('\n');
 }
-function targets(){
-  const deck = activeDeckId ? layoutsCache[activeDeckId] : null;
+function targets(zoneOverride){
+  const zoneId = zoneOverride !== undefined ? zoneOverride : (activeDeckId || mainTargetZone);
+  const deck = zoneId ? layoutsCache[zoneId] : null;
   const deckVirts = deck && deck.virtuals && Object.keys(deck.virtuals).length ? new Set(Object.keys(deck.virtuals)) : null;
   return Object.keys(virtualsCache).filter(id => (!deckVirts || deckVirts.has(id)) && (S.target==='All' || groups[id]===S.target));
 }
@@ -1445,8 +1492,7 @@ function quantWait(mode){
   const unit=(60000/bpm)*(mode==='Bar'?4:16), now=Date.now();
   return new Promise(r=>setTimeout(r, unit-((now-(beatRef||now))%unit)));
 }
-// live audio strip + energy meter (LedFx websocket, graph_update events)
-const live=$('#live'); for(let i=0;i<48;i++) live.appendChild(document.createElement('span'));
+// live audio energy meter (LedFx websocket, graph_update events)
 let ws=null, wsReconnectT=null, wsWasDropped=false, lastAudio=0, runMax=0.0001, wsSeen=0, levels=null, energy=0;
 let previewLive = true, visFrames = {}, visFrameAt = {}, virtualFrames = {}, virtualShapes = {}, virtualFrameAt = {}, previewRaf = 0;
 function decodeVisPixels(px){
@@ -1542,10 +1588,9 @@ function connectWS(){
   };
 }
 setInterval(()=>{
-  const cs=curPalette.colors, on=Date.now()-lastAudio<2000;
-  live.childNodes.forEach((el,i)=>{ el.style.background=cs[Math.round(i/47*(cs.length-1))]; el.style.opacity=on?.12+.88*levels[i]:.15; });
-  $('#eFill').style.width=on?Math.min(100,energy*100)+'%':'0%';
-  $('#stAudio').textContent=on?'live from LedFx':(ws&&ws.readyState===1?'connected, no data':'no stream');
+  const on=Date.now()-lastAudio<2000;
+  if($('#eFill')) $('#eFill').style.width=on?Math.min(100,energy*100)+'%':'0%';
+  if($('#stAudio')) $('#stAudio').textContent=on?'live from LedFx':(ws&&ws.readyState===1?'connected, no data':'no stream');
 },60);
 // segmented controls
 document.querySelectorAll('.seg').forEach(g=>g.addEventListener('click',e=>{
@@ -1557,10 +1602,13 @@ $('#guardBtn').addEventListener('click',e=>{ S.guard=!S.guard; e.target.classLis
 $('#lockBtn').addEventListener('click',e=>{ S.lock=!S.lock; e.target.classList.toggle('on',S.lock); e.target.textContent='Perform-Lock '+(S.lock?'ON':'OFF'); document.body.classList.toggle('locked',S.lock); updateStatus(); });
 $('#apBtn').addEventListener('click',e=>{ apOn=!apOn; apLeft=+$('#apInt').value; e.target.classList.toggle('on',apOn); e.target.textContent='Auto-pilot '+(apOn?'ON':'OFF'); });
 // tap tempo
-$('#tapBtn').addEventListener('click',()=>{
+function tapBpm(){
   const now=Date.now(); if(taps.length&&now-taps[taps.length-1]>2000) taps=[]; taps.push(now); if(taps.length>6) taps.shift(); beatRef=now;
   if(taps.length>1){ bpm=Math.round(60000/((taps[taps.length-1]-taps[0])/(taps.length-1))); updateStatus(); }
-});
+}
+$('#tapBtn').addEventListener('click', tapBpm);
+$('#stBpmBox')?.addEventListener('click', tapBpm);
+$('#stBpmBox')?.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tapBpm(); } });
 $('#bpmDn').addEventListener('click',()=>{ if(bpm){bpm--; updateStatus();} });
 $('#bpmUp').addEventListener('click',()=>{ if(bpm){bpm++; updateStatus();} });
 // brightness
@@ -1715,18 +1763,58 @@ $('#labSave').addEventListener('click', () => {
 
 // ---- Palette Color Cycler ----
 let palCycleOn = false, palCycleIdx = 0, palCycleNextAt = 0, palCycleBusy = false, palBassAvg = 0.05, palLastPeakAt = 0;
+const deckCycleState = {};
+function getDeckCycle(deckId){
+  if(!deckCycleState[deckId]){
+    deckCycleState[deckId] = {
+      on: false, mode: 'bpm_pal', div: 1, idx: 0, nextAt: 0, busy: false, lastPeakAt: 0,
+      pal: null, pool: new Set(palCycleSelected ? [...palCycleSelected] : PALETTES.map(p => p.name))
+    };
+  }
+  return deckCycleState[deckId];
+}
+function stepDeckPalCycler(deckId){
+  const dc = getDeckCycle(deckId);
+  if(dc.busy || !dc.on || S.lock || !HOST) return;
+  let nextPal;
+  if(dc.mode.endsWith('_rot')){
+    const base = dc.pal || curPalette || PALETTES[0];
+    const cols = [...base.colors];
+    cols.push(cols.shift());
+    nextPal = { ...base, colors: cols };
+    dc.pal = nextPal;
+  }else{
+    const pool = PALETTES.filter(p => dc.pool.has(p.name));
+    if(!pool.length) return;
+    dc.idx = (dc.idx + 1) % pool.length;
+    nextPal = pool[dc.idx];
+    dc.pal = nextPal;
+  }
+  dc.busy = true;
+  applyPalette(nextPal, true, deckId).finally(() => { dc.busy = false; });
+}
 function checkAudioPeakCycler(lvls){
-  if(!palCycleOn || !HOST || !Array.isArray(lvls) || !lvls.length) return;
-  const mode = $('#palCycleMode')?.value || '';
-  if(!mode.startsWith('audio_')) return;
+  if(!HOST || !Array.isArray(lvls) || !lvls.length) return;
+  const anyDeckAudio = Object.values(deckCycleState).some(dc => dc.on && dc.mode.startsWith('audio_'));
+  const globalAudio = palCycleOn && ($('#palCycleMode')?.value || '').startsWith('audio_');
+  if(!globalAudio && !anyDeckAudio) return;
   const bins = Math.min(10, lvls.length);
   let sum = 0;
   for(let i = 0; i < bins; i++) sum += lvls[i];
   const bass = sum / bins;
   const now = Date.now();
-  if(bass > 0.14 && bass > palBassAvg * 1.42 && now - palLastPeakAt > 360){
-    palLastPeakAt = now;
-    stepPalCycler();
+  const isPeak = bass > 0.14 && bass > palBassAvg * 1.42;
+  if(isPeak){
+    if(globalAudio && now - palLastPeakAt > 360){
+      palLastPeakAt = now;
+      stepPalCycler();
+    }
+    for(const [did, dc] of Object.entries(deckCycleState)){
+      if(dc.on && dc.mode.startsWith('audio_') && now - dc.lastPeakAt > 360){
+        dc.lastPeakAt = now;
+        stepDeckPalCycler(did);
+      }
+    }
   }
   palBassAvg = palBassAvg * 0.90 + bass * 0.10;
 }
@@ -1780,16 +1868,27 @@ $('#palCycleBtn')?.addEventListener('click', () => {
 $('#palCycleMode')?.addEventListener('change', syncPalCycleUI);
 $('#palCycleDiv')?.addEventListener('change', () => { palCycleNextAt = Date.now(); syncPalCycleUI(); });
 setInterval(() => {
-  if(!palCycleOn || !HOST) return;
+  if(!HOST) return;
   const now = Date.now();
-  const mode = $('#palCycleMode').value;
-  if(mode.startsWith('bpm')){
+  if(palCycleOn){
+    const mode = $('#palCycleMode').value;
+    if(mode.startsWith('bpm')){
+      const effBpm = bpm || 120;
+      const div = Number($('#palCycleDiv').value) || 1;
+      const intervalMs = (60000 / effBpm) * div;
+      if(now >= palCycleNextAt){
+        palCycleNextAt = now + intervalMs;
+        stepPalCycler();
+      }
+    }
+  }
+  for(const [did, dc] of Object.entries(deckCycleState)){
+    if(!dc.on || !dc.mode.startsWith('bpm')) continue;
     const effBpm = bpm || 120;
-    const div = Number($('#palCycleDiv').value) || 1;
-    const intervalMs = (60000 / effBpm) * div;
-    if(now >= palCycleNextAt){
-      palCycleNextAt = now + intervalMs;
-      stepPalCycler();
+    const intervalMs = (60000 / effBpm) * (dc.div || 1);
+    if(now >= dc.nextAt){
+      dc.nextAt = now + intervalMs;
+      stepDeckPalCycler(did);
     }
   }
 }, 50);
@@ -1798,32 +1897,19 @@ $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(
   if(b.dataset.t==='main') activeDeckId = b.dataset.deck || '';
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!=='pane-'+b.dataset.t);
-  const deckGrid = $('#deckGridMain');
-  if(deckGrid && b.dataset.t==='main') deckGrid.hidden = !activeDeckId;
   if(b.dataset.t==='diag') $('#log').textContent=callLog.join('\n')||'no calls yet';
   if(b.dataset.t==='eq') requestAnimationFrame(drawSpectrum);
-  if(b.dataset.t==='main'){ renderScenes(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
+  if(b.dataset.t==='main'){ renderDeckTabs(); renderScenes(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
   if(b.dataset.t==='layout'){ if(typeof renderLayoutEditorBoxes === 'function') renderLayoutEditorBoxes(); if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview(); } });
 $('#resync').addEventListener('click',()=>connect());
-// collapsible virtuals section
-function setVirtualsCollapsed(collapsed){
-  const sec=$('#virtualsSec'), btn=$('#virtualsToggle');
-  if(!sec||!btn) return;
-  sec.classList.toggle('collapsed', collapsed);
-  btn.setAttribute('aria-expanded', String(!collapsed));
-  localStorage.setItem('ledfx_virt_collapsed', collapsed ? '1' : '0');
-}
-setVirtualsCollapsed(localStorage.getItem('ledfx_virt_collapsed') === '1');
-$('#virtualsToggle').addEventListener('click',()=>setVirtualsCollapsed(!$('#virtualsSec').classList.contains('collapsed')));
-$('#virtualsToggle').addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setVirtualsCollapsed(!$('#virtualsSec').classList.contains('collapsed')); } });
 // status + auto-pilot loop
 function updateStatus(){
-  $('#stBpm').textContent=bpm||'—';
+  if($('#stBpm')) $('#stBpm').textContent=bpm||'—';
   const vs=Object.values(virtualsCache); const virtTxt=vs.length?`${vs.filter(v=>v.active).length}/${vs.length} active`:'—';
-  $('#stVirt').textContent=virtTxt;
+  if($('#stVirt')) $('#stVirt').textContent=virtTxt;
   if($('#virtCount')) $('#virtCount').textContent=vs.length?`(${virtTxt})`:'';
-  $('#stMode').textContent=`${S.qnt} · ${S.int} · ${S.trans} · ${S.guard?'guard':'no guard'}${S.lock?' · LOCK':''}`;
-  $('#diagInfo').textContent=HOST?`host ${HOST} · ${Object.keys(virtualsCache).length} virtuals`:'not connected';
+  if($('#stMode')) $('#stMode').textContent=`${S.qnt} · ${S.int} · ${S.trans} · ${S.guard?'guard':'no guard'}${S.lock?' · LOCK':''}`;
+  if($('#diagInfo')) $('#diagInfo').textContent=HOST?`host ${HOST} · ${Object.keys(virtualsCache).length} virtuals`:'not connected';
 }
 setInterval(()=>{
   updateStatus();
@@ -2558,14 +2644,16 @@ function isLayoutPreviewVisible(){
   return pane && !pane.hidden && !!$('#layoutPreviewCanvas');
 }
 
-$('#previewLiveBtn').addEventListener('click', ()=>{
+if($('#previewLiveBtn')) $('#previewLiveBtn').addEventListener('click', ()=>{
   previewLive = !previewLive;
   const btn = $('#previewLiveBtn');
-  btn.textContent = previewLive ? 'Live' : 'Paused';
-  btn.classList.toggle('on', previewLive);
+  if(btn){
+    btn.textContent = previewLive ? 'Live' : 'Paused';
+    btn.classList.toggle('on', previewLive);
+  }
   syncVisSubscription();
   if(previewLive) scheduleTubePreview();
-  else $('#previewMeta').textContent = 'paused';
+  else if($('#previewMeta')) $('#previewMeta').textContent = 'paused';
 });
 
 function scheduleTubePreview(){
@@ -2585,19 +2673,159 @@ function drawTubePreview(){
   if(!activeDeckId && enabledLayouts.length && multiGrid && singleCanvas){
     singleCanvas.hidden = true;
     multiGrid.hidden = false;
-    const key = enabledLayouts.map(([id, p]) => `${id}:${p.name}`).join('|');
+    const key = enabledLayouts.map(([id, p]) => `${id}:${p.name}`).join('|') + '::' + Object.keys(scenesCache).join(',');
     if(key !== multiPreviewKey){
       multiPreviewKey = key;
-      multiGrid.innerHTML = enabledLayouts.map(([id, p]) => `
-        <div class="lprev-card" data-deck="${escHtml(id)}" title="Click to open ${escHtml(p.name || id)} tab">
-          <div class="lprev-head"><span>${escHtml(p.name || id)}</span><span class="status" data-meta></span></div>
-          <canvas></canvas>
-        </div>`).join('');
-      multiGrid.querySelectorAll('.lprev-card').forEach(card => card.addEventListener('click', () => {
+      multiGrid.innerHTML = enabledLayouts.map(([id, p]) => {
+        const zIds = Object.keys(scenesCache).filter(sid => sceneMatchesLayoutFor(scenesCache[sid], id));
+        const activeIds = zIds.filter(sid => scenesCache[sid]?.active);
+        const preferred = lastDeckScene[id] || lastScene;
+        let chosenActive = null;
+        if(preferred && zIds.includes(preferred) && (activeIds.includes(preferred) || !activeIds.length)){
+          chosenActive = preferred;
+        }else if(activeIds.length){
+          chosenActive = activeIds.sort((a,b)=>{
+            const ca = Object.values(scenesCache[a]?.virtuals||{}).filter(e=>e&&e.type).length;
+            const cb = Object.values(scenesCache[b]?.virtuals||{}).filter(e=>e&&e.type).length;
+            return cb - ca;
+          })[0];
+        }
+        const zHtml = zIds.length
+          ? zIds.map(sid => {
+              const s = scenesCache[sid];
+              const activeEffs = Object.entries(s.virtuals || {}).filter(([,eff]) => eff && eff.type);
+              const segStyles = [...new Set(activeEffs.map(([,eff]) => sceneSegmentStyle(eff)))];
+              const strip = segStyles.length ? segStyles.map(st => `<span style="${st}"></span>`).join('') : '<span style="background:var(--panel2);opacity:.4"></span>';
+              const isCur = sid === chosenActive;
+              return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(sid)}"><div class="scene-head"><span class="scene-name">${escHtml(s.name || sid)}</span></div><div class="scene-strip">${strip}</div></button>`;
+            }).join('')
+          : '<span class="status">No scenes for this layout</span>';
+        const dc = getDeckCycle(id);
+        const palHtml = PALETTES.map((pal, pi) => {
+          const inPool = dc.pool.has(pal.name);
+          return `
+          <div class="swatch" data-pi="${pi}" title="${escHtml(pal.name)}">
+            <span class="cyc-pick ${inPool?'on':''}" data-cyc="${pi}" title="Include in palette cycle">${inPool?'✓':''}</span>
+            <div class="strip2">${pal.colors.map(c => `<span style="background:${c}"></span>`).join('')}</div>
+            <div class="name">${escHtml(pal.name)}</div>
+          </div>`;
+        }).join('');
+        const hitsHtml = HITS.map((h, hi) => `<button class="hit-btn" data-hi="${hi}">${escHtml(h.name)}</button>`).join('');
+        return `
+        <div class="lprev-card" data-deck="${escHtml(id)}">
+          <div class="lprev-head" data-open-tab title="Click to open ${escHtml(p.name || id)} tab"><span>${escHtml(p.name || id)}</span><span class="status" data-meta></span></div>
+          <canvas data-open-tab title="Click to open ${escHtml(p.name || id)} tab"></canvas>
+          <div class="lprev-sub">Scenes</div>
+          <div class="lprev-scenes">${zHtml}</div>
+          <div class="lprev-sub">Palette</div>
+          <div class="lprev-pal">${palHtml}</div>
+          <div class="pal-cyc">
+            <button class="tgl ${dc.on?'on':''}" data-cyc-btn>${dc.on?'Cycle ON':'Cycle OFF'}</button>
+            <select data-cyc-mode title="Cycler mode">
+              <option value="bpm_pal" ${dc.mode==='bpm_pal'?'selected':''}>BPM → Next Palette</option>
+              <option value="bpm_rot" ${dc.mode==='bpm_rot'?'selected':''}>BPM → Rotate Colors</option>
+              <option value="audio_pal" ${dc.mode==='audio_pal'?'selected':''}>Audio Peak → Next Palette</option>
+              <option value="audio_rot" ${dc.mode==='audio_rot'?'selected':''}>Audio Peak → Rotate Colors</option>
+            </select>
+            <select data-cyc-div title="BPM divider">
+              <option value="0.5" ${dc.div===0.5?'selected':''}>1/2 Beat</option>
+              <option value="1" ${dc.div===1?'selected':''}>1 Beat</option>
+              <option value="2" ${dc.div===2?'selected':''}>2 Beats</option>
+              <option value="4" ${dc.div===4?'selected':''}>1 Bar (4 Beats)</option>
+              <option value="8" ${dc.div===8?'selected':''}>2 Bars (8 Beats)</option>
+              <option value="16" ${dc.div===16?'selected':''}>4 Bars (16 Beats)</option>
+            </select>
+            <button class="btn" data-cyc-all style="padding:5px 9px;font-size:11px" title="Include all palettes in cycle">All</button>
+            <button class="btn" data-cyc-none style="padding:5px 9px;font-size:11px" title="Clear cycle selection">None</button>
+          </div>
+          <div class="lprev-sub">Controls</div>
+          <div class="lprev-sliders">
+            <div class="gcard"><label><span>Bri</span><span data-val="bri">80%</span></label><input type="range" data-ctl="bri" min="0" max="100" value="80"></div>
+            <div class="gcard"><label><span>Speed</span><span data-val="spd">50%</span></label><input type="range" data-ctl="spd" min="0" max="100" value="50"></div>
+            <div class="gcard"><label><span>Sens</span><span data-val="sns">50%</span></label><input type="range" data-ctl="sns" min="0" max="100" value="50"></div>
+          </div>
+          <div class="lprev-sub">Hits</div>
+          <div class="lprev-hits">${hitsHtml}</div>
+        </div>`;
+      }).join('');
+      multiGrid.querySelectorAll('.lprev-card').forEach(card => {
         const deckId = card.dataset.deck;
-        const tabBtn = [...document.querySelectorAll('#tabs button[data-t="main"]')].find(b => (b.dataset.deck || '') === deckId);
-        if(tabBtn) tabBtn.click();
-      }));
+        card.querySelectorAll('[data-open-tab]').forEach(el => el.addEventListener('click', () => {
+          const tabBtn = [...document.querySelectorAll('#tabs button[data-t="main"]')].find(b => (b.dataset.deck || '') === deckId);
+          if(tabBtn) tabBtn.click();
+        }));
+        card.querySelectorAll('.lprev-scenes .scene').forEach(btn => btn.addEventListener('click', e => {
+          e.stopPropagation();
+          activateScene(btn.dataset.id, deckId);
+        }));
+        card.querySelectorAll('.lprev-pal .swatch').forEach(sw => sw.addEventListener('click', e => {
+          e.stopPropagation();
+          if(e.target.closest('.cyc-pick')) return;
+          const pal = PALETTES[Number(sw.dataset.pi)];
+          getDeckCycle(deckId).pal = pal;
+          applyPalette(pal, false, deckId);
+        }));
+        card.querySelectorAll('.lprev-pal .cyc-pick').forEach(pk => pk.addEventListener('click', e => {
+          e.stopPropagation();
+          const dc = getDeckCycle(deckId);
+          const pal = PALETTES[Number(pk.dataset.cyc)];
+          if(dc.pool.has(pal.name)) dc.pool.delete(pal.name);
+          else dc.pool.add(pal.name);
+          const on = dc.pool.has(pal.name);
+          pk.classList.toggle('on', on);
+          pk.textContent = on ? '✓' : '';
+        }));
+        const cycBtn = card.querySelector('[data-cyc-btn]');
+        const cycMode = card.querySelector('[data-cyc-mode]');
+        const cycDiv = card.querySelector('[data-cyc-div]');
+        cycBtn?.addEventListener('click', e => {
+          e.stopPropagation();
+          const dc = getDeckCycle(deckId);
+          dc.on = !dc.on;
+          dc.nextAt = Date.now();
+          cycBtn.classList.toggle('on', dc.on);
+          cycBtn.textContent = dc.on ? 'Cycle ON' : 'Cycle OFF';
+        });
+        cycMode?.addEventListener('change', e => { getDeckCycle(deckId).mode = e.target.value; });
+        cycDiv?.addEventListener('change', e => {
+          const dc = getDeckCycle(deckId);
+          dc.div = Number(e.target.value) || 1;
+          dc.nextAt = Date.now();
+        });
+        card.querySelector('[data-cyc-all]')?.addEventListener('click', e => {
+          e.stopPropagation();
+          const dc = getDeckCycle(deckId);
+          dc.pool = new Set(PALETTES.map(p => p.name));
+          card.querySelectorAll('.lprev-pal .cyc-pick').forEach(pk => { pk.classList.add('on'); pk.textContent = '✓'; });
+        });
+        card.querySelector('[data-cyc-none]')?.addEventListener('click', e => {
+          e.stopPropagation();
+          getDeckCycle(deckId).pool.clear();
+          card.querySelectorAll('.lprev-pal .cyc-pick').forEach(pk => { pk.classList.remove('on'); pk.textContent = ''; });
+        });
+        let zBriT, zSpdT, zSnsT;
+        card.querySelector('[data-ctl="bri"]')?.addEventListener('input', e => {
+          const v = Number(e.target.value);
+          const lbl = card.querySelector('[data-val="bri"]'); if(lbl) lbl.textContent = v + '%';
+          clearTimeout(zBriT); zBriT = setTimeout(() => setZoneBrightness(v / 100, deckId), 150);
+        });
+        card.querySelector('[data-ctl="spd"]')?.addEventListener('input', e => {
+          const v = Number(e.target.value);
+          const lbl = card.querySelector('[data-val="spd"]'); if(lbl) lbl.textContent = v + '%';
+          clearTimeout(zSpdT); zSpdT = setTimeout(() => setSpeed(v / 100, deckId), 150);
+        });
+        card.querySelector('[data-ctl="sns"]')?.addEventListener('input', e => {
+          const v = Number(e.target.value);
+          const lbl = card.querySelector('[data-val="sns"]'); if(lbl) lbl.textContent = v + '%';
+          clearTimeout(zSnsT); zSnsT = setTimeout(() => setSensitivity(v / 100, deckId), 150);
+        });
+        card.querySelectorAll('.lprev-hits .hit-btn').forEach(hb => {
+          const h = HITS[Number(hb.dataset.hi)];
+          hb.addEventListener('pointerdown', e => { e.stopPropagation(); hitDown(h, hb, deckId); });
+          hb.addEventListener('pointerup', e => { e.stopPropagation(); hitUp(h, hb, deckId); });
+          hb.addEventListener('pointerleave', () => hitUp(h, hb, deckId));
+        });
+      });
     }
     const meta = $('#previewMeta');
     if(meta) meta.textContent = `${enabledLayouts.length} layout(s) · click a preview to open tab`;
