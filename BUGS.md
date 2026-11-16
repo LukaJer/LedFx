@@ -23,6 +23,11 @@ Severity: **M** = medium (real user-visible breakage), **L** = low (edge case / 
 - **Problem:** Each scene is compared against live state independently and `ignore`/`{}` virtuals always match, so overlapping scenes all report `active: true` (also in the stock LedFx UI). The DJ controller now highlights one using `lastScene` or the scene with the most effects, which is a heuristic, not the truth.
 - **Fix:** Track the last activated scene id in the backend (`Scenes.activate`) and expose it, instead of inferring from state.
 
+### M4. Offline simulated tube preview shows 1-segment offset on `WLEDBB01` / `WLEDBB04` in `BlinkerL` / `BlinkerR`
+- **Where:** `ledfx-control.html` (`getTubePixelsFromVirtuals`, `drawTubePreview`) and/or `remap` virtual preview reconstruction.
+- **Problem:** When physical tubes are offline and the preview simulates pixels from `remap` (`18×12` matrix, 216 segments), `WLEDBB01` and `WLEDBB04` still show the bottom two segment rows shifted 1 segment ahead of the top two rows in `BlinkerL` and `BlinkerR`, even with `visualisation_maxlen=512`. (`config.json` segment definitions are clean; needs inspection of the raw `VirtualUpdateEvent` pixel order vs. `getTubePixelsFromVirtuals` / `remap` segment mapping.)
+- **Fix:** Inspect the exact `VirtualUpdateEvent` frame bytes for `remap` during `BlinkerL`/`BlinkerR` and align the 2D/segment reconstruction in `getTubePixelsFromVirtuals` (and verify against live online `DeviceUpdateEvent` frames).
+
 ### L1. `POST /api/devices/{id}` reports success when the device is still offline
 - **Where:** `ledfx/api/device.py` (`post`).
 - **Problem:** `resolve_address()` swallows `ValueError` and sets `_online = False`, then `device.activate()` runs and the endpoint returns success. The UI toast says "Connected" even if it failed.

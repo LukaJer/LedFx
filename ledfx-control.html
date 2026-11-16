@@ -26,7 +26,12 @@
   .dot{width:9px;height:9px;border-radius:50%;background:var(--bad)}
   .dot.on{background:var(--ok)}
   .status{font-size:12px;color:var(--muted)}
-  main{max-width:1180px;margin:0 auto;padding:26px 24px}
+  main{max-width:1680px;margin:0 auto;padding:22px 28px}
+  .deck-grid{display:grid;grid-template-columns:1fr;gap:0}
+  .deck-col{min-width:0}
+  @media (min-width:1180px){
+    .deck-grid{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:28px;align-items:start}
+  }
   .section{margin-bottom:34px}
   .section h2{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:0 0 14px;font-weight:650}
   .scenes{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
@@ -148,7 +153,22 @@
   .gcell .gdir{font-size:11px;color:var(--amber);font-weight:700}
   .preview-wrap{background:#090a0c;border:1px solid var(--line);border-radius:12px;padding:10px}
   .section.collapsed .preview-wrap{display:none}
-  #tubePreviewCanvas{display:block;width:100%;height:150px;border-radius:8px}
+  #tubePreviewCanvas{display:block;width:100%;height:240px;border-radius:8px}
+  .pal-cyc{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+  .pal-cyc select{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:6px 9px;border-radius:8px;font-size:12px}
+  .swatch{position:relative}
+  .cyc-pick{position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:5px;border:1px solid var(--line);background:rgba(12,13,18,.85);color:var(--muted);font-size:10px;line-height:16px;text-align:center;cursor:pointer;user-select:none}
+  .cyc-pick.on{border-color:var(--amber);background:var(--amber);color:#1a0f02;font-weight:700}
+  .lab-strip{height:18px;border-radius:8px;border:1px solid var(--line);margin-bottom:14px}
+  .lab-stops{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+  .lab-stop{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;align-items:center;gap:10px}
+  .lab-stop input[type=color]{width:38px;height:32px;border:0;background:none;padding:0;cursor:pointer}
+  .lab-stop .role{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px}
+  .lab-stop .hex{font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .lab-tuners{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px}
+  .lab-tuner{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .lab-tuner label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px}
+  .lab-tuner input[type=range]{width:100%;accent-color:var(--amber)}
 </style>
 </head>
 <body>
@@ -181,38 +201,69 @@
     </div>
     <div class="preview-wrap"><canvas id="tubePreviewCanvas"></canvas></div>
   </div>
-  <div class="section"><h2>Vibe Macros <span style="text-transform:none;font-weight:400">— palette + speed + sensitivity</span></h2><div class="macros" id="macros"></div></div>
-  <div class="section">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
-      <h2 style="margin:0">Scenes</h2>
-      <div class="row2" style="margin:0">
-        <button class="tgl" id="allScenesBtn" title="Show scenes from all layout tags">All Scenes</button>
-        <button class="btn" id="updateSceneBtn" title="Snapshot current live virtual effects back into the selected scene">Update Scene</button>
+  <div class="deck-grid">
+    <div class="deck-col">
+      <div class="section"><h2>Vibe Macros <span style="text-transform:none;font-weight:400">— palette + speed + sensitivity</span></h2><div class="macros" id="macros"></div></div>
+      <div class="section">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
+          <h2 style="margin:0">Scenes</h2>
+          <div class="row2" style="margin:0">
+            <button class="tgl" id="allScenesBtn" title="Show scenes from all layout tags">All Scenes</button>
+            <button class="btn" id="updateSceneBtn" title="Snapshot current live virtual effects back into the selected scene">Update Scene</button>
+          </div>
+        </div>
+        <div class="scenes" id="scenes"><div class="empty">Connect to LedFx to load scenes.</div></div>
       </div>
     </div>
-    <div class="scenes" id="scenes"><div class="empty">Connect to LedFx to load scenes.</div></div>
-  </div>
-  <div class="section"><h2>Palette</h2><div class="palette" id="palette"></div></div>
-  <div class="section"><h2>Global <span style="text-transform:none;font-weight:400">— applies to the target group</span></h2>
-    <div class="globalRow">
-      <div class="gcard"><label><span>Brightness</span><span id="briVal">80%</span></label><input type="range" id="briSlider" min="0" max="100" value="80"></div>
-      <div class="gcard"><label><span>Speed</span><span id="speedVal">50%</span></label><input type="range" id="speedSlider" min="0" max="100" value="50"></div>
-      <div class="gcard"><label><span>Sensitivity</span><span id="sensVal">50%</span></label><input type="range" id="sensSlider" min="0" max="100" value="50"></div>
-    </div>
-    <div class="row2">
-      <span class="status">TARGET</span><div class="seg" data-k="target"><button class="on">All</button><button>Accent</button><button>Left</button><button>Right</button></div>
-      <button class="btn" id="tapBtn">TAP</button><button class="btn" id="bpmDn">−</button><button class="btn" id="bpmUp">+</button>
-      <button class="tgl" id="apBtn">Auto-pilot OFF</button>
-      <button class="tgl warn" id="blackoutBtn">Blackout OFF</button>
-    </div>
-  </div>
-  <div class="section"><h2>Hits <span style="text-transform:none;font-weight:400">— hold to trigger, releases spring back</span></h2><div class="hits" id="hits"></div>
-    <div class="ctl">
-      <div class="grp">QNT <div class="seg" data-k="qnt"><button class="on">Now</button><button>Bar</button><button>Phrase</button></div></div>
-      <div class="grp">INT <div class="seg" data-k="int"><button>Soft</button><button class="on">Normal</button><button>Peak</button></div></div>
-      <div class="grp">TRANS <div class="seg" data-k="trans"><button class="on">Cut</button><button>Quantize</button></div></div>
-      <button class="tgl on" id="guardBtn">Strobe Guard ON</button>
-      <button class="tgl warn" id="lockBtn">Perform-Lock OFF</button>
+    <div class="deck-col">
+      <div class="section">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
+          <h2 style="margin:0">Palette</h2>
+          <span class="status" id="palCycleInfo">manual</span>
+        </div>
+        <div class="palette" id="palette"></div>
+        <div class="pal-cyc">
+          <button class="tgl" id="palCycleBtn">Cycle OFF</button>
+          <select id="palCycleMode" title="Cycler mode">
+            <option value="bpm_pal">BPM → Next Palette</option>
+            <option value="bpm_rot">BPM → Rotate Colors</option>
+            <option value="audio_pal">Audio Peak → Next Palette</option>
+            <option value="audio_rot">Audio Peak → Rotate Colors</option>
+          </select>
+          <select id="palCycleDiv" title="BPM divider">
+            <option value="0.5">1/2 Beat</option>
+            <option value="1" selected>1 Beat</option>
+            <option value="2">2 Beats</option>
+            <option value="4">1 Bar (4 Beats)</option>
+            <option value="8">2 Bars (8 Beats)</option>
+            <option value="16">4 Bars (16 Beats)</option>
+          </select>
+          <button class="btn" id="palPoolAllBtn" style="padding:5px 9px;font-size:11px" title="Include all palettes in cycle">All</button>
+          <button class="btn" id="palPoolNoneBtn" style="padding:5px 9px;font-size:11px" title="Clear cycle selection">None</button>
+        </div>
+      </div>
+      <div class="section"><h2>Global <span style="text-transform:none;font-weight:400">— applies to the target group</span></h2>
+        <div class="globalRow">
+          <div class="gcard"><label><span>Brightness</span><span id="briVal">80%</span></label><input type="range" id="briSlider" min="0" max="100" value="80"></div>
+          <div class="gcard"><label><span>Speed</span><span id="speedVal">50%</span></label><input type="range" id="speedSlider" min="0" max="100" value="50"></div>
+          <div class="gcard"><label><span>Sensitivity</span><span id="sensVal">50%</span></label><input type="range" id="sensSlider" min="0" max="100" value="50"></div>
+        </div>
+        <div class="row2">
+          <span class="status">TARGET</span><div class="seg" data-k="target"><button class="on">All</button><button>Accent</button><button>Left</button><button>Right</button></div>
+          <button class="btn" id="tapBtn">TAP</button><button class="btn" id="bpmDn">−</button><button class="btn" id="bpmUp">+</button>
+          <button class="tgl" id="apBtn">Auto-pilot OFF</button>
+          <button class="tgl warn" id="blackoutBtn">Blackout OFF</button>
+        </div>
+      </div>
+      <div class="section"><h2>Hits <span style="text-transform:none;font-weight:400">— hold to trigger, releases spring back</span></h2><div class="hits" id="hits"></div>
+        <div class="ctl">
+          <div class="grp">QNT <div class="seg" data-k="qnt"><button class="on">Now</button><button>Bar</button><button>Phrase</button></div></div>
+          <div class="grp">INT <div class="seg" data-k="int"><button>Soft</button><button class="on">Normal</button><button>Peak</button></div></div>
+          <div class="grp">TRANS <div class="seg" data-k="trans"><button class="on">Cut</button><button>Quantize</button></div></div>
+          <button class="tgl on" id="guardBtn">Strobe Guard ON</button>
+          <button class="tgl warn" id="lockBtn">Perform-Lock OFF</button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="section" id="virtualsSec">
@@ -237,10 +288,48 @@
   </div>
 </div>
 <div id="pane-lab" class="pane" hidden>
-  <div class="section"><h2>Palette Lab</h2>
-    <div class="lab"><input type="color" value="#3a0f02"><input type="color" value="#c2410c"><input type="color" value="#f0a336"><input type="color" value="#ffe08a">
+  <div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <h2 style="margin:0">Palette Lab <span style="text-transform:none;font-weight:400">— tune stops, HSL shift, role mapping &amp; effect overrides</span></h2>
+      <div class="row2" style="margin:0">
+        <select id="labLoadSel" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;font-size:12px"><option value="">Load preset…</option></select>
+        <button class="btn" id="labFromActiveBtn" title="Pull colors from the first active virtual">From Active Effect</button>
+        <button class="btn" id="labReverseBtn">Reverse</button>
+        <button class="btn" id="labRotateBtn">Rotate</button>
+      </div>
+    </div>
+    <div class="lab-strip" id="labPreviewStrip"></div>
+    <div class="lab-stops" id="labStops">
+      <div class="lab-stop"><input type="color" data-role="0" value="#3a0f02"><div><div class="role">Low / Base</div><div class="hex">#3a0f02</div></div></div>
+      <div class="lab-stop"><input type="color" data-role="1" value="#c2410c"><div><div class="role">Mid</div><div class="hex">#c2410c</div></div></div>
+      <div class="lab-stop"><input type="color" data-role="2" value="#f0a336"><div><div class="role">Accent</div><div class="hex">#f0a336</div></div></div>
+      <div class="lab-stop"><input type="color" data-role="3" value="#ffe08a"><div><div class="role">High / Peak</div><div class="hex">#ffe08a</div></div></div>
+    </div>
+    <div class="lab-tuners">
+      <div class="lab-tuner"><label><span>Hue Shift</span><span id="labHueVal">0°</span></label><input type="range" id="labHue" min="-180" max="180" value="0"></div>
+      <div class="lab-tuner"><label><span>Saturation</span><span id="labSatVal">100%</span></label><input type="range" id="labSat" min="0" max="200" value="100"></div>
+      <div class="lab-tuner"><label><span>Brightness</span><span id="labLightVal">100%</span></label><input type="range" id="labLight" min="30" max="170" value="100"></div>
+      <div class="lab-tuner"><label><span>Gradient Roll</span><span id="labRollVal">keep</span></label><input type="range" id="labRoll" min="-1" max="10" step="0.5" value="-1"></div>
+    </div>
+    <div class="row2" style="margin:0 0 14px">
+      <label class="status" style="display:flex;align-items:center;gap:6px">3-Band / Accent Map
+        <select id="labRoleMap" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;font-size:12px">
+          <option value="normal">Low → Mid → High (Normal)</option>
+          <option value="reverse">High → Mid → Low (Reversed)</option>
+          <option value="accent">Accent-First (High / Accent / Low)</option>
+        </select>
+      </label>
+      <label class="status" style="display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="labBgApply"> Background
+        <input type="color" id="labBgColor" value="#000000" style="width:32px;height:26px;border:0;background:none;cursor:pointer">
+      </label>
+    </div>
+    <div class="lab" style="margin:0">
       <input type="text" id="labName" placeholder="Palette name" value="My Palette">
-      <button class="btn" id="labApply">Apply</button><button class="btn primary" id="labSave">Save to palettes</button></div>
+      <button class="btn" id="labResetHslBtn">Reset HSL</button>
+      <button class="btn" id="labApply">Apply Now</button>
+      <button class="btn primary" id="labSave">Save to Palettes</button>
+    </div>
   </div>
 </div>
 <div id="pane-eq" class="pane" hidden>
@@ -804,14 +893,50 @@ const PALETTES = [
   {name:'Forest', colors:['#0b3d1f','#1f7a3f','#5fbf6b','#c7f2c1']},
   {name:'Violet Haze', colors:['#1a1035','#4c1d95','#8b5cf6','#ddd6fe']},
   {name:'Sunset', colors:['#3a0518','#b3123f','#ff5e3a','#ffb37a']},
+  {name:'Aqua Acid', colors:['#042f2e','#0d9488','#2dd4bf','#d9f99d']},
+  {name:'Cyberpunk', colors:['#090d2e','#2563eb','#ec4899','#22d3ee']},
+  {name:'Crimson Club', colors:['#240008','#991b1b','#ef4444','#fecaca']},
+  {name:'Ultraviolet', colors:['#14042e','#6d28d9','#d946ef','#67e8f9']},
+  {name:'Gold Rush', colors:['#1f1200','#854d0e','#eab308','#fef08a']},
+  {name:'Ice Mint', colors:['#082f49','#0284c7','#38bdf8','#a7f3d0']},
+  {name:'Lava', colors:['#1c0400','#9a3412','#f97316','#fde047']},
+  {name:'Techno White', colors:['#18181b','#52525b','#d4d4d8','#ffffff']},
+  {name:'Miami', colors:['#1e1b4b','#ec4899','#f472b6','#2dd4bf']},
+  {name:'Emerald', colors:['#022c22','#047857','#10b981','#a7f3d0']},
 ];
+let palCycleSelected = null;
+try{
+  const savedPool = JSON.parse(localStorage.getItem('ledfx_cycle_pool') || 'null');
+  if(Array.isArray(savedPool)) palCycleSelected = new Set(savedPool);
+}catch(e){}
+if(!palCycleSelected) palCycleSelected = new Set(PALETTES.map(p => p.name));
+function savePalCyclePool(){
+  try{ localStorage.setItem('ledfx_cycle_pool', JSON.stringify([...palCycleSelected])); }catch(e){}
+}
 function renderPalettes(){
-  $('#palette').innerHTML = PALETTES.map((p,i)=>`
-    <button class="swatch" data-i="${i}">
+  $('#palette').innerHTML = PALETTES.map((p,i)=>{
+    const inPool = palCycleSelected.has(p.name);
+    return `
+    <div class="swatch" data-i="${i}" role="button" tabindex="0">
+      <span class="cyc-pick ${inPool?'on':''}" data-cyc="${i}" title="Include in palette cycle">${inPool?'✓':''}</span>
       <div class="strip2">${p.colors.map(c=>`<span style="background:${c}"></span>`).join('')}</div>
-      <div class="name">${p.name}</div>
-    </button>`).join('');
-  document.querySelectorAll('.swatch').forEach(el=>el.addEventListener('click', ()=>applyPalette(PALETTES[el.dataset.i])));
+      <div class="name">${escHtml(p.name)}</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.swatch').forEach(el=>el.addEventListener('click', e => {
+    if(e.target.closest('.cyc-pick')) return;
+    applyPalette(PALETTES[el.dataset.i]);
+  }));
+  document.querySelectorAll('.cyc-pick').forEach(el=>el.addEventListener('click', e => {
+    e.stopPropagation();
+    const p = PALETTES[el.dataset.cyc];
+    if(!p) return;
+    if(palCycleSelected.has(p.name)) palCycleSelected.delete(p.name);
+    else palCycleSelected.add(p.name);
+    savePalCyclePool();
+    renderPalettes();
+    if(typeof syncPalCycleUI === 'function') syncPalCycleUI();
+  }));
 }
 function toGradientString(colors){
   const n = colors.length;
@@ -822,19 +947,62 @@ function toGradientString(colors){
   }).join(', ');
   return `linear-gradient(90deg, ${stops})`;
 }
-async function applyPalette(p){
-  if(guardLock()) return;
+function buildColorPatch(effType, effConfig, colors, opts){
+  const props = effectsSchema[effType]?.schema?.properties || effConfig || {};
+  const has = k => Object.prototype.hasOwnProperty.call(props, k);
+  const roleMap = opts?.roleMap || 'normal';
+  const c0 = colors[0], c1 = colors[Math.floor((colors.length - 1) / 2)], c2 = colors[Math.max(0, colors.length - 2)], c3 = colors[colors.length - 1];
+  const [cLow, cMid, cHigh] = roleMap === 'reverse' ? [c3, c1, c0]
+    : roleMap === 'accent' ? [c3, c2, c0]
+    : [c0, c1, c3];
+  const grad = toGradientString(roleMap === 'reverse' ? [...colors].reverse() : colors);
+  const patch = {};
+  if(has('gradient')) patch.gradient = grad;
+  if(has('use_gradient')) patch.use_gradient = true;
+  if(has('power_gradient')) patch.power_gradient = grad;
+  if(opts?.roll !== undefined && opts.roll >= 0 && has('gradient_roll')) patch.gradient_roll = Number(opts.roll);
+  if(opts?.bgColor && has('background_color')) patch.background_color = opts.bgColor;
+  if(has('color_lows')) patch.color_lows = cLow;
+  if(has('color_mids')) patch.color_mids = cMid;
+  if(has('color_high')) patch.color_high = cHigh;
+  if(has('lows_color')) patch.lows_color = cLow;
+  if(has('mids_color')) patch.mids_color = cMid;
+  if(has('high_color')) patch.high_color = cHigh;
+  if(has('color_low')) patch.color_low = cLow;
+  if(has('color_mid')) patch.color_mid = cMid;
+  if(has('color_min')) patch.color_min = cLow;
+  if(has('color_max')) patch.color_max = cHigh;
+  if(has('color_peak')) patch.color_peak = cHigh;
+  if(has('peak_color')) patch.peak_color = cHigh;
+  if(has('sparks_color')) patch.sparks_color = cHigh;
+  if(has('center_color')) patch.center_color = cHigh;
+  if(has('edge_color')) patch.edge_color = cLow;
+  if(has('color_scan')) patch.color_scan = cHigh;
+  if(has('strobe_color')) patch.strobe_color = cHigh;
+  if(has('pixel_color')) patch.pixel_color = cHigh;
+  if(has('flash_color')) patch.flash_color = cHigh;
+  if(has('hit_color')) patch.hit_color = cHigh;
+  if(has('text_color')) patch.text_color = cHigh;
+  if(has('color')) patch.color = cHigh;
+  return patch;
+}
+
+async function applyPalette(p, quiet){
+  if(!quiet && guardLock()) return;
+  if(quiet && S.lock) return;
   curPalette=p; $('#stPal').textContent=p.name;
-  const gradient = toGradientString(p.colors);
-  let ok=0, fail=0;
+  let ok=0, skip=0;
   for(const id of targets()){
     const v = virtualsCache[id];
-    if(!v.active) continue;
-    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{gradient}})}); ok++; continue; }catch(e){}
-    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{color:p.colors[p.colors.length-1]}})}); ok++; }
-    catch(e){ fail++; }
+    if(!v?.active || !v?.effect?.type) continue;
+    const patch = buildColorPatch(v.effect.type, v.effect.config, p.colors, p);
+    if(!Object.keys(patch).length){ skip++; continue; }
+    try{
+      await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})});
+      ok++;
+    }catch(e){ skip++; }
   }
-  toast(fail ? `Palette applied to ${ok} virtual(s), ${fail} effect(s) don't support color` : `${p.name} applied`);
+  if(!quiet) toast(skip ? `${p.name} applied to ${ok} virtual(s) (${skip} fixed-color skipped)` : `${p.name} applied`);
 }
 
 // ---- Global speed / sensitivity ----
@@ -847,16 +1015,80 @@ $('#sensSlider').addEventListener('input', e=>{
   $('#sensVal').textContent = e.target.value+'%';
   clearTimeout(sensT); sensT = setTimeout(()=>setSensitivity(e.target.value/100), 150);
 });
+function scaleAroundDefault(prop, val, inv){
+  if(!prop || typeof prop !== 'object') return null;
+  const min = typeof prop.minimum === 'number' ? prop.minimum : 0;
+  const max = typeof prop.maximum === 'number' ? prop.maximum : 1;
+  if(max <= min) return null;
+  const u = inv ? (1 - val) : val;
+  let def = typeof prop.default === 'number' ? prop.default : (min + (max - min) * 0.5);
+  def = Math.max(min, Math.min(max, def));
+  let out;
+  if(u <= 0.5){
+    const t = u / 0.5;
+    out = min + (def - min) * Math.pow(t, 1.35);
+  }else{
+    const t = (u - 0.5) / 0.5;
+    out = def + (max - def) * Math.pow(t, 1.5);
+  }
+  return prop.type === 'integer' ? Math.round(out) : Number(out.toFixed(4));
+}
+
+function buildSpeedPatch(effType, val){
+  const props = effectsSchema[effType]?.schema?.properties || {};
+  const has = k => Object.prototype.hasOwnProperty.call(props, k);
+  const patch = {};
+  if(has('step_period')){ const v = scaleAroundDefault(props.step_period, val, true); if(v !== null) patch.step_period = v; }
+  if(has('scroll_time')){ const v = scaleAroundDefault(props.scroll_time, val, true); if(v !== null) patch.scroll_time = v; }
+  if(has('speed')){ const v = scaleAroundDefault(props.speed, val, false); if(v !== null) patch.speed = v; }
+  if(has('scroll_per_sec')){ const v = scaleAroundDefault(props.scroll_per_sec, val, false); if(v !== null) patch.scroll_per_sec = v; }
+  if(has('gradient_speed')){ const v = scaleAroundDefault(props.gradient_speed, val, false); if(v !== null) patch.gradient_speed = v; }
+  if(has('roll_speed')){ const v = scaleAroundDefault(props.roll_speed, val, false); if(v !== null) patch.roll_speed = v; }
+  if(has('base_game_speed')){ const v = scaleAroundDefault(props.base_game_speed, val, false); if(v !== null) patch.base_game_speed = v; }
+  if(has('add_speed')){ const v = scaleAroundDefault(props.add_speed, val, false); if(v !== null) patch.add_speed = v; }
+  if(!Object.keys(patch).length){
+    if(has('strobe_decay')){ const v = scaleAroundDefault(props.strobe_decay, val, true); if(v !== null) patch.strobe_decay = v; }
+    else if(has('decay')){ const v = scaleAroundDefault(props.decay, val, true); if(v !== null) patch.decay = v; }
+    else if(has('strobe_decay_rate')){ const v = scaleAroundDefault(props.strobe_decay_rate, val, true); if(v !== null) patch.strobe_decay_rate = v; }
+    else if(has('gradient_roll')){ const v = scaleAroundDefault(props.gradient_roll, val, false); if(v !== null) patch.gradient_roll = v; }
+  }
+  return patch;
+}
+
+function buildSensPatch(effType, val){
+  const props = effectsSchema[effType]?.schema?.properties || {};
+  const has = k => Object.prototype.hasOwnProperty.call(props, k);
+  const patch = {};
+  for(const k of ['reactivity','sensitivity','multiplier','power_multiplier','spin_multiplier','size_multiplication','speed_multiplication']){
+    if(has(k)){ const v = scaleAroundDefault(props[k], val, false); if(v !== null) patch[k] = v; }
+  }
+  for(const k of ['lows_sensitivity','mids_sensitivity','high_sensitivity','threshold','threshold_lows','threshold_mids','sparkles_threshold','strobe_threshold']){
+    if(has(k)){ const v = scaleAroundDefault(props[k], val, true); if(v !== null) patch[k] = v; }
+  }
+  return patch;
+}
+
 async function setSpeed(val){
   for(const id of targets()){
-    if(!virtualsCache[id].active) continue;
-    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{speed:val}})}); }catch(e){}
+    const v = virtualsCache[id];
+    if(!v?.active || !v?.effect?.type) continue;
+    const patch = buildSpeedPatch(v.effect.type, val);
+    if(!Object.keys(patch).length) continue;
+    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})}); }catch(e){}
   }
 }
 async function setSensitivity(val){
-  const min_volume = (1 - val) * 0.3; // more sensitivity = lower cutoff
-  try{ await api('/config', {method:'PUT', body: JSON.stringify({audio:{min_volume}})}); }
-  catch(e){ toast('Sensitivity update failed: '+e.message, true); }
+  const min_volume = Number((Math.pow(1 - val, 1.5) * 0.25).toFixed(4));
+  const jobs = [api('/config', {method:'PUT', body: JSON.stringify({audio:{min_volume}})}).catch(e=>{ toast('Sensitivity update failed: '+e.message, true); })];
+  for(const id of targets()){
+    const v = virtualsCache[id];
+    if(!v?.active || !v?.effect?.type) continue;
+    const patch = buildSensPatch(v.effect.type, val);
+    if(Object.keys(patch).length){
+      jobs.push(api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})}).catch(()=>{}));
+    }
+  }
+  await Promise.all(jobs);
 }
 
 // ---- Hits (momentary tools via /api/virtuals_tools) ----
@@ -879,10 +1111,11 @@ function renderHits(){
     btn.addEventListener('pointerleave', ()=>hitUp(h, btn));
   });
 }
-async function tool(body){
-  if(S.target==='All') return api('/virtuals_tools', {method:'PUT', body: JSON.stringify(body)});
+async function tool(body, method){
+  const m = method || (body?.tool === 'oneshot' ? 'POST' : 'PUT');
+  if(S.target==='All') return api('/virtuals_tools', {method:m, body: JSON.stringify(body)});
   const ids = targets().filter(id=>virtualsCache[id].active);
-  await Promise.all(ids.map(id=>api(`/virtuals_tools/${id}`, {method:'PUT', body: JSON.stringify(body)}).catch(()=>{})));
+  await Promise.all(ids.map(id=>api(`/virtuals_tools/${id}`, {method:m, body: JSON.stringify(body)}).catch(()=>{})));
 }
 async function takeSnapshot(){
   try{ const d = await api('/virtuals'); snapshot = d.virtuals || d; }catch(e){ snapshot = virtualsCache; }
@@ -941,7 +1174,7 @@ function quantWait(mode){
 // live audio strip + energy meter (LedFx websocket, graph_update events)
 const live=$('#live'); for(let i=0;i<48;i++) live.appendChild(document.createElement('span'));
 let ws=null, wsReconnectT=null, wsWasDropped=false, lastAudio=0, runMax=0.0001, wsSeen=0, levels=null, energy=0;
-let previewLive = true, visFrames = {}, visFrameAt = {}, virtualFrames = {}, virtualFrameAt = {}, previewRaf = 0;
+let previewLive = true, visFrames = {}, visFrameAt = {}, virtualFrames = {}, virtualShapes = {}, virtualFrameAt = {}, previewRaf = 0;
 function decodeVisPixels(px){
   if(typeof px === 'string'){
     try{
@@ -1005,7 +1238,11 @@ function connectWS(){
       const px = decodeVisPixels(rawPx);
       if(visId && px){
         const now = performance.now();
-        if(isDev === false){ virtualFrames[visId] = px; virtualFrameAt[visId] = now; }
+        if(isDev === false){
+          virtualFrames[visId] = px;
+          virtualShapes[visId] = m.shape ?? m.data?.shape ?? null;
+          virtualFrameAt[visId] = now;
+        }
         else{ visFrames[visId] = px; visFrameAt[visId] = now; }
         if(previewLive && typeof scheduleTubePreview === 'function') scheduleTubePreview();
         if(previewLive && typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview();
@@ -1017,6 +1254,7 @@ function connectWS(){
     runMax=Math.max(runMax*0.999,...arr,0.0001);
     levels=Array.from({length:48},(_,i)=>{ const a=arr[Math.floor(i/48*arr.length)]; return Math.min(1,a/runMax); });
     energy=arr.reduce((x,y)=>x+y,0)/arr.length/runMax; lastAudio=Date.now();
+    if(typeof checkAudioPeakCycler === 'function') checkAudioPeakCycler(levels);
     const freqs = Array.isArray(m.frequencies) ? m.frequencies : (Array.isArray(m.data?.frequencies) ? m.data.frequencies : null);
     updateSpectrumData(arr, freqs);
   };
@@ -1068,14 +1306,219 @@ function renderMacros(){
     applyPalette(PALETTES[m.p]); setSpeed(m.sp); setSensitivity(m.se);
   }));
 }
-// palette lab
+// palette lab + color cycler
 try{ JSON.parse(localStorage.getItem('ledfx_custom_palettes')||'[]').forEach(p=>PALETTES.push(p)); }catch(e){}
-const labColors=()=>[...document.querySelectorAll('.lab input[type=color]')].map(i=>i.value);
-$('#labApply').addEventListener('click',()=>applyPalette({name:$('#labName').value||'Custom',colors:labColors()}));
-$('#labSave').addEventListener('click',()=>{
-  const p={name:$('#labName').value||'Custom',colors:labColors()}; PALETTES.push(p); renderPalettes(); renderMacros();
-  const saved=JSON.parse(localStorage.getItem('ledfx_custom_palettes')||'[]'); saved.push(p); localStorage.setItem('ledfx_custom_palettes',JSON.stringify(saved)); toast('Palette saved');
+
+let labBaseColors = ['#3a0f02','#c2410c','#f0a336','#ffe08a'];
+function hexToHsl(hex){
+  let r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), l=(max+min)/2;
+  let h=0, s=0;
+  if(max!==min){
+    const d=max-min;
+    s = l>0.5 ? d/(2-max-min) : d/(max+min);
+    h = max===r ? (g-b)/d + (g<b?6:0) : max===g ? (b-r)/d + 2 : (r-g)/d + 4;
+    h *= 60;
+  }
+  return [h, s*100, l*100];
+}
+function hslToHex(h, s, l){
+  h = ((h % 360) + 360) % 360;
+  s = Math.max(0, Math.min(100, s)) / 100;
+  l = Math.max(0, Math.min(100, l)) / 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => {
+    const k = (n + h / 30) % 12;
+    const c = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * c).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+function labColors(){
+  const dh = Number($('#labHue').value) || 0;
+  const sm = (Number($('#labSat').value) || 100) / 100;
+  const lm = (Number($('#labLight').value) || 100) / 100;
+  return labBaseColors.map(hex => {
+    if(dh === 0 && sm === 1 && lm === 1) return hex;
+    const [h, s, l] = hexToHsl(hex);
+    return hslToHex(h + dh, s * sm, l * lm);
+  });
+}
+function buildLabPaletteObj(){
+  const roll = Number($('#labRoll').value);
+  return {
+    name: $('#labName').value.trim() || 'Custom',
+    colors: labColors(),
+    roleMap: $('#labRoleMap').value,
+    bgColor: $('#labBgApply').checked ? $('#labBgColor').value : undefined,
+    roll: roll >= 0 ? roll : undefined,
+  };
+}
+function syncLabUI(){
+  const cols = labColors();
+  const strip = $('#labPreviewStrip');
+  if(strip) strip.style.background = toGradientString(cols);
+  const inputs = [...document.querySelectorAll('#labStops input[type=color]')];
+  inputs.forEach((inp, i) => {
+    if(cols[i]){
+      inp.value = cols[i];
+      const hx = inp.closest('.lab-stop')?.querySelector('.hex');
+      if(hx) hx.textContent = cols[i];
+    }
+  });
+  $('#labHueVal').textContent = `${$('#labHue').value}°`;
+  $('#labSatVal').textContent = `${$('#labSat').value}%`;
+  $('#labLightVal').textContent = `${$('#labLight').value}%`;
+  const rv = Number($('#labRoll').value);
+  $('#labRollVal').textContent = rv < 0 ? 'keep' : rv.toFixed(1);
+}
+function populateLabPresets(){
+  const sel = $('#labLoadSel');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">Load preset…</option>' + PALETTES.map((p,i)=>`<option value="${i}">${escHtml(p.name)}</option>`).join('');
+}
+populateLabPresets();
+syncLabUI();
+
+document.querySelectorAll('#labStops input[type=color]').forEach((inp, idx) => {
+  inp.addEventListener('input', () => {
+    $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100;
+    labBaseColors[idx] = inp.value;
+    syncLabUI();
+  });
 });
+['#labHue','#labSat','#labLight','#labRoll'].forEach(id => $(id)?.addEventListener('input', syncLabUI));
+$('#labLoadSel')?.addEventListener('change', e => {
+  const p = PALETTES[e.target.value];
+  if(!p) return;
+  labBaseColors = p.colors.slice(0, 4);
+  while(labBaseColors.length < 4) labBaseColors.push(labBaseColors[labBaseColors.length - 1]);
+  $('#labName').value = p.name + ' (Edit)';
+  $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100;
+  $('#labRoleMap').value = p.roleMap || 'normal';
+  syncLabUI();
+});
+$('#labResetHslBtn')?.addEventListener('click', () => {
+  $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100; $('#labRoll').value = -1;
+  syncLabUI();
+});
+$('#labReverseBtn')?.addEventListener('click', () => { labBaseColors.reverse(); syncLabUI(); });
+$('#labRotateBtn')?.addEventListener('click', () => { labBaseColors.push(labBaseColors.shift()); syncLabUI(); });
+$('#labFromActiveBtn')?.addEventListener('click', () => {
+  const active = Object.values(virtualsCache).find(v => v?.active && v?.effect?.type);
+  if(!active){ toast('No active virtual effect found', true); return; }
+  const cfg = active.effect.config || {};
+  const found = [];
+  for(const [k, val] of Object.entries(cfg)){
+    if(k === 'background_color' || typeof val !== 'string') continue;
+    const ms = val.match(/#[0-9a-f]{6}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)/gi);
+    if(ms) for(const m of ms){
+      if(m.startsWith('#')) found.push(m.toLowerCase());
+      else{
+        const nums = m.match(/\d+/g);
+        if(nums) found.push('#' + nums.slice(0,3).map(n => Number(n).toString(16).padStart(2,'0')).join(''));
+      }
+    }
+  }
+  if(!found.length){ toast(`No colors found on ${active.effect.type}`, true); return; }
+  const uniq = [...new Set(found)];
+  while(uniq.length < 4) uniq.push(uniq[uniq.length - 1]);
+  labBaseColors = uniq.slice(0, 4);
+  $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100;
+  $('#labName').value = active.config?.name || active.effect.type;
+  syncLabUI();
+  toast(`Loaded colors from ${active.effect.type}`);
+});
+$('#labApply').addEventListener('click', () => applyPalette(buildLabPaletteObj()));
+$('#labSave').addEventListener('click', () => {
+  const p = buildLabPaletteObj();
+  PALETTES.push(p); palCycleSelected.add(p.name); savePalCyclePool();
+  renderPalettes(); renderMacros(); populateLabPresets(); syncPalCycleUI();
+  const saved = JSON.parse(localStorage.getItem('ledfx_custom_palettes')||'[]');
+  saved.push(p); localStorage.setItem('ledfx_custom_palettes', JSON.stringify(saved));
+  toast('Palette saved');
+});
+
+// ---- Palette Color Cycler ----
+let palCycleOn = false, palCycleIdx = 0, palCycleNextAt = 0, palCycleBusy = false, palBassAvg = 0.05, palLastPeakAt = 0;
+function checkAudioPeakCycler(lvls){
+  if(!palCycleOn || !HOST || !Array.isArray(lvls) || !lvls.length) return;
+  const mode = $('#palCycleMode')?.value || '';
+  if(!mode.startsWith('audio_')) return;
+  const bins = Math.min(10, lvls.length);
+  let sum = 0;
+  for(let i = 0; i < bins; i++) sum += lvls[i];
+  const bass = sum / bins;
+  const now = Date.now();
+  if(bass > 0.14 && bass > palBassAvg * 1.42 && now - palLastPeakAt > 360){
+    palLastPeakAt = now;
+    stepPalCycler();
+  }
+  palBassAvg = palBassAvg * 0.90 + bass * 0.10;
+}
+function syncPalCycleUI(){
+  const btn = $('#palCycleBtn');
+  if(!btn) return;
+  btn.classList.toggle('on', palCycleOn);
+  btn.textContent = palCycleOn ? 'Cycle ON' : 'Cycle OFF';
+  const info = $('#palCycleInfo');
+  const poolCount = PALETTES.filter(p => palCycleSelected.has(p.name)).length;
+  if(info){
+    if(!palCycleOn) info.textContent = `manual · ${poolCount} selected`;
+    else{
+      const mode = $('#palCycleMode').value;
+      const div = Number($('#palCycleDiv').value) || 1;
+      const effBpm = bpm || 120;
+      info.textContent = mode.startsWith('bpm') ? `${effBpm} BPM · ÷${div} (${poolCount})` : `audio peak (${poolCount})`;
+    }
+  }
+}
+function stepPalCycler(){
+  if(palCycleBusy || !palCycleOn || S.lock || !HOST) return;
+  const mode = $('#palCycleMode').value;
+  let nextPal;
+  if(mode.endsWith('_rot')){
+    const cols = [...(curPalette?.colors || PALETTES[0].colors)];
+    cols.push(cols.shift());
+    nextPal = { ...curPalette, colors: cols };
+  }else{
+    const pool = PALETTES.filter(p => palCycleSelected.has(p.name));
+    if(!pool.length) return;
+    palCycleIdx = (palCycleIdx + 1) % pool.length;
+    nextPal = pool[palCycleIdx];
+  }
+  palCycleBusy = true;
+  applyPalette(nextPal, true).finally(() => { palCycleBusy = false; });
+}
+$('#palPoolAllBtn')?.addEventListener('click', () => {
+  palCycleSelected = new Set(PALETTES.map(p => p.name));
+  savePalCyclePool(); renderPalettes(); syncPalCycleUI();
+});
+$('#palPoolNoneBtn')?.addEventListener('click', () => {
+  palCycleSelected.clear();
+  savePalCyclePool(); renderPalettes(); syncPalCycleUI();
+});
+$('#palCycleBtn')?.addEventListener('click', () => {
+  palCycleOn = !palCycleOn;
+  palCycleNextAt = Date.now();
+  syncPalCycleUI();
+});
+$('#palCycleMode')?.addEventListener('change', syncPalCycleUI);
+$('#palCycleDiv')?.addEventListener('change', () => { palCycleNextAt = Date.now(); syncPalCycleUI(); });
+setInterval(() => {
+  if(!palCycleOn || !HOST) return;
+  const now = Date.now();
+  const mode = $('#palCycleMode').value;
+  if(mode.startsWith('bpm')){
+    const effBpm = bpm || 120;
+    const div = Number($('#palCycleDiv').value) || 1;
+    const intervalMs = (60000 / effBpm) * div;
+    if(now >= palCycleNextAt){
+      palCycleNextAt = now + intervalMs;
+      stepPalCycler();
+    }
+  }
+}, 50);
 // tabs
 $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
@@ -1620,7 +2063,7 @@ $('#arrApplyBtn').addEventListener('click', async ()=>{
   const segments = chosen.map(t => [t.deviceId, 0, Math.max(0, t.pixelCount - 1), t.invert]);
   try{
     await api('/virtuals', {method:'POST', body:JSON.stringify({id:vid, config:{rows, grouping}})});
-    await api(`/virtuals/${vid}`, {method:'PUT', body:JSON.stringify({segments})});
+    await api(`/virtuals/${vid}`, {method:'POST', body:JSON.stringify({segments})});
     toast(`Updated "${vid}" (${chosen.length} tubes, rows=${rows}, grouping=${grouping})`);
     await loadVirtuals();
   }catch(e){
@@ -1636,11 +2079,32 @@ const GRID_DIRS = [
   {id:'V-', label:'V ↑', horiz:false, inv:true},
 ];
 let gridCols = 5, gridRows = 2, gridCells = {}, gridBrush = '';
+try{
+  const savedGrid = JSON.parse(localStorage.getItem('ledfx_stage_grid') || 'null');
+  if(savedGrid && typeof savedGrid === 'object'){
+    if(savedGrid.cols) gridCols = Math.max(1, Math.min(12, Number(savedGrid.cols) || 5));
+    if(savedGrid.rows) gridRows = Math.max(1, Math.min(12, Number(savedGrid.rows) || 2));
+    if(savedGrid.cells && typeof savedGrid.cells === 'object') gridCells = savedGrid.cells;
+    const gcIn = $('#gridCols'), grIn = $('#gridRows');
+    if(gcIn) gcIn.value = gridCols;
+    if(grIn) grIn.value = gridRows;
+  }
+}catch(e){}
+
+function saveStageGrid(){
+  try{ localStorage.setItem('ledfx_stage_grid', JSON.stringify({cols:gridCols, rows:gridRows, cells:gridCells})); }catch(e){}
+}
+
+function getTubeDevices(){
+  return Object.entries(devicesCache)
+    .filter(([, d]) => d && d.type !== 'dummy')
+    .sort((a, b) => (a[1]?.config?.name || a[0]).localeCompare(b[1]?.config?.name || b[0], undefined, {numeric:true, sensitivity:'base'}));
+}
 
 function renderStageGrid(){
   const pal = $('#gridPalette'), grid = $('#stageGrid');
   if(!pal || !grid) return;
-  const devs = Object.entries(devicesCache);
+  const devs = getTubeDevices();
   if(!gridBrush && devs.length) gridBrush = devs[0][0];
   const placedDevs = new Set(Object.values(gridCells).map(c => c.deviceId));
   pal.innerHTML = `<button class="gchip ${gridBrush==='__ERASE__'?'sel':''}" data-dev="__ERASE__">Eraser</button>` +
@@ -1664,6 +2128,8 @@ function renderStageGrid(){
   }
   grid.innerHTML = html;
   $('#gridInfo').textContent = `${placedDevs.size} tube(s) placed on ${gridCols}×${gridRows} grid`;
+  saveStageGrid();
+  if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
 }
 
 $('#gridPalette').addEventListener('click', e => {
@@ -1703,7 +2169,7 @@ function setGridPreset(cols, rows, defaultDir){
   gridCols = cols; gridRows = rows;
   $('#gridCols').value = cols; $('#gridRows').value = rows;
   gridCells = {};
-  const devs = Object.keys(devicesCache);
+  const devs = getTubeDevices().map(([id]) => id);
   let idx = 0;
   for(let r=0; r<rows; r++){
     for(let c=0; c<cols; c++){
@@ -1794,7 +2260,7 @@ $('#gridApplyBtn').addEventListener('click', async ()=>{
   if(!built || !built.segments.length){ toast('Place at least one tube on the grid', true); return; }
   try{
     await api('/virtuals', {method:'POST', body:JSON.stringify({id:vid, config:{rows:built.rows, grouping}})});
-    await api(`/virtuals/${vid}`, {method:'PUT', body:JSON.stringify({segments:built.segments})});
+    await api(`/virtuals/${vid}`, {method:'POST', body:JSON.stringify({segments:built.segments})});
     toast(`Grid applied to "${vid}" (${built.rows} rows, ${built.segments.length} segments)`);
     await loadVirtuals();
   }catch(e){
@@ -1862,12 +2328,10 @@ function drawTubePreview(){
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  const devs = Object.entries(devicesCache).sort((a, b) =>
-    (a[1]?.config?.name || a[0]).localeCompare(b[1]?.config?.name || b[0])
-  );
+  const devs = getTubeDevices();
   const meta = $('#previewMeta');
   if(!devs.length){
-    if(meta) meta.textContent = 'no devices';
+    if(meta) meta.textContent = 'no tubes';
     ctx.fillStyle = '#74748c';
     ctx.font = '12px Inter, system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -1888,6 +2352,12 @@ function drawTubePreview(){
       let totalPhys = 0;
       for(const seg of virt.segments) totalPhys += Math.max(0, (Number(seg[2]) || 0) - (Number(seg[1]) || 0) + 1);
       if(!totalPhys) continue;
+      const vShape = virtualShapes[vid];
+      const virtRows = Math.max(1, Number(virt?.config?.rows) || 1);
+      const virtCols = totalPhys / virtRows;
+      const fRows = Array.isArray(vShape) ? (Number(vShape[0]) || 1) : 1;
+      const fCols = Array.isArray(vShape) ? (Number(vShape[1]) || vFrame.length) : vFrame.length;
+      const use2D = virtRows > 1 && fRows > 1 && fRows * fCols === vFrame.length && totalPhys % virtRows === 0;
       let offset = 0;
       let out = null;
       for(const seg of virt.segments){
@@ -1898,8 +2368,25 @@ function drawTubePreview(){
           for(let k = 0; k < segLen; k++){
             const dst = inv ? (end - k) : (start + k);
             if(dst >= 0 && dst < pixelCount){
-              const fIdx = Math.min(vFrame.length - 1, Math.floor((offset + k) * vFrame.length / totalPhys));
-              out[dst] = vFrame[fIdx];
+              if(use2D){
+                const vIdx = offset + k;
+                const vr = Math.floor(vIdx / virtCols);
+                const vc = vIdx % virtCols;
+                const fr = Math.min(fRows - 1, Math.max(0, Math.round((vr + 0.5) * fRows / virtRows - 0.5)));
+                const fc = Math.min(fCols - 1, Math.max(0, Math.round((vc + 0.5) * fCols / virtCols - 0.5)));
+                out[dst] = vFrame[fr * fCols + fc];
+              }else{
+                const pos = (offset + k + 0.5) * (vFrame.length / totalPhys) - 0.5;
+                const i0 = Math.max(0, Math.min(vFrame.length - 1, Math.floor(pos)));
+                const i1 = Math.max(0, Math.min(vFrame.length - 1, i0 + 1));
+                const t = Math.max(0, Math.min(1, pos - i0));
+                const p0 = vFrame[i0], p1 = vFrame[i1];
+                out[dst] = [
+                  Math.round(p0[0] + (p1[0] - p0[0]) * t),
+                  Math.round(p0[1] + (p1[1] - p0[1]) * t),
+                  Math.round(p0[2] + (p1[2] - p0[2]) * t)
+                ];
+              }
             }
           }
         }
@@ -1934,48 +2421,99 @@ function drawTubePreview(){
     else meta.textContent = `0/${devs.length} streaming`;
   }
 
-  const padX = 14, padTop = 10, padBot = 24;
-  const usableW = Math.max(40, w - padX * 2);
-  const slotW = usableW / devs.length;
-  const tubeW = Math.max(14, Math.min(36, slotW * 0.56));
-  const tubeH = Math.max(30, h - padTop - padBot);
+  // Build physical layout items from Stage Grid if placed, else 1-row vertical tubes
+  const tubeMap = Object.fromEntries(devs);
+  const placedItems = [];
+  const placedIds = new Set();
+  for(const [key, cell] of Object.entries(gridCells)){
+    if(!cell || !tubeMap[cell.deviceId]) continue;
+    const [rr, cc] = key.split(',').map(Number);
+    const dir = GRID_DIRS.find(x => x.id === cell.dir) || GRID_DIRS[0];
+    placedItems.push({ id: cell.deviceId, dev: tubeMap[cell.deviceId], r: rr, c: cc, dir });
+    placedIds.add(cell.deviceId);
+  }
 
-  devs.forEach(([id, dev], idx) => {
-    const cx = padX + slotW * (idx + 0.5);
-    const x = Math.round(cx - tubeW / 2);
-    const y = padTop;
+  let items;
+  if(placedItems.length){
+    const minR = Math.min(...placedItems.map(x => x.r));
+    const minC = Math.min(...placedItems.map(x => x.c));
+    placedItems.forEach(x => { x.r -= minR; x.c -= minC; });
+    const maxR = Math.max(...placedItems.map(x => x.r));
+    const unplaced = devs.filter(([id]) => !placedIds.has(id));
+    unplaced.forEach(([id, dev], i) => {
+      placedItems.push({ id, dev, r: maxR + 1, c: i, dir: GRID_DIRS[2] });
+    });
+    items = placedItems;
+  }else{
+    items = devs.map(([id, dev], i) => ({ id, dev, r: 0, c: i, dir: GRID_DIRS[2] }));
+  }
+
+  const nRows = Math.max(1, Math.max(...items.map(x => x.r)) + 1);
+  const nCols = Math.max(1, Math.max(...items.map(x => x.c)) + 1);
+  const padX = 12, padY = 10, gapX = 12, gapY = 12;
+  const slotW = Math.max(44, (w - padX * 2 - gapX * (nCols - 1)) / nCols);
+  const slotH = Math.max(44, (h - padY * 2 - gapY * (nRows - 1)) / nRows);
+
+  items.forEach(({ id, dev, r: gr, c: gc, dir }) => {
+    const sx = padX + gc * (slotW + gapX);
+    const sy = padY + gr * (slotH + gapY);
     const online = dev?.online !== false;
     const pixels = resolvedPixels[id];
     const n = pixels?.length || dev?.config?.pixel_count || 36;
+    const sides = (n >= 4 && n % 4 === 0) ? 4 : 1;
+    const segsPerSide = Math.max(1, Math.floor(n / sides));
+    const horiz = !!dir.horiz;
+    const matCols = horiz ? segsPerSide : sides;
+    const matRows = horiz ? sides : segsPerSide;
+
+    const labelH = 14;
+    const availW = Math.max(24, slotW - 4);
+    const availH = Math.max(24, slotH - labelH - 4);
+    const cellW = horiz
+      ? Math.max(4, Math.min(38, availW / matCols))
+      : Math.max(3, Math.min(16, availW / matCols, (availH / matRows) * 0.9));
+    const cellH = horiz
+      ? Math.max(3, Math.min(14, availH / matRows, cellW * 0.65))
+      : Math.max(4, Math.min(26, availH / matRows));
+    const bodyW = cellW * matCols;
+    const bodyH = cellH * matRows;
+    const bx = Math.round(sx + (slotW - bodyW) / 2);
+    const by = Math.round(sy + (availH - bodyH) / 2);
 
     // Tube housing
-    ctx.fillStyle = '#0e0e16';
+    ctx.fillStyle = '#0c0d14';
     ctx.strokeStyle = online ? '#34344a' : '#6b2334';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(x - 2, y - 2, tubeW + 4, tubeH + 4, 5);
+    ctx.roundRect(bx - 3, by - 3, bodyW + 6, bodyH + 6, 5);
     ctx.fill();
     ctx.stroke();
 
-    // Segments
-    const segH = tubeH / n;
-    const gap = segH > 3.5 ? 0.8 : 0;
-    for(let i = 0; i < n; i++){
-      const px = pixels?.[i];
-      const r = px ? px[0] : 24;
-      const g = px ? px[1] : 24;
-      const b = px ? px[2] : 38;
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(x, y + i * segH, tubeW, Math.max(1, segH - gap));
+    // 4x9 (or 9x4 horizontal) segment matrix
+    const segGapX = cellW >= 5 ? 1 : 0.4;
+    const segGapY = cellH >= 5 ? 1 : 0.4;
+    for(let s = 0; s < sides; s++){
+      for(let k = 0; k < segsPerSide; k++){
+        const idx = s * segsPerSide + k;
+        const px = pixels?.[idx];
+        const cr = px ? px[0] : 24;
+        const cg = px ? px[1] : 24;
+        const cb = px ? px[2] : 38;
+        const posAlong = dir.inv ? (segsPerSide - 1 - k) : k;
+        const mc = horiz ? posAlong : s;
+        const mr = horiz ? s : posAlong;
+        ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+        ctx.fillRect(bx + mc * cellW + segGapX * 0.5, by + mr * cellH + segGapY * 0.5, Math.max(1, cellW - segGapX), Math.max(1, cellH - segGapY));
+      }
     }
 
     // Label
-    const label = (dev?.config?.name || id).slice(0, 14);
+    const label = (dev?.config?.name || id).slice(0, 12);
     ctx.fillStyle = online ? '#b6b6ca' : '#ff6b86';
     ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(online ? label : `${label} (off)`, cx, y + tubeH + 6);
+    ctx.fillText(online ? label : `${label} (off)`, sx + slotW / 2, by + bodyH + 5);
   });
 }
 
@@ -2065,8 +2603,16 @@ function drawLayoutPreview(){
         const srcIdx = inv ? (end - k) : (start + k);
         px = frame[srcIdx];
       }else if(vFrame?.length){
-        const fIdx = Math.min(vFrame.length - 1, Math.floor((vOffset + k) * vFrame.length / totalPhys));
-        px = vFrame[fIdx];
+        const pos = (vOffset + k + 0.5) * (vFrame.length / totalPhys) - 0.5;
+        const i0 = Math.max(0, Math.min(vFrame.length - 1, Math.floor(pos)));
+        const i1 = Math.max(0, Math.min(vFrame.length - 1, i0 + 1));
+        const t = Math.max(0, Math.min(1, pos - i0));
+        const p0 = vFrame[i0], p1 = vFrame[i1];
+        px = [
+          Math.round(p0[0] + (p1[0] - p0[0]) * t),
+          Math.round(p0[1] + (p1[1] - p0[1]) * t),
+          Math.round(p0[2] + (p1[2] - p0[2]) * t)
+        ];
       }
       const cr = px ? px[0] : 24;
       const cg = px ? px[1] : 24;
