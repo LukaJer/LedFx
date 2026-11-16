@@ -55,6 +55,11 @@ def get_default_config_directory() -> str:
     Returns:
         str: The default configuration directory path.
     """
+    repo_config_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "config")
+    )
+    if os.path.isfile(os.path.join(repo_config_dir, "config.json")):
+        return repo_config_dir
 
     base_dir = os.getenv("APPDATA") if os.name == "nt" else os.path.expanduser("~")
     return os.path.join(base_dir, CONFIG_DIRECTORY)

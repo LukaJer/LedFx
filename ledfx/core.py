@@ -283,10 +283,11 @@ class LedFxCore:
     def open_ui(self):
         # Check if we're binding to all adaptors
         if str(self.config.host) == "0.0.0.0":
-            url = f"http://127.0.0.1:{self.port!s}"
+            base_url = f"http://127.0.0.1:{self.port!s}"
         else:
             # If the user has specified an adaptor, launch its address
-            url = self.http.base_url
+            base_url = self.http.base_url.rstrip("/")
+        url = f"{base_url}/control"
         try:
             webbrowser.get().open(url)
         except webbrowser.Error:

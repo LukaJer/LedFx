@@ -102,3 +102,15 @@ Testing & Project Notes
 
 - ``AGENTS.md`` — Repo conventions and fork architecture summary.
 - ``BUGS.md`` — Known open issues and resolved bug log.
+- ``TODO.md`` — Tracked follow-up tasks.
+
+TODO
+====
+
+- [ ] Scene tab
+- [ ] Improve/change/fix sensitivity & speed sliders
+- [ ] Setups
+- [ ] Improve layout tab
+- [ ] Check sound-to-light algorithm
+- [ ] RGBW support
+

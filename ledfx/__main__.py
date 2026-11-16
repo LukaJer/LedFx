@@ -101,7 +101,14 @@ def parse_args():
         "--open-ui",
         dest="open_ui",
         action="store_true",
-        help="Automatically open the webinterface",
+        default=True,
+        help="Automatically open the webinterface (default: enabled)",
+    )
+    parser.add_argument(
+        "--no-open-ui",
+        dest="open_ui",
+        action="store_false",
+        help="Do not automatically open the webinterface on startup",
     )
     parser.add_argument(
         "-v",
