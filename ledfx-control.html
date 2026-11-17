@@ -164,7 +164,15 @@
   .gcell{min-height:64px;border:1px dashed var(--line);border-radius:8px;background:var(--panel);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px;cursor:pointer;user-select:none;font-size:12px;text-align:center}
   .gcell:hover{border-color:var(--amber)}
   .gcell.filled{border-style:solid;border-color:var(--amber);background:var(--panel2);color:var(--text)}
+  .gcell.start-left{border-left:4px solid #38bdf8}
+  .gcell.start-right{border-right:4px solid #38bdf8}
+  .gcell.start-top{border-top:4px solid #38bdf8}
+  .gcell.start-bottom{border-bottom:4px solid #38bdf8}
   .gcell .gdir{font-size:11px;color:var(--amber);font-weight:700}
+  .gcell .gflips{display:flex;gap:4px;margin-top:2px}
+  .gcell .gflip{background:var(--bg);border:1px solid var(--line);color:var(--muted);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:600;cursor:pointer}
+  .gcell .gflip:hover{border-color:var(--amber);color:var(--text)}
+  .gcell .gflip.on{border-color:#38bdf8;background:rgba(56,189,248,.16);color:#7dd3fc}
   .preview-wrap{background:#090a0c;border:1px solid var(--line);border-radius:12px;padding:10px}
   .section.collapsed .preview-wrap{display:none}
   #tubePreviewCanvas{display:block;width:100%;height:300px;border-radius:8px}
@@ -217,8 +225,30 @@
   .layout-pill{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
   .top-energy{height:5px;width:100%;background:var(--panel2);overflow:hidden}
   .top-energy i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--amber),var(--amber2));transition:width 60ms linear}
+  .fold{display:inline-flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
+  .fold:hover{color:var(--text)}
+  .fold .tri{display:inline-block;font-size:11px;line-height:1;transition:transform .15s ease;color:var(--amber)}
+  .section.collapsed .fold .tri{transform:rotate(-90deg)}
+  .section.collapsed .scenes{display:none}
   .hdr-brand{display:flex;align-items:center;gap:16px;flex:1;min-width:0}
   #hdrSpecCanvas{flex:1;min-width:120px;height:40px;background:transparent;border:0;display:block;cursor:pointer}
+  .se-vcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+  .se-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .se-vname{font-weight:700;font-size:14px}
+  .se-etype{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--amber);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .se-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 14px}
+  .se-field{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}
+  .se-field label{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);text-transform:capitalize}
+  .se-field label span:last-child{font-variant-numeric:tabular-nums;color:var(--text);font-weight:600}
+  .se-field input[type=range]{width:100%;accent-color:var(--amber);cursor:pointer}
+  .se-field select,.se-field input[type=text]{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:6px 8px;border-radius:7px;font-size:12px}
+  .se-color-row{display:flex;align-items:center;gap:8px}
+  .se-color-row input[type=color]{width:38px;height:28px;border:0;background:none;padding:0;cursor:pointer}
+  .se-color-hex{font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text)}
+  .se-bool{display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:12px;color:var(--text)}
+  .se-bool input{width:16px;height:16px;accent-color:var(--amber);cursor:pointer}
+  .se-grad-field{grid-column:1 / -1}
+  .se-grad-bar{height:12px;border-radius:6px;border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -238,7 +268,7 @@
   </div>
 </header>
 
-<nav class="tabs" id="tabs"><button data-t="main" data-deck="" class="on">Main</button><span id="deckTabs" style="display:contents"></span><button data-t="virtuals">Virtuals</button><button data-t="eq">EQ &amp; Spectrum</button><button data-t="layout">Layouts &amp; Tubes</button><button data-t="auto">Auto</button><button data-t="lab">Palette Lab</button><button data-t="diag">Diagnostics</button></nav>
+<nav class="tabs" id="tabs"><button data-t="main" data-deck="" class="on">Main</button><span id="deckTabs" style="display:contents"></span><button data-t="virtuals">Virtuals</button><button data-t="scenes">Scenes</button><button data-t="eq">EQ &amp; Spectrum</button><button data-t="layout">Layouts &amp; Tubes</button><button data-t="auto">Auto</button><button data-t="lab">Palette Lab</button><button data-t="diag">Diagnostics</button></nav>
 <main>
 <div class="statusbar">
   <div class="stc" id="stBpmBox" role="button" tabindex="0" title="Click to tap BPM" style="cursor:pointer;user-select:none"><small>BPM (tap)</small><b id="stBpm">—</b></div>
@@ -256,13 +286,23 @@
       <div class="section"><h2>Vibe Macros <span style="text-transform:none;font-weight:400">— palette + speed + sensitivity</span></h2><div class="macros" id="macros"></div></div>
       <div class="section" id="mainScenesSec">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
-          <h2 style="margin:0">Scenes</h2>
+          <h2 class="fold" id="toggleMainScenesBtn" role="button" tabindex="0" aria-expanded="true" style="margin:0" title="Collapse or expand scenes"><span class="tri">&#9662;</span> Scenes</h2>
           <div class="row2" style="margin:0">
             <button class="tgl" id="allScenesBtn" title="Show scenes from all layout tags">All Scenes</button>
             <button class="btn" id="updateSceneBtn" title="Snapshot current live virtual effects back into the selected scene">Update Scene</button>
           </div>
         </div>
         <div class="scenes" id="scenes"><div class="empty">Connect to LedFx to load scenes.</div></div>
+      </div>
+      <div class="section" id="sceneEditorSec" hidden>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <h2 style="margin:0">Scene Effect Settings <span class="fold-count" id="sceneEditorTitle"></span></h2>
+          <div class="row2" style="margin:0">
+            <button class="btn" id="sceneEditorSaveBtn" title="Save changes back to the selected scene">Update Scene</button>
+            <button class="btn primary" id="sceneEditorSaveAsBtn" title="Save modified effect settings as a new scene">Save As New…</button>
+          </div>
+        </div>
+        <div id="sceneEditorBody"></div>
       </div>
     </div>
     <div class="deck-col">
@@ -329,6 +369,42 @@
     </div>
     <div id="offlineDevices" class="row2" style="margin:0 0 12px" hidden></div>
     <div class="virtuals" id="virtuals"><div class="empty">Connect to LedFx to load virtuals.</div></div>
+  </div>
+</div>
+<div id="pane-scenes" class="pane" hidden>
+  <div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <h2 style="margin:0">Scene Editor &amp; Creator</h2>
+      <div class="row2" style="margin:0">
+        <select id="stSceneSel" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;min-width:190px"><option value="">(New Scene)</option></select>
+        <button class="btn" id="stNewBtn">+ New Scene</button>
+        <button class="btn" id="stPreviewBtn" title="Push draft virtual effects live without saving">Preview Live</button>
+        <button class="btn primary" id="stSaveBtn">Save</button>
+        <button class="btn" id="stSaveAsBtn">Save As New…</button>
+        <button class="btn" id="stDelBtn" style="color:var(--bad)">Delete</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:14px">
+      <div class="se-field">
+        <label><span>Scene Name</span></label>
+        <input type="text" id="stNameIn" placeholder="e.g. Front Club Groove" />
+      </div>
+      <div class="se-field">
+        <label><span>Scene Tags (comma-separated)</span></label>
+        <input type="text" id="stTagsIn" placeholder="chill, house, dynamic, trippy" />
+        <div class="tag-bar" id="stQuickTags" style="margin:4px 0 0">
+          <button type="button" class="tag-pill" data-qtag="chill">+ chill</button>
+          <button type="button" class="tag-pill" data-qtag="house">+ house</button>
+          <button type="button" class="tag-pill" data-qtag="dynamic">+ dynamic</button>
+          <button type="button" class="tag-pill" data-qtag="trippy">+ trippy</button>
+        </div>
+      </div>
+    </div>
+    <div class="row2" style="margin:0 0 14px">
+      <select id="stAddVirtSel" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;min-width:190px"><option value="">Choose virtual to add…</option></select>
+      <button class="btn" id="stAddVirtBtn">+ Add Virtual to Scene</button>
+    </div>
+    <div id="stVirtualsBody"><div class="empty">Select a scene above or click + New Scene to build one.</div></div>
   </div>
 </div>
 <div id="pane-auto" class="pane" hidden>
@@ -455,7 +531,10 @@
   </div>
   <div class="section">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
-      <h2 style="margin:0">Stage Layout <span style="text-transform:none;font-weight:400">— remaps virtual segments &amp; filters tagged scenes</span></h2>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 style="margin:0">Stage Layout <span style="text-transform:none;font-weight:400">— remaps virtual segments &amp; filters tagged scenes</span></h2>
+        <span class="layout-pill" id="layoutModeBadge" style="font-size:11px;padding:3px 10px">Creating New Layout</span>
+      </div>
       <span class="status" id="layoutStatus">no layout selected</span>
     </div>
     <div class="row2" style="margin:0 0 10px">
@@ -757,10 +836,41 @@ function findLayoutTubeConflict(layoutId, devIds){
   return null;
 }
 
+let layoutOrder = [];
+try{
+  const savedOrder = JSON.parse(localStorage.getItem('ledfx_layout_order') || '[]');
+  if(Array.isArray(savedOrder)) layoutOrder = savedOrder;
+}catch(e){}
+
+function getOrderedLayoutEntries(onlyEnabled){
+  let entries = Object.entries(layoutsCache);
+  if(onlyEnabled) entries = entries.filter(([, p]) => p && p.enabled !== false);
+  const rank = new Map(layoutOrder.map((id, i) => [id, i]));
+  return entries.sort((a, b) => {
+    const ra = rank.has(a[0]) ? rank.get(a[0]) : 9999;
+    const rb = rank.has(b[0]) ? rank.get(b[0]) : 9999;
+    return ra - rb || a[0].localeCompare(b[0]);
+  });
+}
+
+function moveLayoutOrder(id, delta){
+  const ids = getOrderedLayoutEntries(false).map(([lid]) => lid);
+  const idx = ids.indexOf(id);
+  const next = idx + delta;
+  if(idx < 0 || next < 0 || next >= ids.length) return;
+  [ids[idx], ids[next]] = [ids[next], ids[idx]];
+  layoutOrder = ids;
+  try{ localStorage.setItem('ledfx_layout_order', JSON.stringify(layoutOrder)); }catch(e){}
+  multiPreviewKey = '';
+  renderLayoutsOverview();
+  renderDeckTabs();
+  if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
+}
+
 function renderDeckTabs(){
   const holder = $('#deckTabs');
   if(!holder) return;
-  const enabled = Object.entries(layoutsCache).filter(([, p]) => p && p.enabled !== false);
+  const enabled = getOrderedLayoutEntries(true);
   holder.innerHTML = enabled.map(([id, p]) =>
     `<button data-t="main" data-deck="${escHtml(id)}">${escHtml(p.name || id)}</button>`
   ).join('');
@@ -793,12 +903,12 @@ function renderDeckTabs(){
 function renderLayoutsOverview(){
   const box = $('#layoutsOverview');
   if(!box) return;
-  const entries = Object.entries(layoutsCache);
+  const entries = getOrderedLayoutEntries(false);
   if(!entries.length){
     box.innerHTML = '<div class="empty">No saved layouts yet. Configure one below and click Save Layout.</div>';
     return;
   }
-  box.innerHTML = entries.map(([id, p]) => {
+  box.innerHTML = entries.map(([id, p], idx) => {
     const active = p.enabled !== false;
     const devs = getLayoutDevices(p);
     const vCount = Object.keys(p.virtuals || {}).length;
@@ -818,12 +928,17 @@ function renderLayoutsOverview(){
         <div class="layout-card-tubes">${pills}</div>
         ${conflict ? `<div class="status" style="color:var(--warn)">Blocked: ${escHtml(devicesCache[conflict.devId]?.config?.name || conflict.devId)} active in "${escHtml(conflict.layoutName)}"</div>` : ''}
         <div class="row2" style="margin:2px 0 0">
+          <button class="btn" data-lmove="${escHtml(id)}" data-dir="-1" ${idx===0?'disabled':''} style="padding:5px 8px;font-size:12px" title="Move earlier on Main page">&larr;</button>
+          <button class="btn" data-lmove="${escHtml(id)}" data-dir="1" ${idx===entries.length-1?'disabled':''} style="padding:5px 8px;font-size:12px" title="Move later on Main page">&rarr;</button>
           <button class="btn" data-ledit="${escHtml(id)}" style="padding:5px 10px;font-size:12px">Edit</button>
           <button class="btn" data-lapply="${escHtml(id)}" style="padding:5px 10px;font-size:12px">Apply</button>
           <button class="btn" data-ldel="${escHtml(id)}" style="padding:5px 10px;font-size:12px">Delete</button>
         </div>
       </div>`;
   }).join('');
+  box.querySelectorAll('[data-lmove]').forEach(b => b.addEventListener('click', () => {
+    moveLayoutOrder(b.dataset.lmove, Number(b.dataset.dir));
+  }));
   box.querySelectorAll('[data-ltog]').forEach(b => b.addEventListener('click', async () => {
     const id = b.dataset.ltog, p = layoutsCache[id];
     if(!p) return;
@@ -846,6 +961,7 @@ function renderLayoutsOverview(){
   box.querySelectorAll('[data-ledit]').forEach(b => b.addEventListener('click', () => {
     loadLayoutIntoEditor(b.dataset.ledit);
     if($('#layoutSel')) $('#layoutSel').value = b.dataset.ledit;
+    $('#layoutNameIn')?.scrollIntoView({behavior:'smooth', block:'center'});
     toast(`Editing "${layoutsCache[b.dataset.ledit]?.name || b.dataset.ledit}"`);
   }));
   box.querySelectorAll('[data-lapply]').forEach(b => b.addEventListener('click', async () => {
@@ -940,6 +1056,15 @@ function syncLayoutUI(){
   $('#layoutStatus').textContent = cur
     ? `active: ${cur.name}${cur.scene_tag ? ` · tag "${cur.scene_tag}"` : ''}`
     : `${entries.length} saved layout(s)`;
+  const editing = !!(layoutEditingId && layoutsCache[layoutEditingId]);
+  const modeBadge = $('#layoutModeBadge');
+  if(modeBadge){
+    modeBadge.textContent = editing ? `Editing: ${layoutsCache[layoutEditingId].name || layoutEditingId}` : 'Creating New Layout';
+    modeBadge.style.borderColor = editing ? 'var(--amber)' : 'var(--ok)';
+    modeBadge.style.color = editing ? 'var(--amber)' : 'var(--ok)';
+  }
+  const saveBtn = $('#saveLayoutBtn');
+  if(saveBtn) saveBtn.textContent = editing ? 'Update Layout' : 'Create Layout';
   renderDeckTabs();
   renderLayoutsOverview();
   renderLayoutEditorBoxes();
@@ -1007,7 +1132,7 @@ $('#saveLayoutBtn').addEventListener('click', async ()=>{
     devices: devList,
     grid_cols: typeof gridCols === 'number' ? gridCols : 5,
     grid_rows: typeof gridRows === 'number' ? gridRows : 2,
-    grid_cells: typeof gridCells === 'object' ? gridCells : {},
+    grid_cells: typeof sanitizeGridCells === 'function' ? sanitizeGridCells(gridCells) : {},
     snapshot: true,
   };
   if(layoutEditingId && layoutsCache[layoutEditingId]) payload.id = layoutEditingId;
@@ -1066,6 +1191,10 @@ function renderScenes(){
     })[0];
   }
   if(chosenActive) syncSceneDisplay(chosenActive);
+  if(typeof renderSceneEditor === 'function'){
+    const edTarget = activeDeckId ? (lastDeckScene[activeDeckId] && ids.includes(lastDeckScene[activeDeckId]) ? lastDeckScene[activeDeckId] : chosenActive) : '';
+    renderSceneEditor(edTarget);
+  }
   el.innerHTML = ids.map(id => {
     const s = scenesCache[id];
     const vEntries = Object.entries(s.virtuals || {});
@@ -1130,16 +1259,22 @@ async function activateScene(id, deckId){
     await api('/scenes', {method:'PUT', body: JSON.stringify({id, action:'activate'})});
     toast('Scene activated');
     await loadVirtuals();
+    if(typeof renderSceneEditor === 'function' && activeDeckId) renderSceneEditor(id);
   }catch(e){ toast('Scene failed: ' + e.message, true); }
 }
 
 $('#updateSceneBtn').addEventListener('click', async ()=>{
   if(guardLock()) return;
+  if(activeDeckId && editingSceneId && editingSceneId === lastScene && Object.keys(sceneDraftVirtuals).length){
+    await saveEditedScene(false);
+    return;
+  }
   if(!lastScene || lastScene === '—' || !scenesCache[lastScene]){
     toast('Select or activate a scene first', true);
     return;
   }
   const sceneName = scenesCache[lastScene].name || lastScene;
+  if(!confirm(`Overwrite scene "${sceneName}" with current live effects?`)) return;
   try{
     const existing = scenesCache[lastScene].virtuals || {};
     const hasTracked = Object.values(existing).some(e => e && (e.type || e.action === 'activate'));
@@ -1167,6 +1302,527 @@ $('#updateSceneBtn').addEventListener('click', async ()=>{
   }catch(e){
     toast('Update scene failed: ' + e.message, true);
   }
+});
+
+// ---- Layout Tab Scene / Effect Settings Editor ----
+let editingSceneId = '', sceneDraftVirtuals = {}, sceneReplacedVirtuals = new Set();
+const SE_SKIP_KEYS = new Set(['diag', 'test', 'dump', 'advanced']);
+
+function resolveGradientCss(val){
+  if(typeof val !== 'string') return 'linear-gradient(90deg, #ff0000, #0000ff)';
+  const g = LEDFX_GRADIENTS[val] || val.trim();
+  return /^(#|rgb|hsl|linear-gradient|radial-gradient)/i.test(g) ? g : 'linear-gradient(90deg, #ff0000, #0000ff)';
+}
+
+function buildEffectFieldsHtml(vid, type, mergedCfg){
+  const schemaProps = (effectsSchema[type] || {}).schema?.properties || {};
+  const keys = Object.keys(schemaProps).length ? Object.keys(schemaProps) : Object.keys(mergedCfg);
+  return keys.filter(k => !SE_SKIP_KEYS.has(k) && k in mergedCfg).map(k => {
+    const def = schemaProps[k] || {};
+    const val = mergedCfg[k];
+    const isGrad = k === 'gradient' || def.format === 'gradient' || (typeof val === 'string' && val.includes('gradient('));
+    const isColor = !isGrad && (k.includes('color') || (typeof val === 'string' && /^#[0-9a-f]{6}$/i.test(val)));
+    if(isGrad){
+      const curGrad = String(val || '');
+      const matchedPreset = Object.keys(LEDFX_GRADIENTS).find(pn => pn === curGrad || LEDFX_GRADIENTS[pn] === curGrad) || '';
+      const opts = `<option value="">Custom…</option>` + Object.keys(LEDFX_GRADIENTS).map(pn => `<option value="${escHtml(pn)}" ${pn===matchedPreset?'selected':''}>${escHtml(pn)}</option>`).join('');
+      return `<div class="se-field se-grad-field" data-vid="${escHtml(vid)}" data-key="${escHtml(k)}">
+        <label><span>${escHtml(k)}</span><span>${escHtml(matchedPreset || 'custom')}</span></label>
+        <div class="se-grad-bar" style="background:${escHtml(resolveGradientCss(curGrad))}"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select data-se-grad-preset style="flex:0 0 150px">${opts}</select>
+          <input type="text" data-se-input value="${escHtml(curGrad)}" style="flex:1;min-width:180px" />
+        </div>
+      </div>`;
+    }
+    if(isColor){
+      const hex = /^#[0-9a-f]{6}$/i.test(String(val)) ? String(val) : '#ffffff';
+      return `<div class="se-field" data-vid="${escHtml(vid)}" data-key="${escHtml(k)}">
+        <label><span>${escHtml(k)}</span></label>
+        <div class="se-color-row">
+          <input type="color" data-se-input value="${escHtml(hex)}" />
+          <span class="se-color-hex">${escHtml(hex)}</span>
+        </div>
+      </div>`;
+    }
+    if(def.type === 'boolean' || typeof val === 'boolean'){
+      return `<div class="se-field" data-vid="${escHtml(vid)}" data-key="${escHtml(k)}">
+        <label class="se-bool"><span>${escHtml(k)}</span><input type="checkbox" data-se-input ${val?'checked':''} /></label>
+      </div>`;
+    }
+    if(Array.isArray(def.enum) && def.enum.length){
+      const opts = def.enum.map(ev => `<option value="${escHtml(ev)}" ${String(ev)===String(val)?'selected':''}>${escHtml(ev)}</option>`).join('');
+      return `<div class="se-field" data-vid="${escHtml(vid)}" data-key="${escHtml(k)}">
+        <label><span>${escHtml(k)}</span></label>
+        <select data-se-input>${opts}</select>
+      </div>`;
+    }
+    if(def.type === 'number' || def.type === 'integer' || typeof val === 'number'){
+      const min = def.minimum ?? 0;
+      const max = def.maximum ?? (typeof val === 'number' && val > 1 ? Math.max(10, val * 2) : 1);
+      const step = def.type === 'integer' ? 1 : Number(((max - min) / 100 || 0.01).toPrecision(2));
+      const numVal = Number(val ?? min);
+      return `<div class="se-field" data-vid="${escHtml(vid)}" data-key="${escHtml(k)}">
+        <label><span>${escHtml(k)}</span><span data-se-val>${escHtml(numVal)}</span></label>
+        <input type="range" data-se-input data-num="${def.type==='integer'?'int':'float'}" min="${min}" max="${max}" step="${step}" value="${numVal}" />
+      </div>`;
+    }
+    return `<div class="se-field" data-vid="${escHtml(vid)}" data-key="${escHtml(k)}">
+      <label><span>${escHtml(k)}</span></label>
+      <input type="text" data-se-input value="${escHtml(val ?? '')}" />
+    </div>`;
+  }).join('');
+}
+
+function wireEffectFields(container, draftMap, livePush){
+  container.querySelectorAll('.se-field[data-vid][data-key]').forEach(field => {
+    const vid = field.dataset.vid, key = field.dataset.key;
+    const inp = field.querySelector('[data-se-input]');
+    const presetSel = field.querySelector('[data-se-grad-preset]');
+    let sendT = null;
+    const pushUpdate = (newVal, immediate) => {
+      if(!draftMap[vid]) return;
+      draftMap[vid].config[key] = newVal;
+      if(!livePush) return;
+      if(virtualsCache[vid]?.effect?.config) virtualsCache[vid].effect.config[key] = newVal;
+      const send = () => api(`/virtuals/${vid}/effects`, {method:'PUT', body: JSON.stringify({config:{[key]: newVal}})}).catch(e => toast('Update failed: ' + e.message, true));
+      if(immediate){ clearTimeout(sendT); send(); }
+      else{ clearTimeout(sendT); sendT = setTimeout(send, 100); }
+    };
+    if(presetSel && inp){
+      presetSel.addEventListener('change', () => {
+        if(!presetSel.value) return;
+        const gVal = LEDFX_GRADIENTS[presetSel.value] || presetSel.value;
+        inp.value = gVal;
+        const bar = field.querySelector('.se-grad-bar');
+        if(bar) bar.style.background = resolveGradientCss(gVal);
+        const lbl = field.querySelector('label span:last-child');
+        if(lbl) lbl.textContent = presetSel.value;
+        pushUpdate(gVal, true);
+      });
+    }
+    if(!inp) return;
+    if(inp.type === 'range'){
+      inp.addEventListener('input', () => {
+        const v = inp.dataset.num === 'int' ? parseInt(inp.value, 10) : Number(inp.value);
+        const valEl = field.querySelector('[data-se-val]');
+        if(valEl) valEl.textContent = v;
+        pushUpdate(v, false);
+      });
+      inp.addEventListener('change', () => {
+        const v = inp.dataset.num === 'int' ? parseInt(inp.value, 10) : Number(inp.value);
+        pushUpdate(v, true);
+      });
+    }else if(inp.type === 'color'){
+      inp.addEventListener('input', () => {
+        const hexEl = field.querySelector('.se-color-hex');
+        if(hexEl) hexEl.textContent = inp.value;
+        pushUpdate(inp.value, false);
+      });
+      inp.addEventListener('change', () => pushUpdate(inp.value, true));
+    }else if(inp.type === 'checkbox'){
+      inp.addEventListener('change', () => pushUpdate(inp.checked, true));
+    }else{
+      inp.addEventListener('change', () => {
+        const bar = field.querySelector('.se-grad-bar');
+        if(bar) bar.style.background = resolveGradientCss(inp.value);
+        pushUpdate(inp.value, true);
+      });
+    }
+  });
+}
+
+let mainScenesHidden = localStorage.getItem('ledfx_main_scenes_hidden') === '1';
+function syncMainScenesVisibility(){
+  const sec = $('#mainScenesSec'), btn = $('#toggleMainScenesBtn');
+  if(sec) sec.classList.toggle('collapsed', mainScenesHidden);
+  if(btn) btn.setAttribute('aria-expanded', String(!mainScenesHidden));
+}
+syncMainScenesVisibility();
+$('#toggleMainScenesBtn')?.addEventListener('click', ()=>{
+  mainScenesHidden = !mainScenesHidden;
+  localStorage.setItem('ledfx_main_scenes_hidden', mainScenesHidden ? '1' : '0');
+  syncMainScenesVisibility();
+});
+$('#toggleMainScenesBtn')?.addEventListener('keydown', e => {
+  if(e.key === 'Enter' || e.key === ' '){
+    e.preventDefault();
+    $('#toggleMainScenesBtn').click();
+  }
+});
+
+function defaultEffectConfig(type){
+  const props = (effectsSchema[type] || {}).schema?.properties || {};
+  const out = {};
+  for(const [k, def] of Object.entries(props)){
+    if(def && 'default' in def) out[k] = def.default;
+  }
+  return out;
+}
+
+function buildVirtualMappingBarHtml(vid){
+  const vCfg = virtualsCache[vid]?.config || {};
+  return `<div class="arr-grid" style="margin-bottom:10px;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px">
+    <label>Mapping
+      <select data-st-map="${escHtml(vid)}" style="background:var(--bg);border:1px solid var(--line);color:var(--text);padding:5px 8px;border-radius:6px">
+        <option value="span" ${(vCfg.mapping||'span')==='span'?'selected':''}>span</option>
+        <option value="copy" ${vCfg.mapping==='copy'?'selected':''}>copy</option>
+      </select>
+    </label>
+    <label>Rows <input type="number" data-st-rows="${escHtml(vid)}" min="1" max="32" value="${vCfg.rows || 1}" style="width:58px"></label>
+    <label>Grouping
+      <select data-st-grp="${escHtml(vid)}" style="background:var(--bg);border:1px solid var(--line);color:var(--text);padding:5px 8px;border-radius:6px">
+        <option value="1" ${Number(vCfg.grouping||1)===1?'selected':''}>1 (Full 36px)</option>
+        <option value="4" ${Number(vCfg.grouping||1)===4?'selected':''}>4 (Ring-Grouped)</option>
+      </select>
+    </label>
+    <label>Rotate
+      <select data-st-rot="${escHtml(vid)}" style="background:var(--bg);border:1px solid var(--line);color:var(--text);padding:5px 8px;border-radius:6px">
+        ${[0,1,2,3].map(r => `<option value="${r}" ${Number(vCfg.rotate||0)===r?'selected':''}>${r * 90}°</option>`).join('')}
+      </select>
+    </label>
+    <button type="button" class="btn" data-st-apply-virt="${escHtml(vid)}" style="padding:5px 10px;font-size:11px">Apply Virtual Mapping</button>
+    <button type="button" class="btn" data-st-clone-virt="${escHtml(vid)}" style="padding:5px 10px;font-size:11px" title="Create a new virtual copy with these mapping settings for this scene">+ Clone Virtual for Scene</button>
+    <span class="status" style="font-size:10px">(virtual-wide unless cloned)</span>
+  </div>`;
+}
+
+function readVirtualMappingBar(container, vid){
+  return {
+    mapping: container.querySelector(`[data-st-map="${CSS.escape(vid)}"]`)?.value || 'span',
+    rows: Math.max(1, Number(container.querySelector(`[data-st-rows="${CSS.escape(vid)}"]`)?.value) || 1),
+    grouping: Math.max(1, Number(container.querySelector(`[data-st-grp="${CSS.escape(vid)}"]`)?.value) || 1),
+    rotate: Number(container.querySelector(`[data-st-rot="${CSS.escape(vid)}"]`)?.value) || 0,
+  };
+}
+
+function wireVirtualMappingBar(container, draftMap, onCloned){
+  container.querySelectorAll('[data-st-apply-virt]').forEach(btn => btn.addEventListener('click', async () => {
+    const vid = btn.dataset.stApplyVirt;
+    const cfgPatch = readVirtualMappingBar(container, vid);
+    try{
+      await api('/virtuals', {method:'POST', body: JSON.stringify({id: vid, config: cfgPatch})});
+      if(virtualsCache[vid]?.config) Object.assign(virtualsCache[vid].config, cfgPatch);
+      toast(`Updated virtual "${vid}" mapping`);
+    }catch(e){ toast('Failed to update virtual: ' + e.message, true); }
+  }));
+  container.querySelectorAll('[data-st-clone-virt]').forEach(btn => btn.addEventListener('click', async () => {
+    const vid = btn.dataset.stCloneVirt;
+    const orig = virtualsCache[vid];
+    if(!orig){ toast('Virtual not loaded', true); return; }
+    const origName = orig.config?.name || vid;
+    const newName = prompt(`New virtual name (cloned from "${origName}"):`, `${origName} Copy`);
+    if(!newName || !newName.trim()) return;
+    const cfgPatch = readVirtualMappingBar(container, vid);
+    const newCfg = { ...(orig.config || {}), ...cfgPatch, name: newName.trim() };
+    try{
+      const created = await api('/virtuals', {method:'POST', body: JSON.stringify({config: newCfg})});
+      const newVid = created.virtual?.id;
+      if(!newVid) throw new Error('Server did not return new virtual id');
+      if(Array.isArray(orig.segments) && orig.segments.length){
+        await api(`/virtuals/${newVid}`, {method:'POST', body: JSON.stringify({segments: orig.segments})});
+      }
+      for(const [lid, lp] of Object.entries(layoutsCache)){
+        if(lp?.virtuals && vid in lp.virtuals){
+          const updatedVirts = {
+            ...lp.virtuals,
+            [newVid]: { segments: orig.segments || [], rows: cfgPatch.rows, grouping: cfgPatch.grouping },
+          };
+          await api('/layouts', {method:'POST', body: JSON.stringify({
+            id: lid, name: lp.name || lid, scene_tag: lp.scene_tag || '', devices: lp.devices || [],
+            virtuals: updatedVirts, grid_cells: lp.grid_cells, enabled: lp.enabled !== false,
+          })});
+        }
+      }
+      if(draftMap && draftMap[vid]){
+        const draft = draftMap[vid];
+        delete draftMap[vid];
+        draftMap[newVid] = draft;
+        await api(`/virtuals/${vid}`, {method:'PUT', body: JSON.stringify({active: false})}).catch(()=>{});
+        await api(`/virtuals/${newVid}/effects`, {method:'POST', body: JSON.stringify({type: draft.type, config: draft.config})});
+      }
+      await loadLayouts();
+      await loadVirtuals();
+      toast(`Cloned "${newName.trim()}" (${newVid}) — click Save/Update Scene to bind it`);
+      if(typeof onCloned === 'function') onCloned(vid, newVid);
+    }catch(e){ toast('Clone virtual failed: ' + e.message, true); }
+  }));
+}
+
+function renderSceneEditor(sceneId){
+  const sec = $('#sceneEditorSec'), body = $('#sceneEditorBody'), titleEl = $('#sceneEditorTitle');
+  if(!sec || !body) return;
+  if(!activeDeckId || !sceneId || !scenesCache[sceneId]){
+    sec.hidden = true;
+    editingSceneId = '';
+    sceneDraftVirtuals = {};
+    return;
+  }
+  const s = scenesCache[sceneId];
+  const entries = Object.entries(s.virtuals || {}).filter(([, eff]) => eff && eff.type);
+  if(!entries.length){
+    sec.hidden = false;
+    editingSceneId = sceneId;
+    if(titleEl) titleEl.textContent = `— ${s.name || sceneId}`;
+    body.innerHTML = '<div class="empty">This scene has no active effects to edit.</div>';
+    return;
+  }
+  sec.hidden = false;
+  editingSceneId = sceneId;
+  if(titleEl) titleEl.textContent = `— ${s.name || sceneId}`;
+  sceneDraftVirtuals = {};
+  sceneReplacedVirtuals = new Set();
+
+  body.innerHTML = entries.map(([vid, eff]) => {
+    const type = eff.type;
+    const mergedCfg = { ...defaultEffectConfig(type), ...(eff.config || {}) };
+    sceneDraftVirtuals[vid] = { action: 'activate', type, config: JSON.parse(JSON.stringify(mergedCfg)) };
+    const fieldsHtml = buildEffectFieldsHtml(vid, type, mergedCfg);
+    const vName = virtualsCache[vid]?.config?.name || vid;
+    return `<div class="se-vcard">
+      <div class="se-head"><span class="se-vname">${escHtml(vName)}</span><span class="se-etype">${escHtml(type)}</span></div>
+      ${buildVirtualMappingBarHtml(vid)}
+      <div class="se-grid">${fieldsHtml || '<span class="status">No editable properties</span>'}</div>
+    </div>`;
+  }).join('');
+
+  const bindInline = () => {
+    wireEffectFields(body, sceneDraftVirtuals, true);
+    wireVirtualMappingBar(body, sceneDraftVirtuals, (oldVid) => {
+      sceneReplacedVirtuals.add(oldVid);
+      body.innerHTML = Object.entries(sceneDraftVirtuals).map(([vid, d]) => {
+        const fieldsHtml = buildEffectFieldsHtml(vid, d.type, d.config);
+        const vName = virtualsCache[vid]?.config?.name || vid;
+        return `<div class="se-vcard">
+          <div class="se-head"><span class="se-vname">${escHtml(vName)}</span><span class="se-etype">${escHtml(d.type)}</span></div>
+          ${buildVirtualMappingBarHtml(vid)}
+          <div class="se-grid">${fieldsHtml || '<span class="status">No editable properties</span>'}</div>
+        </div>`;
+      }).join('');
+      bindInline();
+    });
+  };
+  bindInline();
+}
+
+async function saveEditedScene(asNew){
+  if(!editingSceneId || !scenesCache[editingSceneId]){
+    toast('Select a scene first', true);
+    return;
+  }
+  const orig = scenesCache[editingSceneId];
+  const mergedVirtuals = {};
+  for(const [vid, oldEntry] of Object.entries(orig.virtuals || {})){
+    if(sceneReplacedVirtuals.has(vid)){
+      mergedVirtuals[vid] = { action: 'stop' };
+      continue;
+    }
+    if(sceneDraftVirtuals[vid]) mergedVirtuals[vid] = sceneDraftVirtuals[vid];
+    else mergedVirtuals[vid] = oldEntry;
+  }
+  for(const [vid, draft] of Object.entries(sceneDraftVirtuals)){
+    if(!(vid in mergedVirtuals)) mergedVirtuals[vid] = draft;
+  }
+  try{
+    if(asNew){
+      const suggested = `${orig.name || editingSceneId} Custom`;
+      const newName = prompt('Save modified scene as:', suggested);
+      if(!newName || !newName.trim()) return;
+      const cleanName = newName.trim();
+      const dup = Object.values(scenesCache).find(sc => (sc?.name || '').toLowerCase() === cleanName.toLowerCase());
+      if(dup && !confirm(`A scene named "${dup.name}" already exists. Save anyway?`)) return;
+      const res = await api('/scenes', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: cleanName,
+          scene_tags: orig.scene_tags || '',
+          virtuals: JSON.parse(JSON.stringify(mergedVirtuals)),
+        }),
+      });
+      const newId = res.scene?.id;
+      toast(`Saved new scene "${cleanName}"`);
+      await loadScenes();
+      if(newId) await activateScene(newId, activeDeckId);
+    }else{
+      if(!confirm(`Overwrite scene "${orig.name || editingSceneId}"?`)) return;
+      await api('/scenes', {
+        method: 'POST',
+        body: JSON.stringify({ id: editingSceneId, virtuals: JSON.parse(JSON.stringify(mergedVirtuals)) }),
+      });
+      toast(`Updated scene "${orig.name || editingSceneId}"`);
+      await loadScenes();
+      renderSceneEditor(editingSceneId);
+    }
+  }catch(e){
+    toast('Save scene failed: ' + e.message, true);
+  }
+}
+
+$('#sceneEditorSaveBtn')?.addEventListener('click', () => saveEditedScene(false));
+$('#sceneEditorSaveAsBtn')?.addEventListener('click', () => saveEditedScene(true));
+
+// ---- Dedicated Scene Editor / Creator Tab ----
+let studioSceneId = '', studioDraftVirtuals = {};
+function loadStudioScene(sid){
+  studioSceneId = sid || '';
+  const sc = sid ? scenesCache[sid] : null;
+  if($('#stSceneSel')) $('#stSceneSel').value = studioSceneId;
+  if($('#stNameIn')) $('#stNameIn').value = sc ? (sc.name || sid) : '';
+  if($('#stTagsIn')) $('#stTagsIn').value = sc ? (sc.scene_tags || '') : '';
+  studioDraftVirtuals = {};
+  if(sc && sc.virtuals){
+    for(const [vid, eff] of Object.entries(sc.virtuals)){
+      if(eff && eff.type){
+        studioDraftVirtuals[vid] = {
+          action: 'activate',
+          type: eff.type,
+          config: { ...defaultEffectConfig(eff.type), ...(eff.config || {}) },
+        };
+      }
+    }
+  }
+  renderStudioVirtuals();
+}
+
+function renderSceneStudio(){
+  const sel = $('#stSceneSel'), addSel = $('#stAddVirtSel');
+  if(sel){
+    const cur = studioSceneId;
+    sel.innerHTML = `<option value="">(New Scene)</option>` + Object.keys(scenesCache).sort().map(id =>
+      `<option value="${escHtml(id)}">${escHtml(scenesCache[id]?.name || id)}</option>`
+    ).join('');
+    if(cur && scenesCache[cur]) sel.value = cur;
+    else if(!cur && lastScene && scenesCache[lastScene] && !Object.keys(studioDraftVirtuals).length){
+      loadStudioScene(lastScene);
+      return;
+    }
+  }
+  if(addSel){
+    const vIds = Object.keys(virtualsCache).filter(id => !virtualsCache[id]?.is_device).sort();
+    addSel.innerHTML = `<option value="">Choose virtual to add…</option>` + vIds.map(id =>
+      `<option value="${escHtml(id)}">${escHtml(virtualsCache[id]?.config?.name || id)} (${escHtml(id)})</option>`
+    ).join('');
+  }
+  renderStudioVirtuals();
+}
+
+function renderStudioVirtuals(){
+  const body = $('#stVirtualsBody');
+  if(!body) return;
+  const entries = Object.entries(studioDraftVirtuals);
+  if(!entries.length){
+    body.innerHTML = '<div class="empty">No active virtuals in this scene yet. Choose a virtual above and click "+ Add Virtual to Scene".</div>';
+    return;
+  }
+  body.innerHTML = entries.map(([vid, draft]) => {
+    const vObj = virtualsCache[vid] || {};
+    const vCfg = vObj.config || {};
+    const vName = vCfg.name || vid;
+    const effOpts = effectTypes.map(t => `<option value="${escHtml(t)}" ${t===draft.type?'selected':''}>${escHtml(t)}</option>`).join('');
+    const fieldsHtml = buildEffectFieldsHtml(vid, draft.type, draft.config);
+    return `<div class="se-vcard" data-st-vcard="${escHtml(vid)}">
+      <div class="se-head" style="flex-wrap:wrap;gap:8px">
+        <div><span class="se-vname">${escHtml(vName)}</span> <span class="status">(${escHtml(vid)})</span></div>
+        <div class="row2" style="margin:0;gap:8px">
+          <select data-st-eff="${escHtml(vid)}" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:5px 9px;border-radius:7px;font-size:12px">${effOpts}</select>
+          <button type="button" class="btn" data-st-remove="${escHtml(vid)}" style="padding:5px 9px;font-size:11px;color:var(--bad)">Remove</button>
+        </div>
+      </div>
+      ${buildVirtualMappingBarHtml(vid)}
+      <div class="se-grid">${fieldsHtml || '<span class="status">No editable properties</span>'}</div>
+    </div>`;
+  }).join('');
+
+  wireEffectFields(body, studioDraftVirtuals, true);
+  wireVirtualMappingBar(body, studioDraftVirtuals, () => renderStudioVirtuals());
+
+  body.querySelectorAll('[data-st-eff]').forEach(sel => sel.addEventListener('change', async () => {
+    const vid = sel.dataset.stEff, newType = sel.value;
+    studioDraftVirtuals[vid] = { action: 'activate', type: newType, config: defaultEffectConfig(newType) };
+    try{
+      await api(`/virtuals/${vid}/effects`, {method:'POST', body: JSON.stringify({type: newType, config: studioDraftVirtuals[vid].config})});
+    }catch(e){}
+    renderStudioVirtuals();
+  }));
+  body.querySelectorAll('[data-st-remove]').forEach(btn => btn.addEventListener('click', () => {
+    delete studioDraftVirtuals[btn.dataset.stRemove];
+    renderStudioVirtuals();
+  }));
+}
+
+$('#stSceneSel')?.addEventListener('change', e => loadStudioScene(e.target.value));
+$('#stNewBtn')?.addEventListener('click', () => {
+  studioSceneId = '';
+  if($('#stSceneSel')) $('#stSceneSel').value = '';
+  if($('#stNameIn')) $('#stNameIn').value = '';
+  if($('#stTagsIn')) $('#stTagsIn').value = '';
+  studioDraftVirtuals = {};
+  renderStudioVirtuals();
+});
+$('#stQuickTags')?.addEventListener('click', e => {
+  const b = e.target.closest('[data-qtag]');
+  if(!b || !$('#stTagsIn')) return;
+  const tag = b.dataset.qtag;
+  const cur = new Set($('#stTagsIn').value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean));
+  if(cur.has(tag)) cur.delete(tag); else cur.add(tag);
+  $('#stTagsIn').value = [...cur].join(', ');
+});
+$('#stAddVirtBtn')?.addEventListener('click', () => {
+  const vid = $('#stAddVirtSel')?.value;
+  if(!vid){ toast('Choose a virtual first', true); return; }
+  if(studioDraftVirtuals[vid]){ toast('Virtual already in scene'); return; }
+  const liveEff = virtualsCache[vid]?.effect;
+  const type = (liveEff && liveEff.type) || effectTypes[0] || 'fade';
+  studioDraftVirtuals[vid] = {
+    action: 'activate',
+    type,
+    config: { ...defaultEffectConfig(type), ...((liveEff && liveEff.config) || {}) },
+  };
+  renderStudioVirtuals();
+});
+$('#stPreviewBtn')?.addEventListener('click', async () => {
+  for(const [vid, draft] of Object.entries(studioDraftVirtuals)){
+    try{ await api(`/virtuals/${vid}/effects`, {method:'POST', body: JSON.stringify({type: draft.type, config: draft.config})}); }
+    catch(e){ toast(`Preview ${vid} failed: ${e.message}`, true); return; }
+  }
+  toast('Previewing draft scene live');
+});
+
+async function saveStudioScene(forceNew){
+  const name = ($('#stNameIn')?.value || '').trim();
+  if(!name){ toast('Enter a scene name', true); return; }
+  if(!Object.keys(studioDraftVirtuals).length){ toast('Add at least one virtual to the scene', true); return; }
+  const tags = [...new Set(($('#stTagsIn')?.value || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean))].join(',');
+  const payload = { name, scene_tags: tags, virtuals: JSON.parse(JSON.stringify(studioDraftVirtuals)) };
+  if(!forceNew && studioSceneId && scenesCache[studioSceneId]){
+    if(!confirm(`Overwrite existing scene "${scenesCache[studioSceneId].name || studioSceneId}"?`)) return;
+    payload.id = studioSceneId;
+  }else if(forceNew){
+    const dup = Object.values(scenesCache).find(sc => (sc?.name || '').toLowerCase() === name.toLowerCase());
+    if(dup && !confirm(`A scene named "${dup.name}" already exists. Save anyway?`)) return;
+  }
+  try{
+    const res = await api('/scenes', {method:'POST', body: JSON.stringify(payload)});
+    const savedId = res.scene?.id || studioSceneId;
+    toast(`${payload.id ? 'Updated' : 'Created'} scene "${name}"`);
+    await loadScenes();
+    if(savedId) loadStudioScene(savedId);
+  }catch(e){ toast('Save scene failed: ' + e.message, true); }
+}
+$('#stSaveBtn')?.addEventListener('click', () => saveStudioScene(false));
+$('#stSaveAsBtn')?.addEventListener('click', () => saveStudioScene(true));
+$('#stDelBtn')?.addEventListener('click', async () => {
+  if(!studioSceneId || !scenesCache[studioSceneId]){ toast('Select a saved scene to delete', true); return; }
+  const sName = scenesCache[studioSceneId].name || studioSceneId;
+  if(!confirm(`Delete scene "${sName}"?`)) return;
+  try{
+    await api('/scenes', {method:'DELETE', body: JSON.stringify({id: studioSceneId})});
+    toast(`Deleted "${sName}"`);
+    studioSceneId = '';
+    studioDraftVirtuals = {};
+    await loadScenes();
+    renderSceneStudio();
+  }catch(e){ toast('Delete failed: ' + e.message, true); }
 });
 
 async function loadVirtuals(){
@@ -2001,6 +2657,7 @@ $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(
   if(b.dataset.t==='diag') $('#log').textContent=callLog.join('\n')||'no calls yet';
   if(b.dataset.t==='eq') requestAnimationFrame(drawSpectrum);
   if(b.dataset.t==='main'){ renderDeckTabs(); renderScenes(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
+  if(b.dataset.t==='scenes'){ if(typeof renderSceneStudio === 'function') renderSceneStudio(); }
   if(b.dataset.t==='layout'){ if(typeof renderLayoutEditorBoxes === 'function') renderLayoutEditorBoxes(); if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview(); } });
 $('#resync').addEventListener('click',()=>connect());
 // status + auto-pilot loop
@@ -2640,6 +3297,19 @@ try{
   }
 }catch(e){}
 
+function isFlipped(v){ return v === true || v === '1' || v === 'true'; }
+function sanitizeGridCells(cells){
+  const out = {};
+  if(!cells || typeof cells !== 'object') return out;
+  for(const [k, c] of Object.entries(cells)){
+    if(!c || !c.deviceId) continue;
+    const entry = { deviceId: String(c.deviceId), dir: String(c.dir || 'H+') };
+    if(isFlipped(c.flipX)) entry.flipX = '1';
+    if(isFlipped(c.flipY)) entry.flipY = '1';
+    out[k] = entry;
+  }
+  return out;
+}
 function saveStageGrid(){
   try{ localStorage.setItem('ledfx_stage_grid', JSON.stringify({cols:gridCols, rows:gridRows, cells:gridCells})); }catch(e){}
 }
@@ -2670,7 +3340,16 @@ function renderStageGrid(){
         const d = devicesCache[cell.deviceId];
         const name = d?.config?.name || cell.deviceId;
         const dir = GRID_DIRS.find(x=>x.id===cell.dir) || GRID_DIRS[0];
-        html += `<div class="gcell filled" data-key="${key}"><span>${escHtml(name)}</span><span class="gdir">${dir.label}</span></div>`;
+        const fx = isFlipped(cell.flipX), fy = isFlipped(cell.flipY);
+        const startEdge = dir.horiz ? (dir.inv ? 'right' : 'left') : (dir.inv ? 'bottom' : 'top');
+        html += `<div class="gcell filled start-${startEdge}" data-key="${key}" title="Start at ${startEdge} (blue edge)">
+          <span>${escHtml(name)}</span>
+          <span class="gdir">${dir.label} · start ${startEdge}</span>
+          <div class="gflips">
+            <button type="button" class="gflip ${fx?'on':''}" data-flip="x" title="Mirror horizontally (Flip X)">Flip X</button>
+            <button type="button" class="gflip ${fy?'on':''}" data-flip="y" title="Mirror vertically (Flip Y)">Flip Y</button>
+          </div>
+        </div>`;
       }else{
         html += `<div class="gcell" data-key="${key}">+</div>`;
       }
@@ -2691,9 +3370,18 @@ $('#gridPalette').addEventListener('click', e => {
 });
 
 $('#stageGrid').addEventListener('click', e => {
+  const flipBtn = e.target.closest('.gflip');
   const cellEl = e.target.closest('.gcell');
   if(!cellEl) return;
   const key = cellEl.dataset.key;
+  if(flipBtn && gridCells[key]){
+    e.stopPropagation();
+    const fk = flipBtn.dataset.flip === 'x' ? 'flipX' : 'flipY';
+    if(isFlipped(gridCells[key][fk])) delete gridCells[key][fk];
+    else gridCells[key][fk] = '1';
+    renderStageGrid();
+    return;
+  }
   if(gridBrush === '__ERASE__'){
     delete gridCells[key];
   }else if(gridCells[key]){
@@ -2772,12 +3460,13 @@ function buildSegmentsFromStageGrid(grouping){
       const px = devicesCache[cell.deviceId]?.config?.pixel_count || 36;
       const units = Math.max(1, Math.floor(px / grouping));
       const dir = GRID_DIRS.find(x=>x.id===cell.dir) || GRID_DIRS[0];
+      const invAlong = !!(dir.horiz ? (dir.inv ^ isFlipped(cell.flipX)) : (dir.inv ^ isFlipped(cell.flipY)));
       for(let u=0; u<units; u++){
-        const unitIdx = dir.inv ? (units - 1 - u) : u;
+        const unitIdx = invAlong ? (units - 1 - u) : u;
         const x = colX[c] + (dir.horiz ? u : 0);
         const y = rowY[r] + (dir.horiz ? 0 : u);
         if(y < totalH && x < totalW){
-          canvas[y][x] = {dev:cell.deviceId, start:unitIdx*grouping, end:unitIdx*grouping + grouping - 1, inv:dir.inv};
+          canvas[y][x] = {dev:cell.deviceId, start:unitIdx*grouping, end:unitIdx*grouping + grouping - 1, inv:invAlong};
         }
       }
     }
@@ -2855,7 +3544,7 @@ function drawTubePreview(){
   if(document.hidden || !isPreviewVisible()) return;
   const singleCanvas = $('#tubePreviewCanvas');
   const multiGrid = $('#multiPreviewGrid');
-  const enabledLayouts = Object.entries(layoutsCache).filter(([, p]) => p && p.enabled !== false);
+  const enabledLayouts = getOrderedLayoutEntries(true);
   if(!activeDeckId && enabledLayouts.length && multiGrid && singleCanvas){
     singleCanvas.hidden = true;
     multiGrid.hidden = false;
@@ -3189,7 +3878,7 @@ function renderTubeCanvas(canvas, meta, deckLayout){
     if(!cell || !tubeMap[cell.deviceId]) continue;
     const [rr, cc] = key.split(',').map(Number);
     const dir = GRID_DIRS.find(x => x.id === cell.dir) || GRID_DIRS[0];
-    placedItems.push({ id: cell.deviceId, dev: tubeMap[cell.deviceId], r: rr, c: cc, dir });
+    placedItems.push({ id: cell.deviceId, dev: tubeMap[cell.deviceId], r: rr, c: cc, dir, flipX: isFlipped(cell.flipX), flipY: isFlipped(cell.flipY) });
     placedIds.add(cell.deviceId);
   }
 
@@ -3214,7 +3903,7 @@ function renderTubeCanvas(canvas, meta, deckLayout){
   const slotW = Math.max(44, (w - padX * 2 - gapX * (nCols - 1)) / nCols);
   const slotH = Math.max(44, (h - padY * 2 - gapY * (nRows - 1)) / nRows);
 
-  items.forEach(({ id, dev, r: gr, c: gc, dir }) => {
+  items.forEach(({ id, dev, r: gr, c: gc, dir, flipX, flipY }) => {
     const sx = padX + gc * (slotW + gapX);
     const sy = padY + gr * (slotH + gapY);
     const online = dev?.online !== false;
@@ -3270,10 +3959,22 @@ function renderTubeCanvas(canvas, meta, deckLayout){
           ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
         }
         const posAlong = dir.inv ? (segsPerSide - 1 - k) : k;
-        const mc = horiz ? posAlong : s;
-        const mr = horiz ? s : posAlong;
+        let mc = horiz ? posAlong : s;
+        let mr = horiz ? s : posAlong;
+        if(flipX) mc = matCols - 1 - mc;
+        if(flipY) mr = matRows - 1 - mr;
         ctx.fillRect(bx + mc * cellW + segGapX * 0.5, by + mr * cellH + segGapY * 0.5, drawW, drawH);
       }
+    }
+
+    // Start-of-tube marker (LED 0 edge, independent of Flip X/Y)
+    ctx.fillStyle = '#38bdf8';
+    if(horiz){
+      const mx = dir.inv ? (bx + bodyW + 1) : (bx - 3.5);
+      ctx.fillRect(mx, by - 1, 2.5, bodyH + 2);
+    }else{
+      const my = dir.inv ? (by + bodyH + 1) : (by - 3.5);
+      ctx.fillRect(bx - 1, my, bodyW + 2, 2.5);
     }
 
     // Label

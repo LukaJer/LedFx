@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] Scene tab
+- [x] Scene tab
 - [ ] Improve/change/fix sensitivity & speed sliders
 - [ ] Setups
 - [ ] Improve layout tab
