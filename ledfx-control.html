@@ -422,6 +422,7 @@
       <h2 style="margin:0">Palette Lab <span style="text-transform:none;font-weight:400">— tune stops, HSL shift, role mapping &amp; effect overrides</span></h2>
       <div class="row2" style="margin:0">
         <select id="labLoadSel" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;font-size:12px"><option value="">Load preset…</option></select>
+        <button class="btn" id="labDelPresetBtn" style="color:var(--bad)" title="Delete the selected palette">Delete</button>
         <button class="btn" id="labFromActiveBtn" title="Pull colors from the first active virtual">From Active Effect</button>
         <button class="btn" id="labReverseBtn">Reverse</button>
         <button class="btn" id="labRotateBtn">Rotate</button>
@@ -459,6 +460,13 @@
       <button class="btn" id="labApply">Apply Now</button>
       <button class="btn primary" id="labSave">Save to Palettes</button>
     </div>
+  </div>
+  <div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <h2 style="margin:0">All Palettes <span class="fold-count" id="labPalCount"></span></h2>
+      <button class="btn" id="labRestoreDefaultsBtn" title="Restore any deleted built-in palettes">Restore Built-in Palettes</button>
+    </div>
+    <div class="palette" id="labSavedPalettes"></div>
   </div>
 </div>
 <div id="pane-eq" class="pane" hidden>
@@ -1242,8 +1250,10 @@ async function loadScenes(){
 }
 
 const lastDeckScene = {};
+const activePalettePatch = {};
 async function activateScene(id, deckId){
   if(guardLock()) return;
+  for(const vid of Object.keys(scenesCache[id]?.virtuals || {})) delete activePalettePatch[vid];
   await quantWait(S.trans==='Quantize'?(S.qnt==='Now'?'Bar':S.qnt):'Now');
   syncSceneDisplay(id);
   const targetDeck = deckId || activeDeckId;
@@ -1552,10 +1562,18 @@ function wireVirtualMappingBar(container, draftMap, onCloned){
 function renderSceneEditor(sceneId){
   const sec = $('#sceneEditorSec'), body = $('#sceneEditorBody'), titleEl = $('#sceneEditorTitle');
   if(!sec || !body) return;
-  if(!activeDeckId || !sceneId || !scenesCache[sceneId]){
+  if(!activeDeckId){
     sec.hidden = true;
     editingSceneId = '';
     sceneDraftVirtuals = {};
+    return;
+  }
+  if(!sceneId || !scenesCache[sceneId]){
+    sec.hidden = false;
+    editingSceneId = '';
+    sceneDraftVirtuals = {};
+    if(titleEl) titleEl.textContent = '';
+    body.innerHTML = '<div class="empty">Select a scene above to adjust its effect &amp; mapping settings.</div>';
     return;
   }
   const s = scenesCache[sceneId];
@@ -1575,7 +1593,7 @@ function renderSceneEditor(sceneId){
 
   body.innerHTML = entries.map(([vid, eff]) => {
     const type = eff.type;
-    const mergedCfg = { ...defaultEffectConfig(type), ...(eff.config || {}) };
+    const mergedCfg = { ...defaultEffectConfig(type), ...(eff.config || {}), ...(activePalettePatch[vid] || {}) };
     sceneDraftVirtuals[vid] = { action: 'activate', type, config: JSON.parse(JSON.stringify(mergedCfg)) };
     const fieldsHtml = buildEffectFieldsHtml(vid, type, mergedCfg);
     const vName = virtualsCache[vid]?.config?.name || vid;
@@ -2033,8 +2051,12 @@ async function applyPalette(p, quiet, zoneOverride){
       await api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:v.effect.type, config:nextCfg})});
       v.effect.config = nextCfg;
       v.active = true;
+      activePalettePatch[id] = patch;
       ok++;
     }catch(e){ skip++; }
+  }
+  if(activeDeckId && editingSceneId && runIds.some(id => id in sceneDraftVirtuals)){
+    renderSceneEditor(editingSceneId);
   }
   if(!quiet) toast(skip ? `${p.name} applied to ${ok} virtual(s) (${skip} fixed-color skipped)` : `${p.name} applied`);
 }
@@ -2386,7 +2408,17 @@ function renderMacros(){
   }));
 }
 // palette lab + color cycler
-try{ JSON.parse(localStorage.getItem('ledfx_custom_palettes')||'[]').forEach(p=>PALETTES.push(p)); }catch(e){}
+const DEFAULT_PALETTES = PALETTES.map(p => ({ ...p, colors: [...p.colors] }));
+(function initPalettes(){
+  let deleted = new Set();
+  try{ deleted = new Set(JSON.parse(localStorage.getItem('ledfx_deleted_palettes') || '[]')); }catch(e){}
+  for(let i = PALETTES.length - 1; i >= 0; i--){
+    if(deleted.has(PALETTES[i].name)) PALETTES.splice(i, 1);
+  }
+  try{
+    JSON.parse(localStorage.getItem('ledfx_custom_palettes') || '[]').forEach(p => PALETTES.push({ ...p, _custom: true }));
+  }catch(e){}
+})();
 
 let labBaseColors = ['#3a0f02','#c2410c','#f0a336','#ffe08a'];
 function hexToHsl(hex){
@@ -2509,14 +2541,84 @@ $('#labFromActiveBtn')?.addEventListener('click', () => {
   toast(`Loaded colors from ${active.effect.type}`);
 });
 $('#labApply').addEventListener('click', () => applyPalette(buildLabPaletteObj()));
+function renderLabSavedPalettes(){
+  const box = $('#labSavedPalettes'), cnt = $('#labPalCount');
+  if(cnt) cnt.textContent = `(${PALETTES.length})`;
+  if(!box) return;
+  if(!PALETTES.length){
+    box.innerHTML = '<div class="empty">No palettes left. Create one above or click Restore Built-in Palettes.</div>';
+    return;
+  }
+  box.innerHTML = PALETTES.map((p, i) => `
+    <div class="swatch" style="cursor:default;display:flex;flex-direction:column;gap:6px">
+      <div class="strip2" style="margin-bottom:0">${p.colors.map(c => `<span style="background:${c}"></span>`).join('')}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <span class="name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span>
+        <button type="button" class="btn" data-del-pal="${i}" style="padding:2px 7px;font-size:11px;color:var(--bad)" title="Delete ${escHtml(p.name)}">&times;</button>
+      </div>
+    </div>
+  `).join('');
+  box.querySelectorAll('[data-del-pal]').forEach(b => b.addEventListener('click', () => deletePaletteAt(Number(b.dataset.delPal))));
+}
+
+function deletePaletteAt(idx){
+  const p = PALETTES[idx];
+  if(!p) return;
+  if(!confirm(`Delete palette "${p.name}"?`)) return;
+  PALETTES.splice(idx, 1);
+  palCycleSelected?.delete(p.name);
+  for(const dc of Object.values(deckCycleState)) dc?.pool?.delete(p.name);
+  savePalCyclePool();
+  if(p._custom){
+    try{
+      const saved = JSON.parse(localStorage.getItem('ledfx_custom_palettes') || '[]');
+      const next = saved.filter(sp => sp.name !== p.name);
+      localStorage.setItem('ledfx_custom_palettes', JSON.stringify(next));
+    }catch(e){}
+  }else{
+    try{
+      const deleted = new Set(JSON.parse(localStorage.getItem('ledfx_deleted_palettes') || '[]'));
+      deleted.add(p.name);
+      localStorage.setItem('ledfx_deleted_palettes', JSON.stringify([...deleted]));
+    }catch(e){}
+  }
+  multiPreviewKey = '';
+  renderPalettes(); renderMacros(); populateLabPresets(); renderLabSavedPalettes(); syncPalCycleUI();
+  if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
+  toast(`Deleted palette "${p.name}"`);
+}
+
+$('#labDelPresetBtn')?.addEventListener('click', () => {
+  const sel = $('#labLoadSel');
+  if(!sel || sel.value === ''){ toast('Select a palette in the dropdown first', true); return; }
+  deletePaletteAt(Number(sel.value));
+});
+$('#labRestoreDefaultsBtn')?.addEventListener('click', () => {
+  localStorage.removeItem('ledfx_deleted_palettes');
+  for(const dp of DEFAULT_PALETTES){
+    if(!PALETTES.some(p => p.name === dp.name)){
+      PALETTES.unshift({ ...dp, colors: [...dp.colors] });
+      palCycleSelected?.add(dp.name);
+    }
+  }
+  savePalCyclePool();
+  multiPreviewKey = '';
+  renderPalettes(); renderMacros(); populateLabPresets(); renderLabSavedPalettes(); syncPalCycleUI();
+  if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
+  toast('Restored built-in palettes');
+});
+
 $('#labSave').addEventListener('click', () => {
-  const p = buildLabPaletteObj();
+  const p = { ...buildLabPaletteObj(), _custom: true };
   PALETTES.push(p); palCycleSelected.add(p.name); savePalCyclePool();
-  renderPalettes(); renderMacros(); populateLabPresets(); syncPalCycleUI();
+  multiPreviewKey = '';
+  renderPalettes(); renderMacros(); populateLabPresets(); renderLabSavedPalettes(); syncPalCycleUI();
+  if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
   const saved = JSON.parse(localStorage.getItem('ledfx_custom_palettes')||'[]');
   saved.push(p); localStorage.setItem('ledfx_custom_palettes', JSON.stringify(saved));
   toast('Palette saved');
 });
+renderLabSavedPalettes();
 
 // ---- Palette Color Cycler ----
 let palCycleOn = false, palCycleIdx = 0, palCycleNextAt = 0, palCycleBusy = false, palBassAvg = 0.05, palLastPeakAt = 0;
