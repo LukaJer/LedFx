@@ -61,6 +61,7 @@ performance_insights.txt
 debug_config
 config/*.log*
 config/*.bak*
+config/assets/
 # spec file build may leave the ledfx.env behind
 ledfx.env
 # Misc
