@@ -160,6 +160,12 @@ class AudioInputConfig(LedFxModel):
         le=1.0,
         description="Target normalized level when autogain is enabled",
     )
+    autogain_speed: CoercedFloat = Field(
+        0.5,
+        ge=0.05,
+        le=1.0,
+        description="Autogain response speed (0.05 = slow/smooth, 1.0 = fast)",
+    )
 
 
 class AudioAnalysisConfig(LedFxModel):

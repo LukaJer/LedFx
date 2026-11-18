@@ -319,11 +319,14 @@ class GraphUpdateEvent(Event):
         graph_id: str,
         melbank: np.ndarray,
         frequencies: np.ndarray,
+        bpm: float | None = None,
     ):
         super().__init__(Event.GRAPH_UPDATE)
         self.graph_id = graph_id
         self.melbank = melbank.tolist()
         self.frequencies = frequencies.tolist()
+        if bpm is not None:
+            self.bpm = bpm
 
 
 class VisualisationUpdateEvent(Event):

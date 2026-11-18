@@ -230,7 +230,46 @@ function buildSensPatch(effType, val){
   return patch;
 }
 
-async function setSpeed(val, zoneOverride){
+let sceneCtlMemory = {};
+try{ sceneCtlMemory = JSON.parse(localStorage.getItem('ledfx_scene_ctl_memory') || '{}') || {}; }catch(e){}
+function saveSceneCtlMemory(){
+  try{ localStorage.setItem('ledfx_scene_ctl_memory', JSON.stringify(sceneCtlMemory)); }catch(e){}
+}
+function recordSceneCtl(key, pct, zoneOverride){
+  const sid = (zoneOverride && lastDeckScene[zoneOverride]) ? lastDeckScene[zoneOverride] : (activeDeckId && lastDeckScene[activeDeckId] ? lastDeckScene[activeDeckId] : lastScene);
+  if(!sid || sid === '—' || !scenesCache[sid]) return;
+  if(!sceneCtlMemory[sid]) sceneCtlMemory[sid] = {};
+  sceneCtlMemory[sid][key] = Math.round(pct);
+  saveSceneCtlMemory();
+}
+async function restoreSceneCtl(sceneId, deckId){
+  const mem = sceneCtlMemory[sceneId] || {};
+  const spdPct = mem.spd !== undefined ? mem.spd : 50;
+  const snsPct = mem.sns !== undefined ? mem.sns : 50;
+  if(!deckId || deckId === activeDeckId){
+    if($('#speedSlider')) $('#speedSlider').value = spdPct;
+    if($('#speedVal')) $('#speedVal').textContent = spdPct + '%';
+    if($('#sensSlider')) $('#sensSlider').value = snsPct;
+    if($('#sensVal')) $('#sensVal').textContent = snsPct + '%';
+  }
+  const targetDeck = deckId || activeDeckId;
+  if(targetDeck){
+    const card = document.querySelector(`.lprev-card[data-deck="${CSS.escape(targetDeck)}"]`);
+    if(card){
+      const spEl = card.querySelector('[data-ctl="spd"]'), spVal = card.querySelector('[data-val="spd"]');
+      if(spEl) spEl.value = spdPct;
+      if(spVal) spVal.textContent = spdPct + '%';
+      const snEl = card.querySelector('[data-ctl="sns"]'), snVal = card.querySelector('[data-val="sns"]');
+      if(snEl) snEl.value = snsPct;
+      if(snVal) snVal.textContent = snsPct + '%';
+    }
+  }
+  if(mem.spd !== undefined) await setSpeed(spdPct / 100, deckId, true);
+  if(mem.sns !== undefined) await setSensitivity(snsPct / 100, deckId, true);
+}
+
+async function setSpeed(val, zoneOverride, skipRecord){
+  if(!skipRecord) recordSceneCtl('spd', val * 100, zoneOverride);
   for(const id of targets(zoneOverride)){
     const v = virtualsCache[id];
     if(!v?.effect?.type) continue;
@@ -246,7 +285,8 @@ async function setZoneBrightness(val, zoneOverride){
     try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{brightness:val}})}); }catch(e){}
   }
 }
-async function setSensitivity(val, zoneOverride){
+async function setSensitivity(val, zoneOverride, skipRecord){
+  if(!skipRecord) recordSceneCtl('sns', val * 100, zoneOverride);
   const min_volume = Number((Math.pow(1 - val, 1.5) * 0.25).toFixed(4));
   const jobs = [api('/config', {method:'PUT', body: JSON.stringify({audio:{min_volume}})}).catch(e=>{ toast('Sensitivity update failed: '+e.message, true); })];
   for(const id of targets(zoneOverride)){
@@ -474,6 +514,11 @@ function connectWS(){
     energy=arr.reduce((x,y)=>x+y,0)/arr.length/runMax; lastAudio=Date.now();
     if(typeof checkAudioPeakCycler === 'function') checkAudioPeakCycler(levels);
     const freqs = Array.isArray(m.frequencies) ? m.frequencies : (Array.isArray(m.data?.frequencies) ? m.data.frequencies : null);
+    const detBpm = m.bpm ?? m.data?.bpm;
+    if(autoBpm && typeof detBpm === 'number' && detBpm >= 30 && detBpm <= 240){
+      const rounded = Math.round(detBpm);
+      if(rounded !== bpm){ bpm = rounded; updateStatus(); }
+    }
     updateSpectrumData(arr, freqs);
   };
   sock.onerror=()=>logCall('websocket error','WS','err',0);
@@ -504,16 +549,65 @@ document.querySelectorAll('.seg').forEach(g=>g.addEventListener('click',e=>{
 $('#guardBtn').addEventListener('click',e=>{ S.guard=!S.guard; e.target.classList.toggle('on',S.guard); e.target.textContent='Strobe Guard '+(S.guard?'ON':'OFF'); updateStatus(); });
 $('#lockBtn').addEventListener('click',e=>{ S.lock=!S.lock; e.target.classList.toggle('on',S.lock); e.target.textContent='Perform-Lock '+(S.lock?'ON':'OFF'); document.body.classList.toggle('locked',S.lock); updateStatus(); });
 $('#apBtn').addEventListener('click',()=>{ toggleSceneCycle(); });
-// tap tempo
+// tap & auto tempo
+let autoBpm = true;
+function syncBpmModeUI(){
+  const b = $('#autoBpmBtn');
+  if(b){
+    b.classList.toggle('on', autoBpm);
+    b.textContent = autoBpm ? 'Auto' : 'Tap';
+  }
+}
 function tapBpm(){
+  autoBpm = false; syncBpmModeUI();
   const now=Date.now(); if(taps.length&&now-taps[taps.length-1]>2000) taps=[]; taps.push(now); if(taps.length>6) taps.shift(); beatRef=now;
   if(taps.length>1){ bpm=Math.round(60000/((taps[taps.length-1]-taps[0])/(taps.length-1))); updateStatus(); }
 }
+$('#autoBpmBtn')?.addEventListener('click', e => {
+  e.stopPropagation();
+  autoBpm = !autoBpm;
+  syncBpmModeUI();
+  toast(autoBpm ? 'Auto BPM ON' : 'Manual Tap BPM');
+});
+$('#stBpm')?.addEventListener('click', e => {
+  e.stopPropagation();
+  const inp = $('#stBpmInput'), lbl = $('#stBpm');
+  if(!inp || !lbl) return;
+  lbl.hidden = true;
+  inp.hidden = false;
+  inp.value = bpm || 120;
+  inp.focus();
+  inp.select();
+});
+function commitManualBpm(){
+  const inp = $('#stBpmInput'), lbl = $('#stBpm');
+  if(!inp || !lbl || inp.hidden) return;
+  const v = Math.round(Number(inp.value));
+  inp.hidden = true;
+  lbl.hidden = false;
+  if(Number.isFinite(v) && v >= 30 && v <= 240){
+    autoBpm = false;
+    bpm = v;
+    syncBpmModeUI();
+    updateStatus();
+  }
+}
+$('#stBpmInput')?.addEventListener('click', e => e.stopPropagation());
+$('#stBpmInput')?.addEventListener('blur', commitManualBpm);
+$('#stBpmInput')?.addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); commitManualBpm(); }
+  else if(e.key === 'Escape'){
+    e.preventDefault();
+    const inp = $('#stBpmInput'), lbl = $('#stBpm');
+    if(inp) inp.hidden = true;
+    if(lbl) lbl.hidden = false;
+  }
+});
 $('#tapBtn').addEventListener('click', tapBpm);
 $('#stBpmBox')?.addEventListener('click', tapBpm);
 $('#stBpmBox')?.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tapBpm(); } });
-$('#bpmDn').addEventListener('click',()=>{ if(bpm){bpm--; updateStatus();} });
-$('#bpmUp').addEventListener('click',()=>{ if(bpm){bpm++; updateStatus();} });
+$('#bpmDn').addEventListener('click',()=>{ autoBpm=false; syncBpmModeUI(); if(bpm){bpm--; updateStatus();} });
+$('#bpmUp').addEventListener('click',()=>{ autoBpm=false; syncBpmModeUI(); if(bpm){bpm++; updateStatus();} });
 // brightness
 let briT; $('#briSlider').addEventListener('input',e=>{ $('#briVal').textContent=e.target.value+'%'; clearTimeout(briT); briT=setTimeout(async()=>{
   for(const id of targets()){ if(!virtualsCache[id].active) continue; try{ await api(`/virtuals/${id}/effects`,{method:'PUT',body:JSON.stringify({config:{brightness:e.target.value/100}})}); }catch(err){} } },150); });
@@ -572,6 +666,7 @@ function renderMacros(){
     const idx = Number(b.dataset.del);
     MACROS.splice(idx, 1);
     saveMacros();
+    multiPreviewKey = '';
     renderMacros();
   }));
 }
@@ -583,12 +678,14 @@ $('#macroSaveBtn')?.addEventListener('click', () => {
   if(!name || !name.trim()) return;
   MACROS.push({ n: name.trim(), pal: palName, sp, se });
   saveMacros();
+  multiPreviewKey = '';
   renderMacros();
   toast(`Saved Vibe Macro "${name.trim()}"`);
 });
 $('#macroResetBtn')?.addEventListener('click', () => {
   MACROS = DEFAULT_MACROS.map(m => ({...m}));
   saveMacros();
+  multiPreviewKey = '';
   renderMacros();
   toast('Restored default Vibe Macros');
 });
@@ -898,11 +995,18 @@ const deckCycleState = {};
 function getDeckCycle(deckId){
   if(!deckCycleState[deckId]){
     deckCycleState[deckId] = {
-      on: false, mode: 'bpm_pal', div: 1, idx: 0, nextAt: 0, busy: false, lastPeakAt: 0,
+      on: false, mode: 'bpm_pal', div: 1, rand: false, idx: 0, nextAt: 0, busy: false, lastPeakAt: 0,
       pal: null, pool: new Set(palCycleSelected ? [...palCycleSelected] : PALETTES.map(p => p.name))
     };
   }
   return deckCycleState[deckId];
+}
+function pickNextIdx(len, curIdx, rand){
+  if(len <= 1) return 0;
+  if(!rand) return (curIdx + 1) % len;
+  let next = Math.floor(Math.random() * len);
+  if(next === curIdx) next = (curIdx + 1 + Math.floor(Math.random() * (len - 1))) % len;
+  return next;
 }
 function stepDeckPalCycler(deckId){
   const dc = getDeckCycle(deckId);
@@ -917,7 +1021,7 @@ function stepDeckPalCycler(deckId){
   }else{
     const pool = PALETTES.filter(p => dc.pool.has(p.name));
     if(!pool.length) return;
-    dc.idx = (dc.idx + 1) % pool.length;
+    dc.idx = pickNextIdx(pool.length, dc.idx, dc.rand);
     nextPal = pool[dc.idx];
     dc.pal = nextPal;
   }
@@ -952,15 +1056,23 @@ function checkAudioPeakCycler(lvls){
 function syncPalCycleUI(){
   const btn = $('#palCycleBtn');
   if(!btn) return;
-  btn.classList.toggle('on', palCycleOn);
-  btn.textContent = palCycleOn ? 'Cycle ON' : 'Cycle OFF';
+  const dc = activeDeckId ? getDeckCycle(activeDeckId) : null;
+  const on = dc ? dc.on : palCycleOn;
+  const mode = dc ? dc.mode : ($('#palCycleMode')?.value || 'bpm_pal');
+  const div = dc ? dc.div : (Number($('#palCycleDiv')?.value) || 1);
+  const pool = dc ? dc.pool : palCycleSelected;
+  if(dc){
+    if($('#palCycleMode')) $('#palCycleMode').value = mode;
+    if($('#palCycleDiv')) $('#palCycleDiv').value = String(div);
+    if($('#palCycleRand')) $('#palCycleRand').checked = !!dc.rand;
+  }
+  btn.classList.toggle('on', on);
+  btn.textContent = on ? 'Cycle ON' : 'Cycle OFF';
   const info = $('#palCycleInfo');
-  const poolCount = PALETTES.filter(p => palCycleSelected.has(p.name)).length;
+  const poolCount = PALETTES.filter(p => pool.has(p.name)).length;
   if(info){
-    if(!palCycleOn) info.textContent = `manual · ${poolCount} selected`;
+    if(!on) info.textContent = `manual · ${poolCount} selected`;
     else{
-      const mode = $('#palCycleMode').value;
-      const div = Number($('#palCycleDiv').value) || 1;
       const effBpm = bpm || 120;
       info.textContent = mode.startsWith('bpm') ? `${effBpm} BPM · ÷${div} (${poolCount})` : `audio peak (${poolCount})`;
     }
@@ -977,27 +1089,62 @@ function stepPalCycler(){
   }else{
     const pool = PALETTES.filter(p => palCycleSelected.has(p.name));
     if(!pool.length) return;
-    palCycleIdx = (palCycleIdx + 1) % pool.length;
+    palCycleIdx = pickNextIdx(pool.length, palCycleIdx, !!$('#palCycleRand')?.checked);
     nextPal = pool[palCycleIdx];
   }
   palCycleBusy = true;
   applyPalette(nextPal, true).finally(() => { palCycleBusy = false; });
 }
 $('#palPoolAllBtn')?.addEventListener('click', () => {
-  palCycleSelected = new Set(PALETTES.map(p => p.name));
-  savePalCyclePool(); renderPalettes(); syncPalCycleUI();
+  if(activeDeckId){
+    getDeckCycle(activeDeckId).pool = new Set(PALETTES.map(p => p.name));
+    multiPreviewKey = '';
+  }else{
+    palCycleSelected = new Set(PALETTES.map(p => p.name));
+    savePalCyclePool();
+  }
+  renderPalettes(); syncPalCycleUI();
 });
 $('#palPoolNoneBtn')?.addEventListener('click', () => {
-  palCycleSelected.clear();
-  savePalCyclePool(); renderPalettes(); syncPalCycleUI();
+  if(activeDeckId){
+    getDeckCycle(activeDeckId).pool.clear();
+    multiPreviewKey = '';
+  }else{
+    palCycleSelected.clear();
+    savePalCyclePool();
+  }
+  renderPalettes(); syncPalCycleUI();
 });
 $('#palCycleBtn')?.addEventListener('click', () => {
-  palCycleOn = !palCycleOn;
-  palCycleNextAt = Date.now();
+  if(activeDeckId){
+    const dc = getDeckCycle(activeDeckId);
+    dc.on = !dc.on;
+    dc.nextAt = Date.now();
+    multiPreviewKey = '';
+  }else{
+    palCycleOn = !palCycleOn;
+    palCycleNextAt = Date.now();
+  }
   syncPalCycleUI();
 });
-$('#palCycleMode')?.addEventListener('change', syncPalCycleUI);
-$('#palCycleDiv')?.addEventListener('change', () => { palCycleNextAt = Date.now(); syncPalCycleUI(); });
+$('#palCycleMode')?.addEventListener('change', e => {
+  if(activeDeckId){ getDeckCycle(activeDeckId).mode = e.target.value; multiPreviewKey = ''; }
+  syncPalCycleUI();
+});
+$('#palCycleDiv')?.addEventListener('change', e => {
+  if(activeDeckId){
+    const dc = getDeckCycle(activeDeckId);
+    dc.div = Number(e.target.value) || 1;
+    dc.nextAt = Date.now();
+    multiPreviewKey = '';
+  }else{
+    palCycleNextAt = Date.now();
+  }
+  syncPalCycleUI();
+});
+$('#palCycleRand')?.addEventListener('change', e => {
+  if(activeDeckId){ getDeckCycle(activeDeckId).rand = e.target.checked; multiPreviewKey = ''; }
+});
 
 let sceneCycleSelected = null;
 try{

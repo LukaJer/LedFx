@@ -468,10 +468,20 @@ class Melbanks:
             self.send_melbank_event(len(self.melbank_processors) - 1)
 
     def send_melbank_event(self, i):
+        bpm = None
+        tempo = getattr(self._audio, "_tempo", None)
+        if tempo is not None:
+            try:
+                val = float(tempo.get_bpm())
+                if 30.0 <= val <= 240.0:
+                    bpm = round(val, 1)
+            except (TypeError, ValueError):
+                bpm = None
         self._ledfx.events.fire_event(
             GraphUpdateEvent(
                 f"melbank_{i}",
                 self.melbanks_filtered[i],
                 self.melbank_processors[i].melbank_frequencies,
+                bpm=bpm,
             )
         )

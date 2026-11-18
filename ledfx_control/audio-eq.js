@@ -13,7 +13,7 @@ const EQ_PRESETS = {
   scoop:    {eq_low:6,   eq_low_mid:2,   eq_mid:-6, eq_high_mid:3,  eq_high:6},
   crisp:    {eq_low:0,   eq_low_mid:-2,  eq_mid:0,  eq_high_mid:5,  eq_high:8}
 };
-let eqState = {eq_enabled:false, eq_low:0, eq_low_mid:0, eq_mid:0, eq_high_mid:0, eq_high:0, input_gain:1.0, autogain:false, autogain_target:0.5, min_volume:0.2, pitch_method:'yinfft', onset_method:'hfc', pitch_tolerance:0.8, delay_ms:0, beat_min_freq:20, beat_max_freq:100};
+let eqState = {eq_enabled:false, eq_low:0, eq_low_mid:0, eq_mid:0, eq_high_mid:0, eq_high:0, input_gain:1.0, autogain:false, autogain_target:0.5, autogain_speed:0.5, min_volume:0.2, pitch_method:'yinfft', onset_method:'hfc', pitch_tolerance:0.8, delay_ms:0, beat_min_freq:20, beat_max_freq:100};
 let melbanksState = {max_frequencies:[350, 2000, 15000], min_frequency:20, peak_isolation:0.4};
 let melbanksSaveTimer = null;
 let eqSaveTimer = null;
@@ -54,6 +54,9 @@ function syncEqUI(){
   }
   if(agTgt) agTgt.value = eqState.autogain_target;
   if(agVal) agVal.textContent = Number(eqState.autogain_target).toFixed(2);
+  const agSpd = $('#audioAutogainSpeed'), agSpdVal = $('#audioAutogainSpeedVal');
+  if(agSpd) agSpd.value = eqState.autogain_speed ?? 0.5;
+  if(agSpdVal) agSpdVal.textContent = Number(eqState.autogain_speed ?? 0.5).toFixed(2);
   const mvSl = $('#audioMinVolSlider'), mvVal = $('#audioMinVolVal');
   if(mvSl) mvSl.value = eqState.min_volume;
   if(mvVal) mvVal.textContent = Number(eqState.min_volume).toFixed(2);
@@ -153,6 +156,7 @@ async function loadAudioConfig(){
     if(typeof a.input_gain === 'number') eqState.input_gain = a.input_gain;
     if(typeof a.autogain === 'boolean') eqState.autogain = a.autogain;
     if(typeof a.autogain_target === 'number') eqState.autogain_target = a.autogain_target;
+    if(typeof a.autogain_speed === 'number') eqState.autogain_speed = a.autogain_speed;
     if(typeof a.min_volume === 'number') eqState.min_volume = a.min_volume;
     if(typeof a.pitch_method === 'string') eqState.pitch_method = a.pitch_method;
     if(typeof a.onset_method === 'string') eqState.onset_method = a.onset_method;
@@ -224,6 +228,11 @@ $('#audioAutogainBtn')?.addEventListener('click', () => {
 });
 $('#audioAutogainTarget')?.addEventListener('input', e => {
   eqState.autogain_target = Number(e.target.value);
+  syncEqUI();
+  scheduleEqSave();
+});
+$('#audioAutogainSpeed')?.addEventListener('input', e => {
+  eqState.autogain_speed = Number(e.target.value);
   syncEqUI();
   scheduleEqSave();
 });

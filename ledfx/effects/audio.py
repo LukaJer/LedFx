@@ -1136,7 +1136,13 @@ class AudioInputSource:
         if bool(getattr(self._config, "autogain", False)):
             rms = float(np.sqrt(np.mean(self._raw_audio_sample ** 2)))
             if rms > 1e-4:
-                alpha = 0.25 if rms > self._autogain_env else 0.008
+                speed = max(
+                    0.05,
+                    min(1.0, float(getattr(self._config, "autogain_speed", 0.5) or 0.5)),
+                )
+                attack_alpha = 0.05 + 0.40 * speed
+                release_alpha = 0.001 + 0.014 * speed
+                alpha = attack_alpha if rms > self._autogain_env else release_alpha
                 self._autogain_env = (1.0 - alpha) * self._autogain_env + alpha * rms
                 target = float(getattr(self._config, "autogain_target", 0.5) or 0.5)
                 auto_scale = max(0.25, min(6.0, target / max(1e-4, self._autogain_env)))

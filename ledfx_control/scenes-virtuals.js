@@ -107,6 +107,7 @@ async function activateScene(id, deckId){
     await api('/scenes', {method:'PUT', body: JSON.stringify({id, action:'activate'})});
     toast('Scene activated');
     await loadVirtuals();
+    if(typeof restoreSceneCtl === 'function') await restoreSceneCtl(id, deckId);
     if(typeof renderSceneEditor === 'function' && activeDeckId) renderSceneEditor(id);
   }catch(e){ toast('Scene failed: ' + e.message, true); }
 }

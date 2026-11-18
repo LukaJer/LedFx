@@ -21,6 +21,7 @@ PERMITTED_KEYS = {
         "input_gain",
         "autogain",
         "autogain_target",
+        "autogain_speed",
     ),
     "silence_scene": ("enabled", "scene_id", "timeout_seconds"),
     "melbanks": (

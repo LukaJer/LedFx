@@ -206,6 +206,11 @@ function drawTubePreview(){
           </div>`;
         }).join('');
         const hitsHtml = HITS.map((h, hi) => `<button class="hit-btn" data-hi="${hi}">${escHtml(h.name)}</button>`).join('');
+        const macrosHtml = (typeof MACROS !== 'undefined' ? MACROS : []).map((m, mi) => {
+          const pal = macroPalette(m);
+          const tip = `${pal.name} · Speed ${Math.round(m.sp*100)}% · Sens ${Math.round(m.se*100)}%`;
+          return `<div class="macro-wrap"><button type="button" class="macro" data-mi="${mi}" title="${escHtml(tip)}" style="background:linear-gradient(135deg,${pal.colors.join(',')})">${escHtml(m.n)}</button></div>`;
+        }).join('');
         let deckCollapsed = {};
         try{ deckCollapsed = JSON.parse(localStorage.getItem('ledfx_deck_collapsed') || '{}'); }catch(e){}
         const scCol = !!deckCollapsed[id + ':scenes'];
@@ -227,6 +232,8 @@ function drawTubePreview(){
             </div>
           </div>
           <canvas data-open-tab title="Click to open ${escHtml(p.name || id)} tab"></canvas>
+          <div class="lprev-sub">Vibe Macros</div>
+          <div class="macros lprev-macros">${macrosHtml}</div>
           <div class="lprev-sub"><span class="lprev-fold ${scCol?'collapsed':''}" data-fold-toggle="scenes"><span class="tri">&#9662;</span> Scenes</span></div>
           <div data-fold-body="scenes" class="${scCol?'lprev-box-collapsed':''}">
           ${tagBarHtml}
@@ -268,6 +275,7 @@ function drawTubePreview(){
             </select>
             <button class="btn" data-cyc-all style="padding:5px 9px;font-size:11px" title="Include all palettes in cycle">All</button>
             <button class="btn" data-cyc-none style="padding:5px 9px;font-size:11px" title="Clear cycle selection">None</button>
+            <label class="status" style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" data-cyc-rand ${dc.rand?'checked':''}> Shuffle</label>
           </div>
           <div class="status" style="margin-top:6px;line-height:1.45;font-size:10px">
             <b>BPM</b>: steady beat timer &middot; <b>Audio Peak</b>: bass spike trigger &middot; <b>Next Palette</b>: next pooled palette &middot; <b>Rotate Colors</b>: shifts current palette stops.
@@ -289,6 +297,24 @@ function drawTubePreview(){
           canvas: card.querySelector('canvas'),
           meta: card.querySelector('[data-meta]'),
         };
+        card.querySelectorAll('.lprev-macros .macro').forEach(mb => mb.addEventListener('click', async e => {
+          e.stopPropagation();
+          if(guardLock()) return;
+          const m = MACROS[Number(mb.dataset.mi)];
+          if(!m) return;
+          const pal = macroPalette(m);
+          await quantWait(S.qnt);
+          const spEl = card.querySelector('[data-ctl="spd"]'), spVal = card.querySelector('[data-val="spd"]');
+          if(spEl) spEl.value = m.sp * 100;
+          if(spVal) spVal.textContent = Math.round(m.sp * 100) + '%';
+          const snEl = card.querySelector('[data-ctl="sns"]'), snVal = card.querySelector('[data-val="sns"]');
+          if(snEl) snEl.value = m.se * 100;
+          if(snVal) snVal.textContent = Math.round(m.se * 100) + '%';
+          getDeckCycle(deckId).pal = pal;
+          applyPalette(pal, false, deckId);
+          setSpeed(m.sp, deckId);
+          setSensitivity(m.se, deckId);
+        }));
         card.querySelectorAll('[data-deck-out]').forEach(ob => ob.addEventListener('click', e => {
           e.stopPropagation();
           toggleDeckOutMode(deckId, ob.dataset.deckOut, card);
@@ -392,6 +418,10 @@ function drawTubePreview(){
           e.stopPropagation();
           getDeckCycle(deckId).pool.clear();
           card.querySelectorAll('.lprev-pal .cyc-pick').forEach(pk => { pk.classList.remove('on'); pk.textContent = ''; });
+        });
+        card.querySelector('[data-cyc-rand]')?.addEventListener('change', e => {
+          e.stopPropagation();
+          getDeckCycle(deckId).rand = e.target.checked;
         });
         let zBriT, zSpdT, zSnsT;
         card.querySelector('[data-ctl="bri"]')?.addEventListener('input', e => {
