@@ -1,0 +1,1037 @@
+// ---- Palette ----
+const PALETTES = [
+  {name:'Warm Amber', colors:['#3a0f02','#c2410c','#f0a336','#ffe08a']},
+  {name:'Cold Steel', colors:['#0a1a2f','#1d4e89','#5aa9e6','#c9e4ff']},
+  {name:'Neon Punch', colors:['#ff2e88','#ff6ec7','#c026d3','#7e22ce']},
+  {name:'Forest', colors:['#0b3d1f','#1f7a3f','#5fbf6b','#c7f2c1']},
+  {name:'Violet Haze', colors:['#1a1035','#4c1d95','#8b5cf6','#ddd6fe']},
+  {name:'Sunset', colors:['#3a0518','#b3123f','#ff5e3a','#ffb37a']},
+  {name:'Aqua Acid', colors:['#042f2e','#0d9488','#2dd4bf','#d9f99d']},
+  {name:'Cyberpunk', colors:['#090d2e','#2563eb','#ec4899','#22d3ee']},
+  {name:'Crimson Club', colors:['#240008','#991b1b','#ef4444','#fecaca']},
+  {name:'Ultraviolet', colors:['#14042e','#6d28d9','#d946ef','#67e8f9']},
+  {name:'Gold Rush', colors:['#1f1200','#854d0e','#eab308','#fef08a']},
+  {name:'Ice Mint', colors:['#082f49','#0284c7','#38bdf8','#a7f3d0']},
+  {name:'Lava', colors:['#1c0400','#9a3412','#f97316','#fde047']},
+  {name:'Techno White', colors:['#18181b','#52525b','#d4d4d8','#ffffff']},
+  {name:'Miami', colors:['#1e1b4b','#ec4899','#f472b6','#2dd4bf']},
+  {name:'Emerald', colors:['#022c22','#047857','#10b981','#a7f3d0']},
+  {name:'Police', colors:['#ff001e','#ff3b00','#0044ff','#00a6ff']},
+  {name:'Fire & Ice', colors:['#ff2200','#ff7700','#0066ff','#00d9ff']},
+  {name:'Laser Mint', colors:['#ff007f','#ff4da6','#00ff9d','#00d4aa']},
+  {name:'Solar Storm', colors:['#ff5500','#ffb700','#6200ea','#b347ff']},
+  {name:'Toxic Voltage', colors:['#7cff00','#00e676','#7c00ff','#d500f9']},
+  {name:'Club Ember', colors:['#e11d48','#fb7185','#0284c7','#38bdf8']},
+  {name:'Berghain Strobe', colors:['#d4d4d8','#ffffff','#b91c1c','#ff1e42']},
+  {name:'Acid 303', colors:['#a3e635','#ecfccb','#042f2e','#14b8a6']},
+  {name:'Industrial Steel', colors:['#1e293b','#64748b','#f97316','#fbbf24']},
+  {name:'Dark Warehouse', colors:['#3b0764','#9333ea','#09090b','#e11d48']},
+  {name:'Cold Laser', colors:['#e2e8f0','#94a3b8','#06b6d4','#22d3ee']},
+  {name:'Sodium Concrete', colors:['#27272a','#52525b','#ea580c','#fdba74']},
+  {name:'Hardgroove', colors:['#dc2626','#f97316','#7c3aed','#c084fc']},
+  {name:'Subzero Pulse', colors:['#0f172a','#1d4ed8','#e0f2fe','#ffffff']},
+];
+let palCycleSelected = null;
+try{
+  const savedPool = JSON.parse(localStorage.getItem('ledfx_cycle_pool') || 'null');
+  if(Array.isArray(savedPool)) palCycleSelected = new Set(savedPool);
+}catch(e){}
+if(!palCycleSelected) palCycleSelected = new Set(PALETTES.map(p => p.name));
+function savePalCyclePool(){
+  try{ localStorage.setItem('ledfx_cycle_pool', JSON.stringify([...palCycleSelected])); }catch(e){}
+}
+function renderPalettes(){
+  $('#palette').innerHTML = PALETTES.map((p,i)=>{
+    const inPool = palCycleSelected.has(p.name);
+    return `
+    <div class="swatch" data-i="${i}" role="button" tabindex="0">
+      <span class="cyc-pick ${inPool?'on':''}" data-cyc="${i}" title="Include in palette cycle">${inPool?'✓':''}</span>
+      <div class="strip2">${p.colors.map(c=>`<span style="background:${c}"></span>`).join('')}</div>
+      <div class="name">${escHtml(p.name)}</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('#palette .swatch').forEach(el=>el.addEventListener('click', e => {
+    if(e.target.closest('.cyc-pick')) return;
+    applyPalette(PALETTES[el.dataset.i]);
+  }));
+  document.querySelectorAll('#palette .cyc-pick').forEach(el=>el.addEventListener('click', e => {
+    e.stopPropagation();
+    const p = PALETTES[el.dataset.cyc];
+    if(!p) return;
+    if(palCycleSelected.has(p.name)) palCycleSelected.delete(p.name);
+    else palCycleSelected.add(p.name);
+    savePalCyclePool();
+    renderPalettes();
+    if(typeof syncPalCycleUI === 'function') syncPalCycleUI();
+  }));
+}
+function toGradientString(colors){
+  const n = colors.length;
+  const stops = colors.map((hex,i)=>{
+    const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+    const pct = n===1?0:(i/(n-1)*100).toFixed(2);
+    return `rgb(${r}, ${g}, ${b}) ${pct}%`;
+  }).join(', ');
+  return `linear-gradient(90deg, ${stops})`;
+}
+function buildColorPatch(effType, effConfig, colors, opts){
+  const props = effectsSchema[effType]?.schema?.properties || effConfig || {};
+  const has = k => Object.prototype.hasOwnProperty.call(props, k);
+  const roleMap = opts?.roleMap || 'normal';
+  const c0 = colors[0], c1 = colors[Math.floor((colors.length - 1) / 2)], c2 = colors[Math.max(0, colors.length - 2)], c3 = colors[colors.length - 1];
+  const [cLow, cMid, cHigh] = roleMap === 'reverse' ? [c3, c1, c0]
+    : roleMap === 'accent' ? [c3, c2, c0]
+    : [c0, c1, c3];
+  const grad = toGradientString(roleMap === 'reverse' ? [...colors].reverse() : colors);
+  const patch = {};
+  if(has('gradient')) patch.gradient = grad;
+  if(has('use_gradient')) patch.use_gradient = true;
+  if(has('power_gradient')) patch.power_gradient = grad;
+  if(opts?.roll !== undefined && opts.roll >= 0 && has('gradient_roll')) patch.gradient_roll = Number(opts.roll);
+  if(opts?.bgColor && has('background_color')) patch.background_color = opts.bgColor;
+  if(has('color_lows')) patch.color_lows = cLow;
+  if(has('color_mids')) patch.color_mids = cMid;
+  if(has('color_high')) patch.color_high = cHigh;
+  if(has('lows_color')) patch.lows_color = cLow;
+  if(has('mids_color')) patch.mids_color = cMid;
+  if(has('high_color')) patch.high_color = cHigh;
+  if(has('color_low')) patch.color_low = cLow;
+  if(has('color_mid')) patch.color_mid = cMid;
+  if(has('color_min')) patch.color_min = cLow;
+  if(has('color_max')) patch.color_max = cHigh;
+  if(has('color_peak')) patch.color_peak = cHigh;
+  if(has('peak_color')) patch.peak_color = cHigh;
+  if(has('sparks_color')) patch.sparks_color = cHigh;
+  if(has('center_color')) patch.center_color = cHigh;
+  if(has('edge_color')) patch.edge_color = cLow;
+  if(has('color_scan')) patch.color_scan = cHigh;
+  if(has('strobe_color')) patch.strobe_color = cHigh;
+  if(has('pixel_color')) patch.pixel_color = cHigh;
+  if(has('flash_color')) patch.flash_color = cHigh;
+  if(has('hit_color')) patch.hit_color = cHigh;
+  if(has('text_color')) patch.text_color = cHigh;
+  if(has('color')) patch.color = cHigh;
+  return patch;
+}
+
+async function applyPalette(p, quiet, zoneOverride){
+  if(!quiet && guardLock()) return;
+  if(quiet && S.lock) return;
+  curPalette=p; if($('#stPal')) $('#stPal').textContent=p.name;
+  let ok=0, skip=0;
+  const targetIds = targets(zoneOverride).filter(id => virtualsCache[id]?.effect?.type);
+  const activeIds = targetIds.filter(id => virtualsCache[id]?.active);
+  const runIds = activeIds.length ? activeIds : targetIds;
+  for(const id of runIds){
+    const v = virtualsCache[id];
+    const patch = buildColorPatch(v.effect.type, v.effect.config, p.colors, p);
+    if(!Object.keys(patch).length){ skip++; continue; }
+    const nextCfg = { ...(v.effect.config || {}), ...patch };
+    try{
+      await api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:v.effect.type, config:nextCfg})});
+      v.effect.config = nextCfg;
+      v.active = true;
+      activePalettePatch[id] = patch;
+      ok++;
+    }catch(e){ skip++; }
+  }
+  if(activeDeckId && editingSceneId && runIds.some(id => id in sceneDraftVirtuals)){
+    renderSceneEditor(editingSceneId);
+  }
+  if(!quiet) toast(skip ? `${p.name} applied to ${ok} virtual(s) (${skip} fixed-color skipped)` : `${p.name} applied`);
+}
+
+// ---- Global speed / sensitivity ----
+let speedT, sensT;
+$('#speedSlider').addEventListener('input', e=>{
+  $('#speedVal').textContent = e.target.value+'%';
+  clearTimeout(speedT); speedT = setTimeout(()=>setSpeed(e.target.value/100), 150);
+});
+$('#sensSlider').addEventListener('input', e=>{
+  $('#sensVal').textContent = e.target.value+'%';
+  clearTimeout(sensT); sensT = setTimeout(()=>setSensitivity(e.target.value/100), 150);
+});
+function scaleAroundDefault(prop, val, inv){
+  if(!prop || typeof prop !== 'object') return null;
+  const min = typeof prop.minimum === 'number' ? prop.minimum : 0;
+  const max = typeof prop.maximum === 'number' ? prop.maximum : 1;
+  if(max <= min) return null;
+  const u = inv ? (1 - val) : val;
+  let def = typeof prop.default === 'number' ? prop.default : (min + (max - min) * 0.5);
+  def = Math.max(min, Math.min(max, def));
+  let out;
+  if(u <= 0.5){
+    const t = u / 0.5;
+    out = min + (def - min) * Math.pow(t, 1.35);
+  }else{
+    const t = (u - 0.5) / 0.5;
+    out = def + (max - def) * Math.pow(t, 1.5);
+  }
+  return prop.type === 'integer' ? Math.round(out) : Number(out.toFixed(4));
+}
+
+function buildSpeedPatch(effType, val){
+  const props = effectsSchema[effType]?.schema?.properties || {};
+  const has = k => Object.prototype.hasOwnProperty.call(props, k);
+  const patch = {};
+  if(has('step_period')){ const v = scaleAroundDefault(props.step_period, val, true); if(v !== null) patch.step_period = v; }
+  if(has('scroll_time')){ const v = scaleAroundDefault(props.scroll_time, val, true); if(v !== null) patch.scroll_time = v; }
+  if(has('speed')){ const v = scaleAroundDefault(props.speed, val, false); if(v !== null) patch.speed = v; }
+  if(has('scroll_per_sec')){ const v = scaleAroundDefault(props.scroll_per_sec, val, false); if(v !== null) patch.scroll_per_sec = v; }
+  if(has('gradient_speed')){ const v = scaleAroundDefault(props.gradient_speed, val, false); if(v !== null) patch.gradient_speed = v; }
+  if(has('roll_speed')){ const v = scaleAroundDefault(props.roll_speed, val, false); if(v !== null) patch.roll_speed = v; }
+  if(has('base_game_speed')){ const v = scaleAroundDefault(props.base_game_speed, val, false); if(v !== null) patch.base_game_speed = v; }
+  if(has('add_speed')){ const v = scaleAroundDefault(props.add_speed, val, false); if(v !== null) patch.add_speed = v; }
+  if(!Object.keys(patch).length){
+    if(has('strobe_decay')){ const v = scaleAroundDefault(props.strobe_decay, val, true); if(v !== null) patch.strobe_decay = v; }
+    else if(has('decay')){ const v = scaleAroundDefault(props.decay, val, true); if(v !== null) patch.decay = v; }
+    else if(has('strobe_decay_rate')){ const v = scaleAroundDefault(props.strobe_decay_rate, val, true); if(v !== null) patch.strobe_decay_rate = v; }
+    else if(has('gradient_roll')){ const v = scaleAroundDefault(props.gradient_roll, val, false); if(v !== null) patch.gradient_roll = v; }
+  }
+  return patch;
+}
+
+function buildSensPatch(effType, val){
+  const props = effectsSchema[effType]?.schema?.properties || {};
+  const has = k => Object.prototype.hasOwnProperty.call(props, k);
+  const patch = {};
+  for(const k of ['reactivity','sensitivity','multiplier','power_multiplier','spin_multiplier','size_multiplication','speed_multiplication']){
+    if(has(k)){ const v = scaleAroundDefault(props[k], val, false); if(v !== null) patch[k] = v; }
+  }
+  for(const k of ['lows_sensitivity','mids_sensitivity','high_sensitivity','threshold','threshold_lows','threshold_mids','sparkles_threshold','strobe_threshold']){
+    if(has(k)){ const v = scaleAroundDefault(props[k], val, true); if(v !== null) patch[k] = v; }
+  }
+  return patch;
+}
+
+async function setSpeed(val, zoneOverride){
+  for(const id of targets(zoneOverride)){
+    const v = virtualsCache[id];
+    if(!v?.effect?.type) continue;
+    const patch = buildSpeedPatch(v.effect.type, val);
+    if(!Object.keys(patch).length) continue;
+    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})}); }catch(e){}
+  }
+}
+async function setZoneBrightness(val, zoneOverride){
+  for(const id of targets(zoneOverride)){
+    const v = virtualsCache[id];
+    if(!v?.effect?.type) continue;
+    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{brightness:val}})}); }catch(e){}
+  }
+}
+async function setSensitivity(val, zoneOverride){
+  const min_volume = Number((Math.pow(1 - val, 1.5) * 0.25).toFixed(4));
+  const jobs = [api('/config', {method:'PUT', body: JSON.stringify({audio:{min_volume}})}).catch(e=>{ toast('Sensitivity update failed: '+e.message, true); })];
+  for(const id of targets(zoneOverride)){
+    const v = virtualsCache[id];
+    if(!v?.effect?.type) continue;
+    const patch = buildSensPatch(v.effect.type, val);
+    if(Object.keys(patch).length){
+      jobs.push(api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})}).catch(()=>{}));
+    }
+  }
+  await Promise.all(jobs);
+}
+
+// ---- Hits (momentary tools via /api/virtuals_tools) ----
+const HITS = [
+  {name:'Flash', kind:'oneshot', color:'white', ramp:10, hold:150, fade:300},
+  {name:'Strobe', kind:'strobe'},
+  {name:'Blackout', kind:'hold', color:'#000000'},
+  {name:'Dim', kind:'hold', color:'#202020'},
+  {name:'Bloom', kind:'oneshot', color:'white', ramp:400, hold:100, fade:1200},
+  {name:'Palette Punch', kind:'punch'},
+  {name:'Build', kind:'build'},
+];
+let strobeInterval=null, snapshot=null;
+function renderHits(){
+  $('#hits').innerHTML = HITS.map((h,i)=>`<button class="hit-btn" data-i="${i}">${h.name}</button>`).join('');
+  document.querySelectorAll('.hit-btn').forEach(btn=>{
+    const h = HITS[btn.dataset.i];
+    btn.addEventListener('pointerdown', ()=>hitDown(h, btn));
+    btn.addEventListener('pointerup', ()=>hitUp(h, btn));
+    btn.addEventListener('pointerleave', ()=>hitUp(h, btn));
+    btn.addEventListener('pointercancel', ()=>hitUp(h, btn));
+  });
+}
+async function tool(body, method, zoneOverride){
+  const m = method || (body?.tool === 'oneshot' ? 'POST' : 'PUT');
+  if(!zoneOverride && !activeDeckId && !mainTargetZone && S.target==='All') return api('/virtuals_tools', {method:m, body: JSON.stringify(body)});
+  const ids = targets(zoneOverride).filter(id=>virtualsCache[id]?.active || virtualsCache[id]?.effect?.type);
+  await Promise.all(ids.map(id=>api(`/virtuals_tools/${id}`, {method:m, body: JSON.stringify(body)}).catch(()=>{})));
+}
+async function takeSnapshot(){
+  try{ const d = await api('/virtuals'); snapshot = d.virtuals || d; }catch(e){ snapshot = virtualsCache; }
+}
+async function restoreSnapshot(zoneOverride){
+  if(!snapshot) return;
+  const allow = new Set(targets(zoneOverride));
+  const jobs = [];
+  for(const id of Object.keys(snapshot)){
+    if(!allow.has(id)) continue;
+    const v = snapshot[id];
+    if(v.active && v.effect && v.effect.type){
+      jobs.push(api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:v.effect.type, config:v.effect.config||{}})}).catch(()=>{}));
+    }
+  }
+  await Promise.all(jobs);
+}
+async function hitDown(h, btn, zoneOverride){
+  btn.classList.add('active');
+  if(h.kind==='oneshot'||h.kind==='punch'){
+    await quantWait(S.qnt);
+    if(!btn.classList.contains('active')) return;
+  }
+  try{
+    if(h.kind==='oneshot'){ const m=INT[S.int]; await tool({tool:'oneshot', color:h.color, ramp:h.ramp, hold:Math.round(h.hold*m), fade:Math.round(h.fade*m)}, undefined, zoneOverride); }
+    else if(h.kind==='punch'){ const c = curPalette.colors[2]; const m=INT[S.int]; await tool({tool:'oneshot', color:c, ramp:10, hold:Math.round(120*m), fade:Math.round(250*m)}, undefined, zoneOverride); }
+    else if(h.kind==='build'){
+      if(buildT){ clearInterval(buildT); buildT=null; }
+      let v=+$('#speedSlider').value/100;
+      buildT=setInterval(()=>{ v=Math.min(1,v+.05); setSpeed(v, zoneOverride); },250);
+    }
+    else if(h.kind==='hold'){
+      await takeSnapshot();
+      if(!btn.classList.contains('active')) return;
+      await tool({tool:'force_color', color:h.color}, undefined, zoneOverride);
+    }
+    else if(h.kind==='strobe'){
+      await takeSnapshot();
+      if(!btn.classList.contains('active')) return;
+      if(strobeInterval){ clearInterval(strobeInterval); strobeInterval=null; }
+      strobeInterval = setInterval(()=>tool({tool:'oneshot', color:'white', ramp:1, hold:30, fade:30}, undefined, zoneOverride).catch(()=>{}), S.guard?260:110);
+    }
+  }catch(e){ toast(h.name+' failed: '+e.message, true); }
+}
+async function hitUp(h, btn, zoneOverride){
+  if(!btn.classList.contains('active')) return;
+  btn.classList.remove('active');
+  if(h.kind==='build'){ if(buildT){ clearInterval(buildT); buildT=null; } setSpeed(+$('#speedSlider').value/100, zoneOverride); }
+  if(h.kind==='hold'){ await restoreSnapshot(zoneOverride); }
+  if(h.kind==='strobe'){ if(strobeInterval){ clearInterval(strobeInterval); strobeInterval=null; } await restoreSnapshot(zoneOverride); }
+}
+
+renderHits();
+// ---- v3: status, macros, groups, quantize, scene-cycler, tabs, lab, diagnostics ----
+const S={target:'All',qnt:'Now',int:'Normal',trans:'Cut',guard:true,lock:false};
+const INT={Soft:.5,Normal:1,Peak:1.8};
+const groups = JSON.parse(localStorage.getItem('ledfx_groups')||'{}');
+let curPalette=PALETTES[0], lastScene='—', taps=[], bpm=0, beatRef=0, buildT=null;
+const callLog=[];
+function logCall(path,method,status,ms){
+  callLog.unshift(`${new Date().toLocaleTimeString()}  ${method.padEnd(5)} ${status}  ${ms}ms  ${path}`);
+  if(callLog.length>60) callLog.pop();
+  const el=$('#log'); if(el && !$('#pane-diag').hidden) el.textContent=callLog.join('\n');
+}
+function targets(zoneOverride){
+  const zoneId = zoneOverride !== undefined ? zoneOverride : (activeDeckId || mainTargetZone);
+  const deck = zoneId ? layoutsCache[zoneId] : null;
+  const deckVirts = deck && deck.virtuals && Object.keys(deck.virtuals).length ? new Set(Object.keys(deck.virtuals)) : null;
+  return Object.keys(virtualsCache).filter(id => (!deckVirts || deckVirts.has(id)) && (S.target==='All' || groups[id]===S.target));
+}
+function guardLock(){ if(S.lock){ toast('Perform-Lock is ON — only hits are active', true); return true; } return false; }
+function quantWait(mode){
+  if(mode==='Now'||!bpm) return Promise.resolve();
+  const unit=(60000/bpm)*(mode==='Bar'?4:16), now=Date.now();
+  return new Promise(r=>setTimeout(r, unit-((now-(beatRef||now))%unit)));
+}
+// live audio energy meter (LedFx websocket, graph_update events)
+let ws=null, wsReconnectT=null, wsWasDropped=false, lastAudio=0, runMax=0.0001, wsSeen=0, levels=null, energy=0;
+let previewLive = true, viewMode = localStorage.getItem('ledfx_view_mode') || 'sim', visFrames = {}, visFrameAt = {}, virtualFrames = {}, virtualShapes = {}, virtualFrameAt = {}, previewRaf = 0;
+function syncViewModeUI(){
+  const btn = $('#viewModeBtn');
+  if(!btn) return;
+  const isSim = viewMode === 'sim';
+  btn.classList.toggle('on', isSim);
+  btn.textContent = isSim ? 'Sim View' : 'Real View';
+}
+syncViewModeUI();
+$('#openLedfxUiBtn')?.addEventListener('click', ()=>{
+  const h = HOST || ($('#host')?.value || '').trim().replace(/^https?:\/\//,'').replace(/\/+$/,'') || location.host;
+  const proto = location.protocol === 'https:' ? 'https:' : 'http:';
+  window.open(`${proto}//${h}/`, '_blank', 'noopener');
+});
+$('#viewModeBtn')?.addEventListener('click', ()=>{
+  viewMode = viewMode === 'sim' ? 'real' : 'sim';
+  localStorage.setItem('ledfx_view_mode', viewMode);
+  syncViewModeUI();
+  if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
+  if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview();
+});
+function decodeVisPixels(px){
+  if(typeof px === 'string'){
+    try{
+      const bin = atob(px);
+      const n3 = Math.floor(bin.length / 3) * 3;
+      const out = new Uint8Array(n3);
+      for(let i = 0; i < n3; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    }catch(e){ return null; }
+  }
+  if(Array.isArray(px)){
+    if(px.length === 3 && Array.isArray(px[0]) && px[0].length !== 3){
+      const n = px[0].length;
+      const out = new Uint8Array(n * 3);
+      for(let i = 0; i < n; i++){
+        const o = i * 3;
+        out[o] = px[0][i]; out[o + 1] = px[1][i]; out[o + 2] = px[2][i];
+      }
+      return out;
+    }
+    const n = px.length;
+    const out = new Uint8Array(n * 3);
+    for(let i = 0; i < n; i++){
+      const p = px[i], o = i * 3;
+      if(p){ out[o] = p[0] || 0; out[o + 1] = p[1] || 0; out[o + 2] = p[2] || 0; }
+    }
+    return out;
+  }
+  return null;
+}
+function syncVisSubscription(){
+  if(!ws || ws.readyState !== 1) return;
+  if(previewLive){
+    ws.send(JSON.stringify({id:2,type:'subscribe_event',event_type:'visualisation_update',event_filter:{}}));
+  }else{
+    ws.send(JSON.stringify({id:2,type:'unsubscribe_event',event_type:'visualisation_update'}));
+  }
+}
+function findArr(o,d=0){
+  if(Array.isArray(o)&&o.length>3&&typeof o[0]==='number') return o;
+  if(o&&typeof o==='object'&&d<4) for(const k in o){ const r=findArr(o[k],d+1); if(r) return r; }
+  return null;
+}
+function connectWS(){
+  clearTimeout(wsReconnectT);
+  if(ws){ const old=ws; ws=null; try{old.onclose=null; old.close();}catch(e){} }
+  if(!HOST) return;
+  const sock=new WebSocket(`ws://${HOST}/api/websocket`);
+  ws=sock;
+  sock.onopen=()=>{
+    setConnected(true);
+    sock.send(JSON.stringify({id:1,type:'subscribe_event',event_type:'graph_update',event_filter:{}}));
+    logCall('subscribe graph_update','WS','sent',0);
+    if(previewLive) syncVisSubscription();
+    if(wsWasDropped){
+      wsWasDropped=false;
+      Promise.all([loadSchema(), loadLayouts(), loadScenes(), loadVirtuals(), loadAudioConfig(), loadDevices()]).catch(()=>{});
+    }
+  };
+  sock.onmessage=ev=>{
+    let m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+    const evtType = m.event_type || m.data?.event_type;
+    if(evtType === 'visualisation_update'){
+      const visId = m.vis_id ?? m.data?.vis_id;
+      const isDev = m.is_device ?? m.data?.is_device;
+      const rawPx = m.pixels ?? m.data?.pixels;
+      const px = decodeVisPixels(rawPx);
+      if(visId && px){
+        const now = performance.now();
+        if(isDev === false){
+          virtualFrames[visId] = px;
+          virtualShapes[visId] = m.shape ?? m.data?.shape ?? null;
+          virtualFrameAt[visId] = now;
+        }
+        else{ visFrames[visId] = px; visFrameAt[visId] = now; }
+        if(previewLive && typeof scheduleTubePreview === 'function') scheduleTubePreview();
+        if(previewLive && typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview();
+      }
+      return;
+    }
+    if(wsSeen<8){ wsSeen++; logCall(ev.data.slice(0,160),'WS','msg',0); }
+    const arr=findArr(m); if(!arr) return;
+    runMax=Math.max(runMax*0.999,...arr,0.0001);
+    levels=Array.from({length:48},(_,i)=>{ const a=arr[Math.floor(i/48*arr.length)]; return Math.min(1,a/runMax); });
+    energy=arr.reduce((x,y)=>x+y,0)/arr.length/runMax; lastAudio=Date.now();
+    if(typeof checkAudioPeakCycler === 'function') checkAudioPeakCycler(levels);
+    const freqs = Array.isArray(m.frequencies) ? m.frequencies : (Array.isArray(m.data?.frequencies) ? m.data.frequencies : null);
+    updateSpectrumData(arr, freqs);
+  };
+  sock.onerror=()=>logCall('websocket error','WS','err',0);
+  sock.onclose=()=>{
+    if(ws===sock){
+      setConnected(false);
+      wsWasDropped=true;
+      if(HOST){ logCall('websocket closed, reconnecting','WS','close',0); wsReconnectT=setTimeout(connectWS, 2500); }
+    }
+  };
+}
+let lastEnergyWidth = '', lastAudioText = '';
+const eFillEl = $('#eFill'), stAudioEl = $('#stAudio');
+setInterval(()=>{
+  if(document.hidden) return;
+  const on=Date.now()-lastAudio<2000;
+  const wStr = on ? Math.min(100, Math.round(energy*1000)/10)+'%' : '0%';
+  if(eFillEl && wStr !== lastEnergyWidth){ lastEnergyWidth = wStr; eFillEl.style.width = wStr; }
+  const aTxt = on ? 'live from LedFx' : (ws&&ws.readyState===1 ? 'connected, no data' : 'no stream');
+  if(stAudioEl && aTxt !== lastAudioText){ lastAudioText = aTxt; stAudioEl.textContent = aTxt; }
+},60);
+// segmented controls
+document.querySelectorAll('.seg').forEach(g=>g.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); S[g.dataset.k]=b.textContent; updateStatus();
+}));
+// toggles
+$('#guardBtn').addEventListener('click',e=>{ S.guard=!S.guard; e.target.classList.toggle('on',S.guard); e.target.textContent='Strobe Guard '+(S.guard?'ON':'OFF'); updateStatus(); });
+$('#lockBtn').addEventListener('click',e=>{ S.lock=!S.lock; e.target.classList.toggle('on',S.lock); e.target.textContent='Perform-Lock '+(S.lock?'ON':'OFF'); document.body.classList.toggle('locked',S.lock); updateStatus(); });
+$('#apBtn').addEventListener('click',()=>{ toggleSceneCycle(); });
+// tap tempo
+function tapBpm(){
+  const now=Date.now(); if(taps.length&&now-taps[taps.length-1]>2000) taps=[]; taps.push(now); if(taps.length>6) taps.shift(); beatRef=now;
+  if(taps.length>1){ bpm=Math.round(60000/((taps[taps.length-1]-taps[0])/(taps.length-1))); updateStatus(); }
+}
+$('#tapBtn').addEventListener('click', tapBpm);
+$('#stBpmBox')?.addEventListener('click', tapBpm);
+$('#stBpmBox')?.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tapBpm(); } });
+$('#bpmDn').addEventListener('click',()=>{ if(bpm){bpm--; updateStatus();} });
+$('#bpmUp').addEventListener('click',()=>{ if(bpm){bpm++; updateStatus();} });
+// brightness
+let briT; $('#briSlider').addEventListener('input',e=>{ $('#briVal').textContent=e.target.value+'%'; clearTimeout(briT); briT=setTimeout(async()=>{
+  for(const id of targets()){ if(!virtualsCache[id].active) continue; try{ await api(`/virtuals/${id}/effects`,{method:'PUT',body:JSON.stringify({config:{brightness:e.target.value/100}})}); }catch(err){} } },150); });
+// groups
+$('#virtuals').addEventListener('change',e=>{ if(e.target.dataset.role==='group'){ const id=e.target.closest('.vcard').dataset.id; groups[id]=e.target.value; localStorage.setItem('ledfx_groups',JSON.stringify(groups)); } });
+// macros
+const DEFAULT_MACROS = [
+  {n:'Warm Groove',    pal:'Warm Amber',   sp:0.50, se:0.60},
+  {n:'Cold Breakdown', pal:'Cold Steel',   sp:0.25, se:0.45},
+  {n:'Peak Stutter',   pal:'Neon Punch',   sp:0.90, se:0.85},
+  {n:'Build Up',       pal:'Sunset',       sp:0.70, se:0.70},
+  {n:'Tropical Flow',  pal:'Forest',       sp:0.45, se:0.55},
+  {n:'Dark Techno',    pal:'Crimson Club', sp:0.65, se:0.80},
+  {n:'Acid Rave',      pal:'Aqua Acid',    sp:0.82, se:0.78},
+  {n:'Afterhours',     pal:'Violet Haze',  sp:0.30, se:0.40},
+];
+let MACROS = (() => {
+  try{
+    const saved = JSON.parse(localStorage.getItem('ledfx_vibe_macros') || 'null');
+    if(Array.isArray(saved) && saved.length) return saved;
+  }catch(e){}
+  return DEFAULT_MACROS.map(m => ({...m}));
+})();
+function saveMacros(){
+  try{ localStorage.setItem('ledfx_vibe_macros', JSON.stringify(MACROS)); }catch(e){}
+}
+function macroPalette(m){
+  if(m.pal){
+    const found = PALETTES.find(p => p.name === m.pal);
+    if(found) return found;
+  }
+  if(typeof m.p === 'number' && PALETTES[m.p]) return PALETTES[m.p];
+  return PALETTES[0];
+}
+function renderMacros(){
+  $('#macros').innerHTML = MACROS.map((m,i) => {
+    const pal = macroPalette(m);
+    const title = `${pal.name} · Speed ${Math.round(m.sp*100)}% · Sens ${Math.round(m.se*100)}%`;
+    return `<div class="macro-wrap"><button class="macro" data-i="${i}" title="${escHtml(title)}" style="background:linear-gradient(135deg,${pal.colors.join(',')})">${escHtml(m.n)}</button><button class="macro-del" data-del="${i}" title="Remove macro">&times;</button></div>`;
+  }).join('');
+  document.querySelectorAll('#macros .macro').forEach(b => b.addEventListener('click', async () => {
+    if(guardLock()) return;
+    const m = MACROS[b.dataset.i];
+    if(!m) return;
+    const pal = macroPalette(m);
+    await quantWait(S.qnt);
+    $('#speedSlider').value = m.sp * 100; $('#speedVal').textContent = Math.round(m.sp * 100) + '%';
+    $('#sensSlider').value = m.se * 100; $('#sensVal').textContent = Math.round(m.se * 100) + '%';
+    const z = activeDeckId || mainTargetZone || undefined;
+    applyPalette(pal, false, z);
+    setSpeed(m.sp, z);
+    setSensitivity(m.se, z);
+  }));
+  document.querySelectorAll('#macros .macro-del').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    const idx = Number(b.dataset.del);
+    MACROS.splice(idx, 1);
+    saveMacros();
+    renderMacros();
+  }));
+}
+$('#macroSaveBtn')?.addEventListener('click', () => {
+  const palName = curPalette?.name || PALETTES[0]?.name || 'Warm Amber';
+  const sp = Number($('#speedSlider').value) / 100;
+  const se = Number($('#sensSlider').value) / 100;
+  const name = prompt('Name for this Vibe Macro:', `${palName} ${Math.round(sp*100)}%`);
+  if(!name || !name.trim()) return;
+  MACROS.push({ n: name.trim(), pal: palName, sp, se });
+  saveMacros();
+  renderMacros();
+  toast(`Saved Vibe Macro "${name.trim()}"`);
+});
+$('#macroResetBtn')?.addEventListener('click', () => {
+  MACROS = DEFAULT_MACROS.map(m => ({...m}));
+  saveMacros();
+  renderMacros();
+  toast('Restored default Vibe Macros');
+});
+// palette lab + color cycler
+const DEFAULT_PALETTES = PALETTES.map(p => ({ ...p, colors: [...p.colors] }));
+(function initPalettes(){
+  let deleted = new Set();
+  try{ deleted = new Set(JSON.parse(localStorage.getItem('ledfx_deleted_palettes') || '[]')); }catch(e){}
+  for(let i = PALETTES.length - 1; i >= 0; i--){
+    if(deleted.has(PALETTES[i].name)) PALETTES.splice(i, 1);
+  }
+  try{
+    JSON.parse(localStorage.getItem('ledfx_custom_palettes') || '[]').forEach(p => PALETTES.push({ ...p, _custom: true }));
+  }catch(e){}
+})();
+
+let labBaseColors = ['#3a0f02','#c2410c','#f0a336','#ffe08a'];
+function hexToHsl(hex){
+  let r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), l=(max+min)/2;
+  let h=0, s=0;
+  if(max!==min){
+    const d=max-min;
+    s = l>0.5 ? d/(2-max-min) : d/(max+min);
+    h = max===r ? (g-b)/d + (g<b?6:0) : max===g ? (b-r)/d + 2 : (r-g)/d + 4;
+    h *= 60;
+  }
+  return [h, s*100, l*100];
+}
+function hslToHex(h, s, l){
+  h = ((h % 360) + 360) % 360;
+  s = Math.max(0, Math.min(100, s)) / 100;
+  l = Math.max(0, Math.min(100, l)) / 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => {
+    const k = (n + h / 30) % 12;
+    const c = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * c).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+function labColors(){
+  const dh = Number($('#labHue').value) || 0;
+  const sm = (Number($('#labSat').value) || 100) / 100;
+  const lm = (Number($('#labLight').value) || 100) / 100;
+  return labBaseColors.map(hex => {
+    if(dh === 0 && sm === 1 && lm === 1) return hex;
+    const [h, s, l] = hexToHsl(hex);
+    return hslToHex(h + dh, s * sm, l * lm);
+  });
+}
+function buildLabPaletteObj(){
+  const roll = Number($('#labRoll').value);
+  return {
+    name: $('#labName').value.trim() || 'Custom',
+    colors: labColors(),
+    roleMap: $('#labRoleMap').value,
+    bgColor: $('#labBgApply').checked ? $('#labBgColor').value : undefined,
+    roll: roll >= 0 ? roll : undefined,
+  };
+}
+function syncLabUI(){
+  const cols = labColors();
+  const strip = $('#labPreviewStrip');
+  if(strip) strip.style.background = toGradientString(cols);
+  const inputs = [...document.querySelectorAll('#labStops input[type=color]')];
+  inputs.forEach((inp, i) => {
+    if(cols[i]){
+      inp.value = cols[i];
+      const hx = inp.closest('.lab-stop')?.querySelector('.hex');
+      if(hx) hx.textContent = cols[i];
+    }
+  });
+  $('#labHueVal').textContent = `${$('#labHue').value}°`;
+  $('#labSatVal').textContent = `${$('#labSat').value}%`;
+  $('#labLightVal').textContent = `${$('#labLight').value}%`;
+  const rv = Number($('#labRoll').value);
+  $('#labRollVal').textContent = rv < 0 ? 'keep' : rv.toFixed(1);
+}
+function populateLabPresets(){
+  const sel = $('#labLoadSel');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">Load preset…</option>' + PALETTES.map((p,i)=>`<option value="${i}">${escHtml(p.name)}</option>`).join('');
+}
+populateLabPresets();
+syncLabUI();
+
+document.querySelectorAll('#labStops input[type=color]').forEach((inp, idx) => {
+  inp.addEventListener('input', () => {
+    $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100;
+    labBaseColors[idx] = inp.value;
+    syncLabUI();
+  });
+});
+['#labHue','#labSat','#labLight','#labRoll'].forEach(id => $(id)?.addEventListener('input', syncLabUI));
+$('#labLoadSel')?.addEventListener('change', e => {
+  const p = PALETTES[e.target.value];
+  if(!p) return;
+  labBaseColors = p.colors.slice(0, 4);
+  while(labBaseColors.length < 4) labBaseColors.push(labBaseColors[labBaseColors.length - 1]);
+  $('#labName').value = p.name + ' (Edit)';
+  $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100;
+  $('#labRoleMap').value = p.roleMap || 'normal';
+  syncLabUI();
+});
+$('#labResetHslBtn')?.addEventListener('click', () => {
+  $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100; $('#labRoll').value = -1;
+  syncLabUI();
+});
+$('#labReverseBtn')?.addEventListener('click', () => { labBaseColors.reverse(); syncLabUI(); });
+$('#labRotateBtn')?.addEventListener('click', () => { labBaseColors.push(labBaseColors.shift()); syncLabUI(); });
+$('#labFromActiveBtn')?.addEventListener('click', () => {
+  const active = Object.values(virtualsCache).find(v => v?.active && v?.effect?.type);
+  if(!active){ toast('No active virtual effect found', true); return; }
+  const cfg = active.effect.config || {};
+  const found = [];
+  for(const [k, val] of Object.entries(cfg)){
+    if(k === 'background_color' || typeof val !== 'string') continue;
+    const ms = val.match(/#[0-9a-f]{6}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)/gi);
+    if(ms) for(const m of ms){
+      if(m.startsWith('#')) found.push(m.toLowerCase());
+      else{
+        const nums = m.match(/\d+/g);
+        if(nums) found.push('#' + nums.slice(0,3).map(n => Number(n).toString(16).padStart(2,'0')).join(''));
+      }
+    }
+  }
+  if(!found.length){ toast(`No colors found on ${active.effect.type}`, true); return; }
+  const uniq = [...new Set(found)];
+  while(uniq.length < 4) uniq.push(uniq[uniq.length - 1]);
+  labBaseColors = uniq.slice(0, 4);
+  $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100;
+  $('#labName').value = active.config?.name || active.effect.type;
+  syncLabUI();
+  toast(`Loaded colors from ${active.effect.type}`);
+});
+$('#labApply').addEventListener('click', () => applyPalette(buildLabPaletteObj()));
+function renderLabSavedPalettes(){
+  const box = $('#labSavedPalettes'), cnt = $('#labPalCount');
+  if(cnt) cnt.textContent = `(${PALETTES.length})`;
+  if(!box) return;
+  if(!PALETTES.length){
+    box.innerHTML = '<div class="empty">No palettes left. Create one above or click Restore Built-in Palettes.</div>';
+    return;
+  }
+  box.innerHTML = PALETTES.map((p, i) => `
+    <div class="swatch" style="cursor:default;display:flex;flex-direction:column;gap:6px">
+      <div class="strip2" style="margin-bottom:0">${p.colors.map(c => `<span style="background:${c}"></span>`).join('')}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <span class="name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span>
+        <button type="button" class="btn" data-del-pal="${i}" style="padding:2px 7px;font-size:11px;color:var(--bad)" title="Delete ${escHtml(p.name)}">&times;</button>
+      </div>
+    </div>
+  `).join('');
+  box.querySelectorAll('[data-del-pal]').forEach(b => b.addEventListener('click', () => deletePaletteAt(Number(b.dataset.delPal))));
+}
+
+function deletePaletteAt(idx){
+  const p = PALETTES[idx];
+  if(!p) return;
+  if(!confirm(`Delete palette "${p.name}"?`)) return;
+  PALETTES.splice(idx, 1);
+  palCycleSelected?.delete(p.name);
+  for(const dc of Object.values(deckCycleState)) dc?.pool?.delete(p.name);
+  savePalCyclePool();
+  if(p._custom){
+    try{
+      const saved = JSON.parse(localStorage.getItem('ledfx_custom_palettes') || '[]');
+      const next = saved.filter(sp => sp.name !== p.name);
+      localStorage.setItem('ledfx_custom_palettes', JSON.stringify(next));
+    }catch(e){}
+  }else{
+    try{
+      const deleted = new Set(JSON.parse(localStorage.getItem('ledfx_deleted_palettes') || '[]'));
+      deleted.add(p.name);
+      localStorage.setItem('ledfx_deleted_palettes', JSON.stringify([...deleted]));
+    }catch(e){}
+  }
+  multiPreviewKey = '';
+  renderPalettes(); renderMacros(); populateLabPresets(); renderLabSavedPalettes(); syncPalCycleUI();
+  if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
+  toast(`Deleted palette "${p.name}"`);
+}
+
+$('#labDelPresetBtn')?.addEventListener('click', () => {
+  const sel = $('#labLoadSel');
+  if(!sel || sel.value === ''){ toast('Select a palette in the dropdown first', true); return; }
+  deletePaletteAt(Number(sel.value));
+});
+$('#labRestoreDefaultsBtn')?.addEventListener('click', () => {
+  localStorage.removeItem('ledfx_deleted_palettes');
+  for(const dp of DEFAULT_PALETTES){
+    if(!PALETTES.some(p => p.name === dp.name)){
+      PALETTES.unshift({ ...dp, colors: [...dp.colors] });
+      palCycleSelected?.add(dp.name);
+    }
+  }
+  savePalCyclePool();
+  multiPreviewKey = '';
+  renderPalettes(); renderMacros(); populateLabPresets(); renderLabSavedPalettes(); syncPalCycleUI();
+  if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
+  toast('Restored built-in palettes');
+});
+
+$('#labSave').addEventListener('click', () => {
+  const p = { ...buildLabPaletteObj(), _custom: true };
+  PALETTES.push(p); palCycleSelected.add(p.name); savePalCyclePool();
+  multiPreviewKey = '';
+  renderPalettes(); renderMacros(); populateLabPresets(); renderLabSavedPalettes(); syncPalCycleUI();
+  if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
+  const saved = JSON.parse(localStorage.getItem('ledfx_custom_palettes')||'[]');
+  saved.push(p); localStorage.setItem('ledfx_custom_palettes', JSON.stringify(saved));
+  toast('Palette saved');
+});
+renderLabSavedPalettes();
+
+// ---- Palette Color Cycler ----
+let palCycleOn = false, palCycleIdx = 0, palCycleNextAt = 0, palCycleBusy = false, palBassAvg = 0.05, palLastPeakAt = 0;
+const deckCycleState = {};
+function getDeckCycle(deckId){
+  if(!deckCycleState[deckId]){
+    deckCycleState[deckId] = {
+      on: false, mode: 'bpm_pal', div: 1, idx: 0, nextAt: 0, busy: false, lastPeakAt: 0,
+      pal: null, pool: new Set(palCycleSelected ? [...palCycleSelected] : PALETTES.map(p => p.name))
+    };
+  }
+  return deckCycleState[deckId];
+}
+function stepDeckPalCycler(deckId){
+  const dc = getDeckCycle(deckId);
+  if(dc.busy || !dc.on || S.lock || !HOST) return;
+  let nextPal;
+  if(dc.mode.endsWith('_rot')){
+    const base = dc.pal || curPalette || PALETTES[0];
+    const cols = [...base.colors];
+    cols.push(cols.shift());
+    nextPal = { ...base, colors: cols };
+    dc.pal = nextPal;
+  }else{
+    const pool = PALETTES.filter(p => dc.pool.has(p.name));
+    if(!pool.length) return;
+    dc.idx = (dc.idx + 1) % pool.length;
+    nextPal = pool[dc.idx];
+    dc.pal = nextPal;
+  }
+  dc.busy = true;
+  applyPalette(nextPal, true, deckId).finally(() => { dc.busy = false; });
+}
+function checkAudioPeakCycler(lvls){
+  if(!HOST || !Array.isArray(lvls) || !lvls.length) return;
+  const anyDeckAudio = Object.values(deckCycleState).some(dc => dc.on && dc.mode.startsWith('audio_'));
+  const globalAudio = palCycleOn && ($('#palCycleMode')?.value || '').startsWith('audio_');
+  if(!globalAudio && !anyDeckAudio) return;
+  const bins = Math.min(10, lvls.length);
+  let sum = 0;
+  for(let i = 0; i < bins; i++) sum += lvls[i];
+  const bass = sum / bins;
+  const now = Date.now();
+  const isPeak = bass > 0.14 && bass > palBassAvg * 1.42;
+  if(isPeak){
+    if(globalAudio && now - palLastPeakAt > 360){
+      palLastPeakAt = now;
+      stepPalCycler();
+    }
+    for(const [did, dc] of Object.entries(deckCycleState)){
+      if(dc.on && dc.mode.startsWith('audio_') && now - dc.lastPeakAt > 360){
+        dc.lastPeakAt = now;
+        stepDeckPalCycler(did);
+      }
+    }
+  }
+  palBassAvg = palBassAvg * 0.90 + bass * 0.10;
+}
+function syncPalCycleUI(){
+  const btn = $('#palCycleBtn');
+  if(!btn) return;
+  btn.classList.toggle('on', palCycleOn);
+  btn.textContent = palCycleOn ? 'Cycle ON' : 'Cycle OFF';
+  const info = $('#palCycleInfo');
+  const poolCount = PALETTES.filter(p => palCycleSelected.has(p.name)).length;
+  if(info){
+    if(!palCycleOn) info.textContent = `manual · ${poolCount} selected`;
+    else{
+      const mode = $('#palCycleMode').value;
+      const div = Number($('#palCycleDiv').value) || 1;
+      const effBpm = bpm || 120;
+      info.textContent = mode.startsWith('bpm') ? `${effBpm} BPM · ÷${div} (${poolCount})` : `audio peak (${poolCount})`;
+    }
+  }
+}
+function stepPalCycler(){
+  if(palCycleBusy || !palCycleOn || S.lock || !HOST) return;
+  const mode = $('#palCycleMode').value;
+  let nextPal;
+  if(mode.endsWith('_rot')){
+    const cols = [...(curPalette?.colors || PALETTES[0].colors)];
+    cols.push(cols.shift());
+    nextPal = { ...curPalette, colors: cols };
+  }else{
+    const pool = PALETTES.filter(p => palCycleSelected.has(p.name));
+    if(!pool.length) return;
+    palCycleIdx = (palCycleIdx + 1) % pool.length;
+    nextPal = pool[palCycleIdx];
+  }
+  palCycleBusy = true;
+  applyPalette(nextPal, true).finally(() => { palCycleBusy = false; });
+}
+$('#palPoolAllBtn')?.addEventListener('click', () => {
+  palCycleSelected = new Set(PALETTES.map(p => p.name));
+  savePalCyclePool(); renderPalettes(); syncPalCycleUI();
+});
+$('#palPoolNoneBtn')?.addEventListener('click', () => {
+  palCycleSelected.clear();
+  savePalCyclePool(); renderPalettes(); syncPalCycleUI();
+});
+$('#palCycleBtn')?.addEventListener('click', () => {
+  palCycleOn = !palCycleOn;
+  palCycleNextAt = Date.now();
+  syncPalCycleUI();
+});
+$('#palCycleMode')?.addEventListener('change', syncPalCycleUI);
+$('#palCycleDiv')?.addEventListener('change', () => { palCycleNextAt = Date.now(); syncPalCycleUI(); });
+
+let sceneCycleSelected = null;
+try{
+  const savedScyc = JSON.parse(localStorage.getItem('ledfx_scene_cycle_pool') || 'null');
+  if(Array.isArray(savedScyc)) sceneCycleSelected = new Set(savedScyc);
+}catch(e){}
+function saveSceneCyclePool(){
+  if(!sceneCycleSelected) return;
+  try{ localStorage.setItem('ledfx_scene_cycle_pool', JSON.stringify([...sceneCycleSelected])); }catch(e){}
+}
+let sceneCycleOn = false, sceneCycleIdx = 0, sceneCycleNextAt = 0;
+const deckSceneCycleState = {};
+function getDeckSceneCycle(deckId){
+  if(!deckSceneCycleState[deckId]){
+    deckSceneCycleState[deckId] = { on: false, div: '16b', rand: false, idx: 0, nextAt: 0, pool: null };
+  }
+  return deckSceneCycleState[deckId];
+}
+function sceneIntervalMs(val){
+  const s = String(val || '16b');
+  if(s.endsWith('s')) return Math.max(1000, Number(s.slice(0, -1)) * 1000);
+  const beats = Number(s.replace('b','')) || 16;
+  return (60000 / (bpm || 120)) * beats;
+}
+function syncSceneCycleUI(){
+  const btn = $('#sceneCycleBtn');
+  if(btn){
+    btn.classList.toggle('on', sceneCycleOn);
+    btn.textContent = sceneCycleOn ? 'Scene Cycle ON' : 'Scene Cycle OFF';
+  }
+  const apBtn = $('#apBtn');
+  if(apBtn){
+    apBtn.classList.toggle('on', sceneCycleOn);
+    apBtn.textContent = 'Auto-pilot ' + (sceneCycleOn ? 'ON' : 'OFF');
+  }
+  const info = $('#sceneCycleInfo');
+  if(info){
+    const visIds = [...document.querySelectorAll('#scenes .scene')].map(b => b.dataset.id).filter(Boolean);
+    const poolCnt = sceneCycleSelected ? visIds.filter(id => sceneCycleSelected.has(id)).length : visIds.length;
+    if(!sceneCycleOn){ info.textContent = `${poolCnt} selected`; }
+    else{
+      const divLbl = $('#sceneCycleDiv')?.selectedOptions?.[0]?.textContent || '16b';
+      const left = Math.max(0, Math.ceil((sceneCycleNextAt - Date.now()) / 1000));
+      info.textContent = `${divLbl} · ${poolCnt} selected · ${left}s`;
+    }
+  }
+}
+function toggleSceneCycle(){
+  sceneCycleOn = !sceneCycleOn;
+  sceneCycleNextAt = Date.now() + sceneIntervalMs($('#sceneCycleDiv')?.value);
+  syncSceneCycleUI();
+}
+function stepSceneCycler(){
+  if(S.lock) return;
+  let ids = [...document.querySelectorAll('#scenes .scene')].map(b => b.dataset.id).filter(Boolean);
+  if(sceneCycleSelected) ids = ids.filter(id => sceneCycleSelected.has(id));
+  if(!ids.length) return;
+  const rand = $('#sceneCycleRand')?.checked;
+  sceneCycleIdx = rand ? Math.floor(Math.random() * ids.length) : (sceneCycleIdx + 1) % ids.length;
+  activateScene(ids[sceneCycleIdx]);
+}
+function stepDeckSceneCycler(deckId){
+  if(S.lock) return;
+  const scyc = getDeckSceneCycle(deckId);
+  const deck = layoutsCache[deckId];
+  const deckTag = (deck?.scene_tag || '').trim().toLowerCase();
+  let ids = Object.keys(scenesCache || {});
+  if(deckTag){
+    const tagged = ids.filter(id => String(scenesCache[id]?.scene_tags || scenesCache[id]?.tags || '').toLowerCase().split(',').map(s=>s.trim()).includes(deckTag));
+    if(tagged.length) ids = tagged;
+  }
+  if(scyc.pool) ids = ids.filter(id => scyc.pool.has(id));
+  if(!ids.length) return;
+  scyc.idx = scyc.rand ? Math.floor(Math.random() * ids.length) : (scyc.idx + 1) % ids.length;
+  activateScene(ids[scyc.idx], deckId);
+}
+$('#sceneCycleBtn')?.addEventListener('click', toggleSceneCycle);
+$('#sceneCycleDiv')?.addEventListener('change', () => { sceneCycleNextAt = Date.now() + sceneIntervalMs($('#sceneCycleDiv').value); syncSceneCycleUI(); });
+$('#scenePoolAllBtn')?.addEventListener('click', () => {
+  sceneCycleSelected = new Set(Object.keys(scenesCache || {}));
+  saveSceneCyclePool();
+  renderScenes();
+  syncSceneCycleUI();
+});
+$('#scenePoolNoneBtn')?.addEventListener('click', () => {
+  sceneCycleSelected = new Set();
+  saveSceneCyclePool();
+  renderScenes();
+  syncSceneCycleUI();
+});
+
+setInterval(() => {
+  if(!HOST) return;
+  const now = Date.now();
+  if(palCycleOn){
+    const mode = $('#palCycleMode').value;
+    if(mode.startsWith('bpm')){
+      const effBpm = bpm || 120;
+      const div = Number($('#palCycleDiv').value) || 1;
+      const intervalMs = (60000 / effBpm) * div;
+      if(now >= palCycleNextAt){
+        palCycleNextAt = now + intervalMs;
+        stepPalCycler();
+      }
+    }
+  }
+  for(const [did, dc] of Object.entries(deckCycleState)){
+    if(!dc.on || !dc.mode.startsWith('bpm')) continue;
+    const effBpm = bpm || 120;
+    const intervalMs = (60000 / effBpm) * (dc.div || 1);
+    if(now >= dc.nextAt){
+      dc.nextAt = now + intervalMs;
+      stepDeckPalCycler(did);
+    }
+  }
+  if(sceneCycleOn && now >= sceneCycleNextAt){
+    sceneCycleNextAt = now + sceneIntervalMs($('#sceneCycleDiv')?.value);
+    stepSceneCycler();
+    syncSceneCycleUI();
+  }
+  for(const [did, scyc] of Object.entries(deckSceneCycleState)){
+    if(!scyc.on) continue;
+    if(now >= scyc.nextAt){
+      scyc.nextAt = now + sceneIntervalMs(scyc.div);
+      stepDeckSceneCycler(did);
+    }
+  }
+}, 50);
+// tabs
+$('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.t==='main') activeDeckId = b.dataset.deck || '';
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!=='pane-'+b.dataset.t);
+  if(b.dataset.t==='diag') $('#log').textContent=callLog.join('\n')||'no calls yet';
+  if(b.dataset.t==='eq') requestAnimationFrame(drawSpectrum);
+  if(b.dataset.t==='main'){ renderDeckTabs(); renderScenes(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
+  if(b.dataset.t==='scenes'){ if(typeof renderSceneStudio === 'function') renderSceneStudio(); }
+  if(b.dataset.t==='layout'){ if(typeof renderLayoutEditorBoxes === 'function') renderLayoutEditorBoxes(); if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview(); } });
+$('#resync').addEventListener('click',()=>connect());
+// status + scene cycler countdown
+function updateStatus(){
+  if($('#stBpm')) $('#stBpm').textContent=bpm||'—';
+  const vs=Object.values(virtualsCache); const virtTxt=vs.length?`${vs.filter(v=>v.active).length}/${vs.length} active`:'—';
+  if($('#stVirt')) $('#stVirt').textContent=virtTxt;
+  if($('#virtCount')) $('#virtCount').textContent=vs.length?`(${virtTxt})`:'';
+  if($('#stMode')) $('#stMode').textContent=`${S.qnt} · ${S.int} · ${S.trans} · ${S.guard?'guard':'no guard'}${S.lock?' · LOCK':''}`;
+  if($('#diagInfo')) $('#diagInfo').textContent=HOST?`host ${HOST} · ${Object.keys(virtualsCache).length} virtuals`:'not connected';
+}
+setInterval(()=>{
+  updateStatus();
+  if(sceneCycleOn) syncSceneCycleUI();
+},1000);

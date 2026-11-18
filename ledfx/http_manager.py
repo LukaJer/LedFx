@@ -69,6 +69,13 @@ class HttpServer:
         self.app.router.add_route("get", "/fonts.css", self.fonts_css)
         self.app.router.add_route("get", "/control", self.dj_control)
         self.app.router.add_route("get", "/dj", self.dj_control)
+        control_dir = Path(__file__).resolve().parent.parent / "ledfx_control"
+        if control_dir.is_dir():
+            self.app.router.add_static(
+                "/ledfx_control",
+                path=str(control_dir),
+                name="ledfx_control",
+            )
 
     async def dj_control(self, request):
         path = Path(__file__).resolve().parent.parent / "ledfx-control.html"
