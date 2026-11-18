@@ -148,6 +148,18 @@ class AudioInputConfig(LedFxModel):
     eq_high: CoercedFloat = Field(
         0.0, ge=-24.0, le=24.0, description="High band gain in dB (12 kHz)"
     )
+    input_gain: CoercedFloat = Field(
+        1.0, ge=0.1, le=5.0, description="Manual input gain multiplier"
+    )
+    autogain: bool = Field(
+        False, description="Automatically normalize incoming audio level"
+    )
+    autogain_target: CoercedFloat = Field(
+        0.5,
+        ge=0.1,
+        le=1.0,
+        description="Target normalized level when autogain is enabled",
+    )
 
 
 class AudioAnalysisConfig(LedFxModel):
@@ -173,6 +185,12 @@ class AudioAnalysisConfig(LedFxModel):
     ] = Field("hfc", description="Method used to detect onsets")
     pitch_tolerance: CoercedFloat = Field(
         0.8, ge=0.0, le=2, description="Pitch detection tolerance"
+    )
+    beat_min_freq: CoercedInt = Field(
+        20, ge=20, le=5000, description="Minimum frequency (Hz) for volume-based beat detection"
+    )
+    beat_max_freq: CoercedInt = Field(
+        100, ge=30, le=10000, description="Maximum frequency (Hz) for volume-based beat detection"
     )
 
 

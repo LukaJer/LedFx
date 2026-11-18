@@ -73,6 +73,7 @@ class AudioInputSource:
     _processed_audio_sample = None
     _volume = -90
     _volume_filter = ExpFilter(-90, alpha_decay=0.99, alpha_rise=0.99)
+    _autogain_env = 0.1
     _subscriber_threshold = 0
     _timer = None
     _last_active = None
@@ -1128,6 +1129,19 @@ class AudioInputSource:
         # clean up nans that have been mysteriously appearing..
         self._raw_audio_sample[np.isnan(self._raw_audio_sample)] = 0
 
+        # Apply manual input gain and optional RMS autogain before volume/FFT
+        gain = float(getattr(self._config, "input_gain", 1.0) or 1.0)
+        if gain != 1.0:
+            self._raw_audio_sample = self._raw_audio_sample * gain
+        if bool(getattr(self._config, "autogain", False)):
+            rms = float(np.sqrt(np.mean(self._raw_audio_sample ** 2)))
+            if rms > 1e-4:
+                alpha = 0.25 if rms > self._autogain_env else 0.008
+                self._autogain_env = (1.0 - alpha) * self._autogain_env + alpha * rms
+                target = float(getattr(self._config, "autogain_target", 0.5) or 0.5)
+                auto_scale = max(0.25, min(6.0, target / max(1e-4, self._autogain_env)))
+                self._raw_audio_sample = self._raw_audio_sample * auto_scale
+
         # Calculate the current volume for silence detection
         self._volume = 1 + aubio.db_spl(self._raw_audio_sample) / 100
         self._volume = max(0, min(1, self._volume))
@@ -1249,15 +1263,31 @@ class AudioAnalysisSource(AudioInputSource):
             )
 
         # volume based beat detection
-        self.beat_max_mel_index = next(
-            (
-                i - 1
-                for i, f in enumerate(
-                    self.melbanks.melbank_processors[0].melbank_frequencies
-                )
-                if f > self.freq_max_mels[0]
+        beat_min_hz = min(self._config.beat_min_freq, self._config.beat_max_freq - 10)
+        beat_max_hz = max(beat_min_hz + 10, self._config.beat_max_freq)
+        freqs_0 = self.melbanks.melbank_processors[0].melbank_frequencies
+        self.beat_min_mel_index = next(
+            (i for i, f in enumerate(freqs_0) if f >= beat_min_hz),
+            0,
+        )
+        self.beat_max_mel_index = max(
+            self.beat_min_mel_index + 1,
+            next(
+                (i for i, f in enumerate(freqs_0) if f > beat_max_hz),
+                len(freqs_0),
             ),
-            self.melbanks.melbank_processors[0].melbank_frequencies[-1],
+        )
+        freqs_2 = self.melbanks.melbank_processors[2].melbank_frequencies
+        self.beat_power_min_idx = next(
+            (i for i, f in enumerate(freqs_2) if f >= beat_min_hz),
+            0,
+        )
+        self.beat_power_max_idx = max(
+            self.beat_power_min_idx + 1,
+            next(
+                (i for i, f in enumerate(freqs_2) if f > beat_max_hz),
+                len(freqs_2),
+            ),
         )
 
         self.beat_min_percent_diff = 0.5
@@ -1320,7 +1350,11 @@ class AudioAnalysisSource(AudioInputSource):
         """
 
         time_now = time.time()
-        melbank = self.melbanks.melbanks[0][: self.beat_max_mel_index]
+        melbank = self.melbanks.melbanks[0][
+            self.beat_min_mel_index : self.beat_max_mel_index
+        ]
+        if len(melbank) == 0:
+            return False
         beat_power = np.sum(melbank)
         melbank_max = np.max(melbank)
 
@@ -1350,7 +1384,10 @@ class AudioAnalysisSource(AudioInputSource):
 
         melbank = self.melbanks.melbanks[2]
 
-        self.freq_power_raw[0] = np.average(melbank[: self.freq_mel_indexes[0]])
+        beat_slice = melbank[self.beat_power_min_idx : self.beat_power_max_idx]
+        self.freq_power_raw[0] = (
+            np.average(beat_slice) if len(beat_slice) else 0.0
+        )
         self.freq_power_raw[1] = np.average(
             melbank[self.freq_mel_indexes[0] : self.freq_mel_indexes[1]]
         )

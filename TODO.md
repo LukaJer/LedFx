@@ -6,12 +6,14 @@
 - [ ] Improve layout tab
 - [ ] Check sound-to-light algorithm
 - [ ] RGBW support
-- [ ] Autogain settings / gain settings
+- [x] Autogain settings / gain settings
 - [ ] Better separation between virtuals and tubes in the Virtuals tab (maybe rename)
 - [ ] Executable / AppImage creator
 - [ ] Performance improvements
 - [ ] Scene Cycler on the main tab similar to the color cycler
-- [ ] When creating/editin a  layout being able to choose which scenes to copy from other layouts
+- [x] When creating/editin a  layout being able to choose which scenes to copy from other layouts
 - [ ] Improve Vibe Macros
 - [ ] Check Target & Hit controls
-- [ ] 
+- [ ] split html maybe?
+- [ ] forany functions which create a new scene/layout/etc or modify it and check whether the saving is done correctly and how eas it is for the user to accidentialy overwrite it. also clarify what buttons do, if its temporary or if a config change occurs 
+- [ ] add a toggle to use the tapped bpm or the recognized 
