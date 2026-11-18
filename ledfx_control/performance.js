@@ -40,11 +40,30 @@ if(!palCycleSelected) palCycleSelected = new Set(PALETTES.map(p => p.name));
 function savePalCyclePool(){
   try{ localStorage.setItem('ledfx_cycle_pool', JSON.stringify([...palCycleSelected])); }catch(e){}
 }
+function syncPaletteDisplay(){
+  const mainName = activeDeckId ? (getDeckCycle(activeDeckId).pal?.name || '') : (curPalette?.name || '');
+  document.querySelectorAll('#palette .swatch').forEach(el => {
+    const p = PALETTES[el.dataset.i];
+    el.classList.toggle('cur', !!p && p.name === mainName);
+  });
+  document.querySelectorAll('.lprev-card').forEach(card => {
+    const did = card.dataset.deck;
+    const deckName = did ? (getDeckCycle(did).pal?.name || '') : '';
+    card.querySelectorAll('.lprev-pal .swatch').forEach(sw => {
+      const p = PALETTES[sw.dataset.pi];
+      sw.classList.toggle('cur', !!p && p.name === deckName);
+    });
+  });
+}
 function renderPalettes(){
+  const dc = activeDeckId ? getDeckCycle(activeDeckId) : null;
+  const activeName = dc ? (dc.pal?.name || '') : (curPalette?.name || '');
+  const pool = dc ? dc.pool : palCycleSelected;
   $('#palette').innerHTML = PALETTES.map((p,i)=>{
-    const inPool = palCycleSelected.has(p.name);
+    const inPool = pool.has(p.name);
+    const isCur = p.name === activeName;
     return `
-    <div class="swatch" data-i="${i}" role="button" tabindex="0">
+    <div class="swatch ${isCur?'cur':''}" data-i="${i}" role="button" tabindex="0">
       <span class="cyc-pick ${inPool?'on':''}" data-cyc="${i}" title="Include in palette cycle">${inPool?'✓':''}</span>
       <div class="strip2">${p.colors.map(c=>`<span style="background:${c}"></span>`).join('')}</div>
       <div class="name">${escHtml(p.name)}</div>
@@ -52,15 +71,19 @@ function renderPalettes(){
   }).join('');
   document.querySelectorAll('#palette .swatch').forEach(el=>el.addEventListener('click', e => {
     if(e.target.closest('.cyc-pick')) return;
-    applyPalette(PALETTES[el.dataset.i]);
+    const pal = PALETTES[el.dataset.i];
+    if(activeDeckId && pal) getDeckCycle(activeDeckId).pal = pal;
+    applyPalette(pal);
   }));
   document.querySelectorAll('#palette .cyc-pick').forEach(el=>el.addEventListener('click', e => {
     e.stopPropagation();
     const p = PALETTES[el.dataset.cyc];
     if(!p) return;
-    if(palCycleSelected.has(p.name)) palCycleSelected.delete(p.name);
-    else palCycleSelected.add(p.name);
-    savePalCyclePool();
+    const targetPool = activeDeckId ? getDeckCycle(activeDeckId).pool : palCycleSelected;
+    if(targetPool.has(p.name)) targetPool.delete(p.name);
+    else targetPool.add(p.name);
+    if(activeDeckId) multiPreviewKey = '';
+    else savePalCyclePool();
     renderPalettes();
     if(typeof syncPalCycleUI === 'function') syncPalCycleUI();
   }));
@@ -117,7 +140,10 @@ function buildColorPatch(effType, effConfig, colors, opts){
 async function applyPalette(p, quiet, zoneOverride){
   if(!quiet && guardLock()) return;
   if(quiet && S.lock) return;
+  const targetZone = zoneOverride || activeDeckId || '';
+  if(targetZone) getDeckCycle(targetZone).pal = p;
   curPalette=p; if($('#stPal')) $('#stPal').textContent=p.name;
+  syncPaletteDisplay();
   let ok=0, skip=0;
   const targetIds = targets(zoneOverride).filter(id => virtualsCache[id]?.effect?.type);
   const activeIds = targetIds.filter(id => virtualsCache[id]?.active);
@@ -294,7 +320,9 @@ async function hitDown(h, btn, zoneOverride){
     else if(h.kind==='hold'){
       await takeSnapshot();
       if(!btn.classList.contains('active')) return;
-      await tool({tool:'force_color', color:h.color}, undefined, zoneOverride);
+      const col = h.color === 'black' ? '#000000' : (h.color === 'white' ? '#ffffff' : h.color);
+      const ids = targets(zoneOverride).filter(id => virtualsCache[id]?.active || virtualsCache[id]?.effect?.type);
+      await Promise.all(ids.map(id => api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:'singleColor', config:{color: col, brightness: 1.0}})}).catch(()=>{})));
     }
     else if(h.kind==='strobe'){
       await takeSnapshot();
@@ -640,32 +668,110 @@ function syncLabUI(){
   const rv = Number($('#labRoll').value);
   $('#labRollVal').textContent = rv < 0 ? 'keep' : rv.toFixed(1);
 }
-function populateLabPresets(){
-  const sel = $('#labLoadSel');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">Load preset…</option>' + PALETTES.map((p,i)=>`<option value="${i}">${escHtml(p.name)}</option>`).join('');
-}
-populateLabPresets();
-syncLabUI();
-
-document.querySelectorAll('#labStops input[type=color]').forEach((inp, idx) => {
-  inp.addEventListener('input', () => {
-    $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100;
-    labBaseColors[idx] = inp.value;
-    syncLabUI();
-  });
-});
-['#labHue','#labSat','#labLight','#labRoll'].forEach(id => $(id)?.addEventListener('input', syncLabUI));
-$('#labLoadSel')?.addEventListener('change', e => {
-  const p = PALETTES[e.target.value];
+let labSelectedIdx = -1;
+function loadPaletteIntoLab(idx){
+  const p = PALETTES[idx];
   if(!p) return;
+  labSelectedIdx = idx;
   labBaseColors = p.colors.slice(0, 4);
   while(labBaseColors.length < 4) labBaseColors.push(labBaseColors[labBaseColors.length - 1]);
   $('#labName').value = p.name + ' (Edit)';
   $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100;
   $('#labRoleMap').value = p.roleMap || 'normal';
   syncLabUI();
+  renderLabSavedPalettes();
+}
+syncLabUI();
+
+const PURE_COLORS = [
+  {name:'Red', hex:'#ff0000'}, {name:'Orange', hex:'#ff6600'}, {name:'Yellow', hex:'#ffff00'},
+  {name:'Green', hex:'#00ff00'}, {name:'Cyan', hex:'#00ffff'}, {name:'Blue', hex:'#0000ff'},
+  {name:'Purple', hex:'#8b00ff'}, {name:'Magenta', hex:'#ff00ff'}, {name:'White', hex:'#ffffff'},
+  {name:'Black', hex:'#000000'},
+];
+let purePopoverEl = null;
+function closePureColorPopover(){
+  if(purePopoverEl){ purePopoverEl.remove(); purePopoverEl = null; }
+}
+document.addEventListener('pointerdown', e => {
+  if(purePopoverEl && !purePopoverEl.contains(e.target)) closePureColorPopover();
 });
+function openPureColorPopover(anchorEl, currentHex, onPick){
+  closePureColorPopover();
+  const pop = document.createElement('div');
+  pop.className = 'pure-pop';
+  pop.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="status" style="font-weight:700;color:var(--text)">Pure Colors</span>
+      <button type="button" class="btn" data-pop-close style="padding:1px 6px;font-size:11px">&times;</button>
+    </div>
+    <div class="pure-pop-grid">
+      ${PURE_COLORS.map(c => `<button type="button" class="pure-swatch" data-hex="${c.hex}" title="${c.name} (${c.hex})" style="background:${c.hex}"></button>`).join('')}
+    </div>
+    <div class="pure-pop-foot">
+      <span style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap">Custom Color</span>
+      <input type="color" data-pop-custom value="${escHtml(currentHex || '#ff0000')}" style="flex:1;height:34px;border:1px solid var(--amber);border-radius:7px;background:var(--panel2);cursor:pointer;padding:2px">
+    </div>`;
+  document.body.appendChild(pop);
+  purePopoverEl = pop;
+  const r = anchorEl.getBoundingClientRect();
+  const pw = 236, ph = pop.offsetHeight || 145;
+  const left = Math.min(window.innerWidth - pw - 8, Math.max(8, r.left));
+  const top = (r.bottom + ph + 8 <= window.innerHeight) ? (r.bottom + 6) : Math.max(8, r.top - ph - 6);
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+
+  pop.addEventListener('pointerdown', e => e.stopPropagation());
+  pop.querySelector('[data-pop-close]')?.addEventListener('click', closePureColorPopover);
+  pop.querySelectorAll('.pure-swatch').forEach(sw => sw.addEventListener('click', () => {
+    onPick(sw.dataset.hex);
+    closePureColorPopover();
+  }));
+  const cust = pop.querySelector('[data-pop-custom]');
+  cust?.addEventListener('input', () => onPick(cust.value));
+  cust?.addEventListener('change', () => { onPick(cust.value); closePureColorPopover(); });
+}
+
+const deckFullColor = {};
+let globalFullColor = '';
+function syncFullColorUI(){
+  const btn = $('#fullColorBtn'), dot = $('#fullColorDot');
+  if(!btn || !dot) return;
+  const z = activeDeckId || mainTargetZone || '';
+  const hex = z ? (deckFullColor[z] || '') : globalFullColor;
+  dot.style.background = hex || '';
+  btn.style.borderColor = hex || '';
+}
+$('#fullColorBtn')?.addEventListener('click', e => {
+  e.stopPropagation();
+  const z = activeDeckId || mainTargetZone || undefined;
+  const curHex = (z ? deckFullColor[z] : globalFullColor) || curPalette?.colors?.[0] || '#ff0000';
+  openPureColorPopover(e.currentTarget, curHex, hex => {
+    const pal = { name: `Full ${hex}`, colors: [hex, hex, hex, hex] };
+    if(z) deckFullColor[z] = hex;
+    else globalFullColor = hex;
+    if(activeDeckId) getDeckCycle(activeDeckId).pal = pal;
+    multiPreviewKey = '';
+    syncFullColorUI();
+    applyPalette(pal, false, z);
+  });
+});
+
+document.querySelectorAll('#labStops .lab-stop').forEach((el, idx) => {
+  const inp = el.querySelector('input[type=color]');
+  const openStopPop = e => {
+    e.preventDefault();
+    e.stopPropagation();
+    openPureColorPopover(el, labBaseColors[idx] || '#ff0000', hex => {
+      $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100;
+      labBaseColors[idx] = hex;
+      syncLabUI();
+    });
+  };
+  el.addEventListener('click', openStopPop);
+  if(inp) inp.addEventListener('click', openStopPop);
+});
+['#labHue','#labSat','#labLight','#labRoll'].forEach(id => $(id)?.addEventListener('input', syncLabUI));
 $('#labResetHslBtn')?.addEventListener('click', () => {
   $('#labHue').value = 0; $('#labSat').value = 100; $('#labLight').value = 100; $('#labRoll').value = -1;
   syncLabUI();
@@ -703,11 +809,11 @@ function renderLabSavedPalettes(){
   if(cnt) cnt.textContent = `(${PALETTES.length})`;
   if(!box) return;
   if(!PALETTES.length){
-    box.innerHTML = '<div class="empty">No palettes left. Create one above or click Restore Built-in Palettes.</div>';
+    box.innerHTML = '<div class="empty">No palettes left. Create one below or click Restore Built-in Palettes.</div>';
     return;
   }
   box.innerHTML = PALETTES.map((p, i) => `
-    <div class="swatch" style="cursor:default;display:flex;flex-direction:column;gap:6px">
+    <div class="swatch ${i===labSelectedIdx?'cur':''}" data-pick-pal="${i}" role="button" tabindex="0" style="display:flex;flex-direction:column;gap:6px">
       <div class="strip2" style="margin-bottom:0">${p.colors.map(c => `<span style="background:${c}"></span>`).join('')}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
         <span class="name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span>
@@ -715,7 +821,14 @@ function renderLabSavedPalettes(){
       </div>
     </div>
   `).join('');
-  box.querySelectorAll('[data-del-pal]').forEach(b => b.addEventListener('click', () => deletePaletteAt(Number(b.dataset.delPal))));
+  box.querySelectorAll('[data-pick-pal]').forEach(sw => sw.addEventListener('click', e => {
+    if(e.target.closest('[data-del-pal]')) return;
+    loadPaletteIntoLab(Number(sw.dataset.pickPal));
+  }));
+  box.querySelectorAll('[data-del-pal]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    deletePaletteAt(Number(b.dataset.delPal));
+  }));
 }
 
 function deletePaletteAt(idx){
@@ -739,16 +852,17 @@ function deletePaletteAt(idx){
       localStorage.setItem('ledfx_deleted_palettes', JSON.stringify([...deleted]));
     }catch(e){}
   }
+  if(labSelectedIdx === idx) labSelectedIdx = -1;
+  else if(labSelectedIdx > idx) labSelectedIdx--;
   multiPreviewKey = '';
-  renderPalettes(); renderMacros(); populateLabPresets(); renderLabSavedPalettes(); syncPalCycleUI();
+  renderPalettes(); renderMacros(); renderLabSavedPalettes(); syncPalCycleUI();
   if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
   toast(`Deleted palette "${p.name}"`);
 }
 
 $('#labDelPresetBtn')?.addEventListener('click', () => {
-  const sel = $('#labLoadSel');
-  if(!sel || sel.value === ''){ toast('Select a palette in the dropdown first', true); return; }
-  deletePaletteAt(Number(sel.value));
+  if(labSelectedIdx < 0 || !PALETTES[labSelectedIdx]){ toast('Click a palette box above first', true); return; }
+  deletePaletteAt(labSelectedIdx);
 });
 $('#labRestoreDefaultsBtn')?.addEventListener('click', () => {
   localStorage.removeItem('ledfx_deleted_palettes');
@@ -760,7 +874,7 @@ $('#labRestoreDefaultsBtn')?.addEventListener('click', () => {
   }
   savePalCyclePool();
   multiPreviewKey = '';
-  renderPalettes(); renderMacros(); populateLabPresets(); renderLabSavedPalettes(); syncPalCycleUI();
+  renderPalettes(); renderMacros(); renderLabSavedPalettes(); syncPalCycleUI();
   if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
   toast('Restored built-in palettes');
 });
@@ -768,8 +882,9 @@ $('#labRestoreDefaultsBtn')?.addEventListener('click', () => {
 $('#labSave').addEventListener('click', () => {
   const p = { ...buildLabPaletteObj(), _custom: true };
   PALETTES.push(p); palCycleSelected.add(p.name); savePalCyclePool();
+  labSelectedIdx = PALETTES.length - 1;
   multiPreviewKey = '';
-  renderPalettes(); renderMacros(); populateLabPresets(); renderLabSavedPalettes(); syncPalCycleUI();
+  renderPalettes(); renderMacros(); renderLabSavedPalettes(); syncPalCycleUI();
   if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
   const saved = JSON.parse(localStorage.getItem('ledfx_custom_palettes')||'[]');
   saved.push(p); localStorage.setItem('ledfx_custom_palettes', JSON.stringify(saved));
@@ -1018,7 +1133,7 @@ $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(
   document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!=='pane-'+b.dataset.t);
   if(b.dataset.t==='diag') $('#log').textContent=callLog.join('\n')||'no calls yet';
   if(b.dataset.t==='eq') requestAnimationFrame(drawSpectrum);
-  if(b.dataset.t==='main'){ renderDeckTabs(); renderScenes(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
+  if(b.dataset.t==='main'){ renderDeckTabs(); renderScenes(); renderPalettes(); syncPalCycleUI(); syncSceneCycleUI(); syncFullColorUI(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
   if(b.dataset.t==='scenes'){ if(typeof renderSceneStudio === 'function') renderSceneStudio(); }
   if(b.dataset.t==='layout'){ if(typeof renderLayoutEditorBoxes === 'function') renderLayoutEditorBoxes(); if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview(); } });
 $('#resync').addEventListener('click',()=>connect());

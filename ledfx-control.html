@@ -23,13 +23,16 @@
   </div>
 </header>
 
-<nav class="tabs" id="tabs"><button data-t="main" data-deck="" class="on">Main</button><span id="deckTabs" style="display:contents"></span><button data-t="virtuals">Virtuals &amp; Tubes</button><button data-t="scenes">Scenes</button><button data-t="eq">EQ &amp; Spectrum</button><button data-t="layout">Layouts &amp; Tubes</button><button data-t="lab">Palette Lab</button><button data-t="diag">Diagnostics</button></nav>
-<main>
-<div class="statusbar">
-  <div class="stc" id="stBpmBox" role="button" tabindex="0" title="Click to tap BPM" style="cursor:pointer;user-select:none"><small>BPM (tap)</small><b id="stBpm">—</b></div>
-  <button class="stc blackout-big" id="stBlackoutBtn" type="button" title="Toggle Blackout (B)"><small>Master</small><b>BLACKOUT</b></button>
-  <div class="stc"><small>Audio</small><span class="status" id="stAudio">no stream</span></div>
+<div class="tabs-bar">
+  <nav class="tabs" id="tabs"><button data-t="main" data-deck="" class="on">Main</button><span id="deckTabs" style="display:contents"></span><button data-t="virtuals">Virtuals &amp; Tubes</button><button data-t="scenes">Scenes</button><button data-t="eq">EQ &amp; Spectrum</button><button data-t="layout">Layouts &amp; Tubes</button><button data-t="lab">Palette Lab</button><button data-t="diag">Diagnostics</button></nav>
+  <div class="statusbar">
+    <div class="stc" id="stBpmBox" role="button" tabindex="0" title="Click to tap BPM" style="cursor:pointer;user-select:none"><small>BPM</small><b id="stBpm">—</b></div>
+    <button class="stc blackout-big" id="stBlackoutBtn" type="button" title="Toggle Master Blackout (B)"><small>Master</small><b>BLACKOUT</b></button>
+    <button class="stc whiteout-big" id="stWhiteoutBtn" type="button" title="Toggle Master Whiteout"><small>Master</small><b>WHITEOUT</b></button>
+    <div class="stc"><small>Audio</small><span class="status" id="stAudio">no stream</span></div>
+  </div>
 </div>
+<main>
 <div id="pane-main" class="pane">
   <div class="section" id="tubePreviewSec">
     <div id="multiPreviewGrid" class="multi-previews" hidden></div>
@@ -90,9 +93,12 @@
     </div>
     <div class="deck-col">
       <div class="row2" id="mainZoneBar" style="margin:0 0 14px" hidden></div>
-      <div class="section">
+      <div class="section" id="mainPaletteSec">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
-          <h2 style="margin:0">Palette</h2>
+          <div style="display:flex;align-items:center;gap:10px">
+            <h2 class="fold" id="toggleMainPaletteBtn" role="button" tabindex="0" aria-expanded="true" style="margin:0" title="Collapse or expand palettes"><span class="tri">&#9662;</span> Palette</h2>
+            <button type="button" class="btn full-color-btn" id="fullColorBtn" title="Apply a solid pure color to this layout"><span class="fc-dot" id="fullColorDot"></span><span>Full Color</span></button>
+          </div>
           <span class="status" id="palCycleInfo">manual</span>
         </div>
         <div class="palette" id="palette"></div>
@@ -115,7 +121,7 @@
           <button class="btn" id="palPoolAllBtn" style="padding:5px 9px;font-size:11px" title="Include all palettes in cycle">All</button>
           <button class="btn" id="palPoolNoneBtn" style="padding:5px 9px;font-size:11px" title="Clear cycle selection">None</button>
         </div>
-        <div class="status" style="margin-top:8px;line-height:1.5;font-size:11px">
+        <div class="status pal-help" style="margin-top:8px;line-height:1.5;font-size:11px">
           <b>BPM</b>: steps on a steady beat timer (synced to tapped/live BPM &times; divider).
           <b>Audio Peak</b>: triggers on sudden bass spikes (&gt;1.42&times; rolling average).
           <b>Next Palette</b>: switches to the next checked palette in the pool.
@@ -226,9 +232,15 @@
 <div id="pane-lab" class="pane" hidden>
   <div class="section">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <h2 style="margin:0">All Palettes <span class="fold-count" id="labPalCount"></span> <span style="text-transform:none;font-weight:400">— click a palette to edit</span></h2>
+      <button class="btn" id="labRestoreDefaultsBtn" title="Restore any deleted built-in palettes">Restore Built-in Palettes</button>
+    </div>
+    <div class="palette" id="labSavedPalettes"></div>
+  </div>
+  <div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
       <h2 style="margin:0">Palette Lab <span style="text-transform:none;font-weight:400">— tune stops, HSL shift, role mapping &amp; effect overrides</span></h2>
       <div class="row2" style="margin:0">
-        <select id="labLoadSel" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:8px;font-size:12px"><option value="">Load preset…</option></select>
         <button class="btn" id="labDelPresetBtn" style="color:var(--bad)" title="Delete the selected palette">Delete</button>
         <button class="btn" id="labFromActiveBtn" title="Pull colors from the first active virtual">From Active Effect</button>
         <button class="btn" id="labReverseBtn">Reverse</button>
@@ -237,10 +249,10 @@
     </div>
     <div class="lab-strip" id="labPreviewStrip"></div>
     <div class="lab-stops" id="labStops">
-      <div class="lab-stop"><input type="color" data-role="0" value="#3a0f02"><div><div class="role">Low / Base</div><div class="hex">#3a0f02</div></div></div>
-      <div class="lab-stop"><input type="color" data-role="1" value="#c2410c"><div><div class="role">Mid</div><div class="hex">#c2410c</div></div></div>
-      <div class="lab-stop"><input type="color" data-role="2" value="#f0a336"><div><div class="role">Accent</div><div class="hex">#f0a336</div></div></div>
-      <div class="lab-stop"><input type="color" data-role="3" value="#ffe08a"><div><div class="role">High / Peak</div><div class="hex">#ffe08a</div></div></div>
+      <div class="lab-stop" data-stop-idx="0"><input type="color" data-role="0" value="#3a0f02"><div><div class="role">Low / Base</div><div class="hex">#3a0f02</div></div></div>
+      <div class="lab-stop" data-stop-idx="1"><input type="color" data-role="1" value="#c2410c"><div><div class="role">Mid</div><div class="hex">#c2410c</div></div></div>
+      <div class="lab-stop" data-stop-idx="2"><input type="color" data-role="2" value="#f0a336"><div><div class="role">Accent</div><div class="hex">#f0a336</div></div></div>
+      <div class="lab-stop" data-stop-idx="3"><input type="color" data-role="3" value="#ffe08a"><div><div class="role">High / Peak</div><div class="hex">#ffe08a</div></div></div>
     </div>
     <div class="lab-tuners">
       <div class="lab-tuner"><label><span>Hue Shift</span><span id="labHueVal">0°</span></label><input type="range" id="labHue" min="-180" max="180" value="0"></div>
@@ -267,13 +279,6 @@
       <button class="btn" id="labApply">Apply Now</button>
       <button class="btn primary" id="labSave">Save to Palettes</button>
     </div>
-  </div>
-  <div class="section">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-      <h2 style="margin:0">All Palettes <span class="fold-count" id="labPalCount"></span></h2>
-      <button class="btn" id="labRestoreDefaultsBtn" title="Restore any deleted built-in palettes">Restore Built-in Palettes</button>
-    </div>
-    <div class="palette" id="labSavedPalettes"></div>
   </div>
 </div>
 <div id="pane-eq" class="pane" hidden>

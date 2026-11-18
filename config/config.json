@@ -1,5 +1,5 @@
 {
-    "active_layout_id": "single",
+    "active_layout_id": "back",
     "allow_null_origin": true,
     "allowed_hosts": [],
     "allowed_origins": [],
@@ -20,7 +20,7 @@
         "fft_size": 4096,
         "input_gain": 5.0,
         "mic_rate": 44100,
-        "min_volume": 0.0632,
+        "min_volume": 0.0911,
         "onset_method": "energy",
         "pitch_method": "yinfast",
         "pitch_tolerance": 0.8,
@@ -318,7 +318,7 @@
                 "wledbb08",
                 "wledbb09"
             ],
-            "enabled": false,
+            "enabled": true,
             "grid_cells": {
                 "0,0": {
                     "deviceId": "wledbb09",
@@ -3200,7 +3200,7 @@
             "devices": [
                 "wledbb08"
             ],
-            "enabled": true,
+            "enabled": false,
             "grid_cells": {
                 "0,0": {
                     "deviceId": "wledbb08",
@@ -6691,17 +6691,17 @@
                     "beat_flash": 0.3,
                     "bg_kick_flash": 0.6,
                     "blur": 0.0,
-                    "brightness": 1.0,
+                    "brightness": 0.8,
                     "color_by_intensity": false,
                     "decay": 0.7,
                     "diag": false,
-                    "flash_color": "#ffe08a",
+                    "flash_color": "#7e22ce",
                     "flip": false,
-                    "gradient": "linear-gradient(90deg, rgb(58, 15, 2) 0.00%, rgb(194, 65, 12) 33.33%, rgb(240, 163, 54) 66.67%, rgb(255, 224, 138) 100.00%)",
+                    "gradient": "linear-gradient(90deg, rgb(255, 46, 136) 0.00%, rgb(255, 110, 199) 33.33%, rgb(192, 38, 211) 66.67%, rgb(126, 34, 206) 100.00%)",
                     "gradient_roll": 0.0,
                     "idle_speed": 0.35,
                     "mirror": true,
-                    "reactivity": 0.6358,
+                    "reactivity": 0.75,
                     "ring_scale": 1.5,
                     "segment_length": 3,
                     "speed": 1.5
@@ -7132,18 +7132,18 @@
                 },
                 "singleColor": {
                     "config": {
-                        "background_brightness": 1,
+                        "background_brightness": 1.0,
                         "background_color": "#000000",
-                        "blur": 0,
-                        "brightness": 1,
-                        "color": "#907373",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
                         "diag": false,
                         "flip": false,
                         "mirror": false,
                         "modulate": false,
                         "modulation_effect": "sine",
                         "modulation_speed": 0.5,
-                        "speed": 1
+                        "speed": 1.0
                     },
                     "type": "singleColor"
                 },
@@ -7160,7 +7160,7 @@
                         "gradient_roll": 0.0,
                         "mirror": false,
                         "strobe_decay": 1.0,
-                        "strobe_frequency": "1/4 (.o. )",
+                        "strobe_frequency": "1/8 (◉◡◉ )",
                         "strobe_pattern": "****"
                     },
                     "type": "strobe"
@@ -7172,17 +7172,17 @@
                         "beat_flash": 0.3,
                         "bg_kick_flash": 0.6,
                         "blur": 0.0,
-                        "brightness": 1.0,
+                        "brightness": 0.8,
                         "color_by_intensity": false,
                         "decay": 0.7,
                         "diag": false,
-                        "flash_color": "#ffe08a",
+                        "flash_color": "#7e22ce",
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(58, 15, 2) 0.00%, rgb(194, 65, 12) 33.33%, rgb(240, 163, 54) 66.67%, rgb(255, 224, 138) 100.00%)",
+                        "gradient": "linear-gradient(90deg, rgb(255, 46, 136) 0.00%, rgb(255, 110, 199) 33.33%, rgb(192, 38, 211) 66.67%, rgb(126, 34, 206) 100.00%)",
                         "gradient_roll": 0.0,
                         "idle_speed": 0.35,
                         "mirror": true,
-                        "reactivity": 0.6358,
+                        "reactivity": 0.75,
                         "ring_scale": 1.5,
                         "segment_length": 3,
                         "speed": 1.5
@@ -7391,24 +7391,20 @@
             },
             "effect": {
                 "config": {
-                    "advanced": true,
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "beat_offset": 0.5,
-                    "beat_skip": "none",
                     "blur": 0.0,
                     "brightness": 1.0,
-                    "color_step": 0.5,
+                    "color": "#ffffff",
                     "diag": false,
-                    "ease_method": "linear",
                     "flip": false,
-                    "gradient": "linear-gradient(90deg, rgb(255, 40, 0) 0%, rgb(128, 0, 128) 33%, rgb(0, 199, 140) 66%, rgb(0, 255, 0) 99%)",
-                    "gradient_roll": 0.0,
-                    "mirror": true,
-                    "mode": "wipe",
-                    "skip_every": 1
+                    "mirror": false,
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "bar"
+                "type": "singleColor"
             },
             "effects": {
                 "bands": {
@@ -7723,6 +7719,23 @@
                     },
                     "type": "scroll"
                 },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
+                },
                 "smoke2d": {
                     "config": {
                         "background_brightness": 1,
@@ -7821,7 +7834,7 @@
             },
             "id": "matrixcamtest",
             "is_device": false,
-            "last_effect": "bar",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb02",
@@ -8577,33 +8590,20 @@
             },
             "effect": {
                 "config": {
-                    "advanced": true,
                     "background_brightness": 1.0,
-                    "background_color": "#ff2800",
-                    "background_mode": "overwrite",
-                    "bg_reactive_brightness": false,
-                    "bg_reactive_color": false,
+                    "background_color": "#000000",
                     "blur": 0.0,
                     "brightness": 1.0,
+                    "color": "#ffffff",
                     "diag": false,
-                    "draw": "Points",
-                    "dump": false,
                     "flip": false,
-                    "flip_horizontal": false,
-                    "flip_vertical": false,
-                    "frequency_range": "Lows (beat+bass)",
-                    "grad_power": false,
-                    "gradient": "#ffffff",
-                    "gradient_roll": 0.0,
                     "mirror": false,
-                    "mirror_effect": true,
-                    "points": 62,
-                    "rotate": 0,
-                    "scroll_time": 0.1,
-                    "size": 1,
-                    "test": false
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "bleep"
+                "type": "singleColor"
             },
             "effects": {
                 "bands": {
@@ -8667,8 +8667,8 @@
                         "background_brightness": 1.0,
                         "background_color": "#ff2800",
                         "background_mode": "overwrite",
-                        "bg_reactive_brightness": false,
-                        "bg_reactive_color": false,
+                        "bg_reactive_brightness": true,
+                        "bg_reactive_color": true,
                         "blur": 0.0,
                         "brightness": 1.0,
                         "diag": false,
@@ -8790,7 +8790,7 @@
                         "flip": false,
                         "flip_horizontal": false,
                         "flip_vertical": false,
-                        "gradient": "linear-gradient(90deg, rgb(4, 47, 46) 0.00%, rgb(13, 148, 136) 33.33%, rgb(45, 212, 191) 66.67%, rgb(217, 249, 157) 100.00%)",
+                        "gradient": "Jungle",
                         "gradient_roll": 0.0,
                         "impulse_decay": 0.01,
                         "mirror": true,
@@ -9092,7 +9092,7 @@
                         "flip_horizontal": false,
                         "flip_vertical": false,
                         "frequency_range": "Lows (beat+bass)",
-                        "gradient": "Frost",
+                        "gradient": "linear-gradient(90deg, rgb(255, 85, 0) 0.00%, rgb(255, 183, 0) 33.33%, rgb(98, 0, 234) 66.67%, rgb(179, 71, 255) 100.00%)",
                         "gradient_roll": 0.0,
                         "lower": 0.01,
                         "mirror": false,
@@ -9193,24 +9193,41 @@
                         "blur": 3.0,
                         "bounce": true,
                         "brightness": 1.0,
-                        "color_high": "#0000ff",
+                        "color_high": "#ffffff",
                         "color_intensity": true,
-                        "color_low": "#000080",
-                        "color_mid": "#00ffff",
+                        "color_low": "#1e1e22",
+                        "color_mid": "#676772",
                         "decay": 0.7,
                         "diag": false,
                         "filter": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(0, 255, 255) 0%, rgb(0, 0, 255) 100%)",
+                        "gradient": "linear-gradient(90deg, rgb(30, 30, 34) 0.00%, rgb(103, 103, 114) 33.33%, rgb(255, 126, 33) 66.67%, rgb(255, 255, 255) 100.00%)",
                         "gradient_roll": 0.0,
                         "input_source": "Power",
                         "mirror": false,
-                        "multiplier": 3.1789,
+                        "multiplier": 3.0,
                         "scan_width": 30,
                         "speed": 50,
                         "use_grad": false
                     },
                     "type": "scan_multi"
+                },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
                 },
                 "smoke2d": {
                     "config": {
@@ -9275,7 +9292,7 @@
             },
             "id": "remap",
             "is_device": false,
-            "last_effect": "bleep",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb00",
@@ -11251,21 +11268,18 @@
                 "config": {
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "beat_flash": 0.85,
                     "blur": 0.0,
                     "brightness": 1.0,
-                    "color_by_intensity": false,
-                    "decay": 0.78,
+                    "color": "#ffffff",
                     "diag": false,
                     "flip": false,
-                    "gradient": "Plasma",
-                    "gradient_roll": 0.0,
-                    "mirror": true,
-                    "pulse_width": 1.2,
-                    "reactivity": 0.75,
-                    "speed": 1.6
+                    "mirror": false,
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "tube_beat_pulse"
+                "type": "singleColor"
             },
             "effects": {
                 "bar": {
@@ -11317,11 +11331,11 @@
                         "diag": false,
                         "fix_hues": true,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(11, 61, 31) 0.00%, rgb(31, 122, 63) 33.33%, rgb(95, 191, 107) 66.67%, rgb(199, 242, 193) 100.00%)",
+                        "gradient": "linear-gradient(90deg, rgb(255,50,20) 0%, rgb(255,155,30) 55%, rgb(180,30,120) 100%)",
                         "gradient_roll": 0.0,
                         "mirror": true,
-                        "reactivity": 0.35,
-                        "speed": 0.35
+                        "reactivity": 0.2919,
+                        "speed": 0.9936
                     },
                     "type": "lava_lamp"
                 },
@@ -11415,6 +11429,23 @@
                     },
                     "type": "scan_and_flare"
                 },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
+                },
                 "tube_beat_pulse": {
                     "config": {
                         "background_brightness": 1.0,
@@ -11426,7 +11457,7 @@
                         "decay": 0.78,
                         "diag": false,
                         "flip": false,
-                        "gradient": "Plasma",
+                        "gradient": "linear-gradient(90deg, rgb(39, 39, 42) 0.00%, rgb(82, 82, 91) 33.33%, rgb(234, 88, 12) 66.67%, rgb(253, 186, 116) 100.00%)",
                         "gradient_roll": 0.0,
                         "mirror": true,
                         "pulse_width": 1.2,
@@ -11447,11 +11478,11 @@
                         "diag": false,
                         "flip": false,
                         "flip_on_kick": true,
-                        "gradient": "Dancefloor",
+                        "gradient": "linear-gradient(90deg, rgb(212, 212, 216) 0.00%, rgb(255, 255, 255) 33.33%, rgb(185, 28, 28) 66.67%, rgb(255, 30, 66) 100.00%)",
                         "gradient_roll": 0.0,
                         "mirror": false,
-                        "reactivity": 0.6358,
-                        "speed": 1.5,
+                        "reactivity": 0.75,
+                        "speed": 2.0,
                         "twist": 1.5
                     },
                     "type": "tube_helix"
@@ -11517,7 +11548,7 @@
             },
             "id": "rotator3000",
             "is_device": false,
-            "last_effect": "tube_beat_pulse",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb00",
@@ -11582,19 +11613,16 @@
                     "background_color": "#000000",
                     "blur": 0.0,
                     "brightness": 1.0,
+                    "color": "#ffffff",
                     "diag": false,
                     "flip": false,
-                    "high_color": "#ff2800",
-                    "high_sensitivity": 0.0818,
-                    "lows_color": "#ff00b2",
-                    "lows_sensitivity": 0.0818,
-                    "mids_color": "#ff2800",
-                    "mids_sensitivity": 0.0448,
-                    "mirror": true,
-                    "pulse_strip": "Off",
-                    "raindrop_animation": "Blob"
+                    "mirror": false,
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "rain"
+                "type": "singleColor"
             },
             "effects": {
                 "bar": {
@@ -11690,12 +11718,12 @@
                         "brightness": 1.0,
                         "diag": false,
                         "flip": false,
-                        "high_color": "#ff2800",
-                        "high_sensitivity": 0.0818,
-                        "lows_color": "#ff00b2",
-                        "lows_sensitivity": 0.0818,
-                        "mids_color": "#ff2800",
-                        "mids_sensitivity": 0.0448,
+                        "high_color": "#fecaca",
+                        "high_sensitivity": 0.1,
+                        "lows_color": "#240008",
+                        "lows_sensitivity": 0.1,
+                        "mids_color": "#991b1b",
+                        "mids_sensitivity": 0.05,
                         "mirror": true,
                         "pulse_strip": "Off",
                         "raindrop_animation": "Blob"
@@ -11838,6 +11866,23 @@
                     },
                     "type": "scroll_plus"
                 },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
+                },
                 "spectrum": {
                     "config": {
                         "background_brightness": 1,
@@ -11857,7 +11902,7 @@
                         "background_color": "#000000",
                         "beat_flash": 0.0,
                         "blur": 3.5,
-                        "brightness": 0.8,
+                        "brightness": 1.0,
                         "color_by_intensity": false,
                         "decay": 0.88,
                         "diag": false,
@@ -11889,7 +11934,7 @@
             },
             "id": "rotator6000",
             "is_device": false,
-            "last_effect": "rain",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb00",
@@ -11950,31 +11995,20 @@
             },
             "effect": {
                 "config": {
-                    "advanced": false,
-                    "background_brightness": 0.45,
-                    "background_color": "#7a0040",
-                    "blur": 1.5,
-                    "bounce": false,
+                    "background_brightness": 1.0,
+                    "background_color": "#000000",
+                    "blur": 0.0,
                     "brightness": 1.0,
-                    "color_intensity": false,
-                    "color_scan": "#ff0000",
-                    "count": 4,
+                    "color": "#ffffff",
                     "diag": false,
                     "flip": false,
-                    "frequency_range": "Lows (beat+bass)",
-                    "full_grad": true,
-                    "gradient": "linear-gradient(90deg, #ff0000 0.00%,#ff00b2 50.00%,#0000ff 100.00%)",
-                    "gradient_roll": 1.0,
-                    "mirror": true,
+                    "mirror": false,
                     "modulate": false,
                     "modulation_effect": "sine",
-                    "modulation_speed": 0.65,
-                    "multiplier": 3.1789,
-                    "scan_width": 22,
-                    "speed": 50,
-                    "use_grad": true
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "scan"
+                "type": "singleColor"
             },
             "effects": {
                 "bar": {
@@ -12115,9 +12149,9 @@
                         "modulate": false,
                         "modulation_effect": "sine",
                         "modulation_speed": 0.65,
-                        "multiplier": 3.1789,
+                        "multiplier": 5.0,
                         "scan_width": 22,
-                        "speed": 50,
+                        "speed": 31,
                         "use_grad": true
                     },
                     "type": "scan"
@@ -12156,15 +12190,15 @@
                         "blur": 0.1,
                         "bounce": true,
                         "brightness": 1.0,
-                        "color_high": "#fef08a",
+                        "color_high": "#000000",
                         "color_intensity": true,
-                        "color_low": "#1f1200",
-                        "color_mid": "#854d0e",
+                        "color_low": "#ff0000",
+                        "color_mid": "#00ff00",
                         "decay": 0.7,
                         "diag": false,
                         "filter": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(31, 18, 0) 0.00%, rgb(133, 77, 14) 33.33%, rgb(234, 179, 8) 66.67%, rgb(254, 240, 138) 100.00%)",
+                        "gradient": "linear-gradient(90deg, rgb(0, 255, 0) 0%, rgb(255, 200, 0) 25%, rgb(255, 120, 0) 50%, rgb(255, 40, 0) 75%, rgb(255, 0, 0) 100%)",
                         "gradient_roll": 0.0,
                         "input_source": "Power",
                         "mirror": false,
@@ -12211,6 +12245,23 @@
                     },
                     "type": "scroll_plus"
                 },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
+                },
                 "spectrum": {
                     "config": {
                         "background_brightness": 1,
@@ -12241,7 +12292,7 @@
             },
             "id": "rotyator",
             "is_device": false,
-            "last_effect": "scan",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb00",
@@ -12304,21 +12355,18 @@
                 "config": {
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "bass_strobe_decay_rate": 0.5,
                     "blur": 0.0,
                     "brightness": 1.0,
-                    "color_shift_delay": 1.0,
-                    "color_step": 0.0625,
+                    "color": "#ffffff",
                     "diag": false,
                     "flip": false,
-                    "gradient": "linear-gradient(90deg, rgb(255,255,255) 0%, rgb(255,0,0) 100%)",
-                    "gradient_roll": 0.0,
                     "mirror": false,
-                    "strobe_color": "#ffffff",
-                    "strobe_decay_rate": 0.5,
-                    "strobe_width": 10
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "real_strobe"
+                "type": "singleColor"
             },
             "effects": {
                 "bar": {
@@ -12620,6 +12668,23 @@
                     },
                     "type": "scroll"
                 },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
+                },
                 "spectrum": {
                     "config": {
                         "background_brightness": 1,
@@ -12637,7 +12702,7 @@
                     "config": {
                         "background_brightness": 1.0,
                         "background_color": "#000000",
-                        "beat_decay": 0.5,
+                        "beat_decay": 2.0,
                         "blur": 0.0,
                         "brightness": 1.0,
                         "diag": false,
@@ -12645,8 +12710,8 @@
                         "gradient": "#ff00b2",
                         "gradient_roll": 0.0,
                         "mirror": false,
-                        "strobe_decay": 1.0,
-                        "strobe_frequency": "1/8 (◉◡◉ )",
+                        "strobe_decay": 1.5,
+                        "strobe_frequency": "1/4 (.o. )",
                         "strobe_pattern": "*.*."
                     },
                     "type": "strobe"
@@ -12668,7 +12733,7 @@
             },
             "id": "leri",
             "is_device": false,
-            "last_effect": "real_strobe",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb00",
@@ -12713,21 +12778,18 @@
                 "config": {
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "bass_strobe_decay_rate": 0.5,
                     "blur": 0.0,
                     "brightness": 1.0,
-                    "color_shift_delay": 1.0,
-                    "color_step": 0.0625,
+                    "color": "#ffffff",
                     "diag": false,
                     "flip": false,
-                    "gradient": "linear-gradient(90deg, rgb(255,255,255) 0%, rgb(255,0,0) 100%)",
-                    "gradient_roll": 0.0,
                     "mirror": false,
-                    "strobe_color": "#ffffff",
-                    "strobe_decay_rate": 0.5,
-                    "strobe_width": 10
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "real_strobe"
+                "type": "singleColor"
             },
             "effects": {
                 "rainbow": {
@@ -12764,11 +12826,28 @@
                     },
                     "type": "real_strobe"
                 },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
+                },
                 "strobe": {
                     "config": {
                         "background_brightness": 1.0,
                         "background_color": "#000000",
-                        "beat_decay": 0.4,
+                        "beat_decay": 2.0,
                         "blur": 0.0,
                         "brightness": 1.0,
                         "diag": false,
@@ -12776,8 +12855,8 @@
                         "gradient": "#00ffff",
                         "gradient_roll": 0.0,
                         "mirror": false,
-                        "strobe_decay": 1.0,
-                        "strobe_frequency": "1/8 (◉◡◉ )",
+                        "strobe_decay": 1.5,
+                        "strobe_frequency": "1/2 (.-. )",
                         "strobe_pattern": ".*.*"
                     },
                     "type": "strobe"
@@ -12799,7 +12878,7 @@
             },
             "id": "re",
             "is_device": false,
-            "last_effect": "real_strobe",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wled-bb03",
@@ -12844,21 +12923,20 @@
                 "config": {
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "bass_strobe_decay_rate": 0.72,
-                    "blur": 0.0,
-                    "brightness": 1.0,
-                    "color_shift_delay": 1.0,
-                    "color_step": 0.1,
+                    "beat_flash": 0.0,
+                    "blur": 1.5,
+                    "brightness": 0.8,
+                    "color_by_intensity": false,
+                    "decay": 0.82,
                     "diag": false,
                     "flip": false,
-                    "gradient": "linear-gradient(90deg, rgb(255,255,255) 0%, rgb(180,220,255) 100%)",
+                    "gradient": "linear-gradient(90deg, rgb(58, 5, 24) 0.00%, rgb(179, 18, 63) 33.33%, rgb(255, 94, 58) 66.67%, rgb(255, 179, 122) 100.00%)",
                     "gradient_roll": 0.0,
-                    "mirror": false,
-                    "strobe_color": "#ffffff",
-                    "strobe_decay_rate": 0.72,
-                    "strobe_width": 10
+                    "mirror": true,
+                    "reactivity": 0.6,
+                    "speed": 1.5
                 },
-                "type": "real_strobe"
+                "type": "tube_split_vu"
             },
             "effects": {
                 "bar": {
@@ -13025,18 +13103,18 @@
                     "config": {
                         "background_brightness": 1.0,
                         "background_color": "#000000",
-                        "bass_strobe_decay_rate": 0.72,
+                        "bass_strobe_decay_rate": 0.55,
                         "blur": 0.0,
                         "brightness": 1.0,
                         "color_shift_delay": 1.0,
-                        "color_step": 0.1,
+                        "color_step": 0.0625,
                         "diag": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(255,255,255) 0%, rgb(180,220,255) 100%)",
+                        "gradient": "linear-gradient(90deg, rgb(255,255,255) 0%, rgb(255,0,0) 100%)",
                         "gradient_roll": 0.0,
-                        "mirror": false,
+                        "mirror": true,
                         "strobe_color": "#ffffff",
-                        "strobe_decay_rate": 0.72,
+                        "strobe_decay_rate": 0.55,
                         "strobe_width": 10
                     },
                     "type": "real_strobe"
@@ -13049,15 +13127,15 @@
                         "blur": 1.0,
                         "bounce": true,
                         "brightness": 0.95,
-                        "color_high": "#00e5ff",
+                        "color_high": "#e11d48",
                         "color_intensity": true,
-                        "color_low": "#ff0055",
-                        "color_mid": "#ffaa00",
+                        "color_low": "#3b0764",
+                        "color_mid": "#9333ea",
                         "decay": 0.7,
                         "diag": false,
                         "filter": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(255, 0, 0) 0%, rgb(255, 120, 0) 14%, rgb(255, 200, 0) 28%, rgb(0, 255, 0) 42%, rgb(0, 199, 140) 56%, rgb(0, 0, 255) 70%, rgb(128, 0, 128) 84%, rgb(255, 0, 178) 98%)",
+                        "gradient": "linear-gradient(90deg, rgb(59, 7, 100) 0.00%, rgb(147, 51, 234) 33.33%, rgb(9, 9, 11) 66.67%, rgb(225, 29, 72) 100.00%)",
                         "gradient_roll": 0.0,
                         "input_source": "Power",
                         "mirror": true,
@@ -13074,9 +13152,9 @@
                         "background_color": "#000000",
                         "blur": 1.5,
                         "brightness": 0.9,
-                        "color_high": "#22d3ee",
-                        "color_lows": "#ff4d6d",
-                        "color_mids": "#fbbf24",
+                        "color_high": "#fef08a",
+                        "color_lows": "#1f1200",
+                        "color_mids": "#854d0e",
                         "decay_per_sec": 0.45,
                         "diag": false,
                         "flip": false,
@@ -13085,6 +13163,23 @@
                         "threshold": 0.25
                     },
                     "type": "scroll_plus"
+                },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
                 },
                 "tube_beat_pulse": {
                     "config": {
@@ -13206,7 +13301,7 @@
                         "decay": 0.76,
                         "diag": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(31, 18, 0) 0.00%, rgb(133, 77, 14) 33.33%, rgb(234, 179, 8) 66.67%, rgb(254, 240, 138) 100.00%)",
+                        "gradient": "Frost",
                         "gradient_roll": 0.0,
                         "mirror": true,
                         "reactivity": 0.6,
@@ -13217,18 +13312,18 @@
                 },
                 "tube_solid_beat": {
                     "config": {
-                        "alternate": true,
+                        "alternate": false,
                         "background_brightness": 1.0,
                         "background_color": "#000000",
-                        "base_level": 0.1,
-                        "beat_flash": 0.95,
+                        "base_level": 0.12,
+                        "beat_flash": 0.9,
                         "blur": 0.0,
                         "brightness": 1.0,
                         "color_by_intensity": true,
-                        "decay": 0.7,
+                        "decay": 0.72,
                         "diag": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(255,0,0) 0%, rgb(255,255,255) 100%)",
+                        "gradient": "Dancefloor",
                         "gradient_roll": 0.0,
                         "mirror": true,
                         "reactivity": 0.6,
@@ -13242,12 +13337,12 @@
                         "background_color": "#000000",
                         "beat_flash": 0.0,
                         "blur": 1.5,
-                        "brightness": 1.0,
+                        "brightness": 0.8,
                         "color_by_intensity": false,
                         "decay": 0.82,
                         "diag": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(60,10,0) 0%, rgb(255,80,10) 60%, rgb(255,210,120) 100%)",
+                        "gradient": "linear-gradient(90deg, rgb(58, 5, 24) 0.00%, rgb(179, 18, 63) 33.33%, rgb(255, 94, 58) 66.67%, rgb(255, 179, 122) 100.00%)",
                         "gradient_roll": 0.0,
                         "mirror": true,
                         "reactivity": 0.6,
@@ -13266,7 +13361,7 @@
                         "decay": 0.78,
                         "diag": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(255,0,40) 0%, rgb(255,255,255) 100%)",
+                        "gradient": "linear-gradient(90deg, rgb(59, 7, 100) 0.00%, rgb(147, 51, 234) 33.33%, rgb(9, 9, 11) 66.67%, rgb(225, 29, 72) 100.00%)",
                         "gradient_roll": 0.0,
                         "mirror": true,
                         "reactivity": 0.8,
@@ -13292,7 +13387,7 @@
             },
             "id": "front-pillars",
             "is_device": false,
-            "last_effect": "real_strobe",
+            "last_effect": "tube_split_vu",
             "segments": [
                 [
                     "wledbb07",
@@ -13331,35 +13426,18 @@
                 "config": {
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "background_mode": "additive",
-                    "bands": 8,
                     "blur": 0.0,
-                    "brightness": 0.9,
-                    "center": true,
+                    "brightness": 0.58,
+                    "color": "#ffffff",
                     "diag": false,
-                    "dump": false,
-                    "filtered": true,
                     "flip": false,
-                    "flip_horizontal": false,
-                    "flip_vertical": false,
-                    "frequency_range": "Lows (beat+bass)",
-                    "gradient": "linear-gradient(90deg, rgb(99,102,241) 0%, rgb(236,72,153) 50%, rgb(250,204,21) 100%)",
-                    "gradient_roll": 0.0,
-                    "max_vs_mean": false,
-                    "mirror": true,
-                    "peak_color": "#ffffff",
-                    "peak_decay": 0.03,
-                    "peak_marks": true,
-                    "peak_percent": 1,
-                    "power_gradient": "Progressive",
-                    "ring": true,
-                    "rotate": 0,
-                    "spin": true,
-                    "spin_decay": 0.1,
-                    "spin_multiplier": 1.0,
-                    "test": false
+                    "mirror": false,
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "equalizer2d"
+                "type": "singleColor"
             },
             "effects": {
                 "concentric": {
@@ -13476,11 +13554,28 @@
                         "twist": 0.2
                     },
                     "type": "plasma2d"
+                },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 0.58,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
                 }
             },
             "id": "front-matrix",
             "is_device": false,
-            "last_effect": "equalizer2d",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb07",
@@ -13935,33 +14030,6 @@
                 "transition_mode": "Add",
                 "transition_time": 0.4
             },
-            "effect": {
-                "config": {
-                    "background_brightness": 1.0,
-                    "background_color": "#000000",
-                    "bass_decay": 0.72,
-                    "beat_flash": 0.0,
-                    "blur": 0.0,
-                    "brightness": 1.0,
-                    "color_by_intensity": false,
-                    "decay": 0.78,
-                    "diag": false,
-                    "drift_speed": 14.0,
-                    "flip": false,
-                    "gradient": "linear-gradient(90deg, rgb(255,255,255) 0%, rgb(180,220,255) 100%)",
-                    "gradient_roll": 0.0,
-                    "idle_glow": 0.0,
-                    "kick_cooldown": 0.22,
-                    "mirror": true,
-                    "reactivity": 0.6,
-                    "segment_length": 3,
-                    "single_side_line": true,
-                    "speed": 1.5,
-                    "strobe_color": "#ffffff",
-                    "strobe_decay": 0.74
-                },
-                "type": "tube_kick_strobe"
-            },
             "effects": {
                 "bar": {
                     "config": {
@@ -14384,31 +14452,20 @@
             },
             "effect": {
                 "config": {
-                    "add_speed": 10.0,
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "background_mode": "additive",
                     "blur": 0.0,
                     "brightness": 1.0,
-                    "count": 1.9,
+                    "color": "#000000",
                     "diag": false,
-                    "dump": false,
                     "flip": false,
-                    "flip_horizontal": false,
-                    "flip_vertical": false,
-                    "gradient": "Jungle",
-                    "gradient_roll": 0.0,
-                    "impulse_decay": 0.01,
-                    "mirror": true,
-                    "multiplier": 10.0,
-                    "rotate": 0,
-                    "run_seconds": 2.0,
-                    "tail": 67,
-                    "tail_segments": 10,
-                    "test": false,
-                    "width": 1
+                    "mirror": false,
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "digitalrain2d"
+                "type": "singleColor"
             },
             "effects": {
                 "concentric": {
@@ -14525,11 +14582,28 @@
                         "twist": 0.2
                     },
                     "type": "plasma2d"
+                },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#000000",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
                 }
             },
             "id": "back-matrix",
             "is_device": false,
-            "last_effect": "digitalrain2d",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb09",
@@ -14988,24 +15062,37 @@
                 "config": {
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "beat_flash": 0.65,
                     "blur": 0.0,
-                    "brightness": 0.92,
-                    "color_by_intensity": false,
-                    "decay": 0.78,
+                    "brightness": 0.58,
+                    "color": "#ffffff",
                     "diag": false,
                     "flip": false,
-                    "gradient": "Sunset",
-                    "gradient_roll": 0.0,
-                    "mirror": true,
-                    "orientation": "Horizontal",
-                    "reactivity": 0.7012,
-                    "speed": 0.745,
-                    "spread": 0.35
+                    "mirror": false,
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "tube_lighthouse"
+                "type": "singleColor"
             },
             "effects": {
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 0.58,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
+                },
                 "tube_lighthouse": {
                     "config": {
                         "background_brightness": 1.0,
@@ -15030,7 +15117,7 @@
             },
             "id": "virtual-wide2",
             "is_device": false,
-            "last_effect": "tube_lighthouse",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb07",
@@ -15069,24 +15156,37 @@
                 "config": {
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "beat_flash": 0.65,
                     "blur": 0.0,
-                    "brightness": 1.0,
-                    "color_by_intensity": false,
-                    "decay": 0.78,
+                    "brightness": 0.58,
+                    "color": "#ffffff",
                     "diag": false,
                     "flip": false,
-                    "gradient": "Sunset",
-                    "gradient_roll": 0.0,
-                    "mirror": true,
-                    "orientation": "Horizontal",
-                    "reactivity": 0.7,
-                    "speed": 2.2,
-                    "spread": 0.35
+                    "mirror": false,
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "tube_lighthouse"
+                "type": "singleColor"
             },
             "effects": {
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 0.58,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
+                },
                 "tube_lighthouse": {
                     "config": {
                         "background_brightness": 1.0,
@@ -15111,7 +15211,7 @@
             },
             "id": "virtual-wide2-1",
             "is_device": false,
-            "last_effect": "tube_lighthouse",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb07",
@@ -15152,12 +15252,12 @@
                     "background_color": "#000000",
                     "beat_flash": 0.65,
                     "blur": 0.0,
-                    "brightness": 1.0,
+                    "brightness": 0.8,
                     "color_by_intensity": false,
                     "decay": 0.78,
                     "diag": false,
                     "flip": false,
-                    "gradient": "Sunset",
+                    "gradient": "linear-gradient(90deg, rgb(0, 255, 255) 0.00%, rgb(0, 255, 255) 33.33%, rgb(0, 255, 255) 66.67%, rgb(0, 255, 255) 100.00%)",
                     "gradient_roll": 0.0,
                     "mirror": true,
                     "orientation": "Horizontal",
@@ -15168,18 +15268,35 @@
                 "type": "tube_lighthouse"
             },
             "effects": {
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
+                },
                 "tube_lighthouse": {
                     "config": {
                         "background_brightness": 1.0,
                         "background_color": "#000000",
                         "beat_flash": 0.65,
                         "blur": 0.0,
-                        "brightness": 1.0,
+                        "brightness": 0.8,
                         "color_by_intensity": false,
                         "decay": 0.78,
                         "diag": false,
                         "flip": false,
-                        "gradient": "Sunset",
+                        "gradient": "linear-gradient(90deg, rgb(0, 255, 255) 0.00%, rgb(0, 255, 255) 33.33%, rgb(0, 255, 255) 66.67%, rgb(0, 255, 255) 100.00%)",
                         "gradient_roll": 0.0,
                         "mirror": true,
                         "orientation": "Horizontal",
@@ -15231,28 +15348,18 @@
                 "config": {
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "bass_decay": 0.72,
-                    "beat_flash": 0.0,
                     "blur": 0.0,
                     "brightness": 1.0,
-                    "color_by_intensity": false,
-                    "decay": 0.78,
+                    "color": "#ffffff",
                     "diag": false,
-                    "drift_speed": 14.0,
                     "flip": false,
-                    "gradient": "linear-gradient(90deg, rgb(15, 23, 42) 0.00%, rgb(29, 78, 216) 33.33%, rgb(224, 242, 254) 66.67%, rgb(255, 255, 255) 100.00%)",
-                    "gradient_roll": 0.0,
-                    "idle_glow": 0.0,
-                    "kick_cooldown": 0.22,
-                    "mirror": true,
-                    "reactivity": 0.6,
-                    "segment_length": 3,
-                    "single_side_line": true,
-                    "speed": 1.5,
-                    "strobe_color": "#ffffff",
-                    "strobe_decay": 0.74
+                    "mirror": false,
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "tube_kick_strobe"
+                "type": "singleColor"
             },
             "effects": {
                 "bar": {
@@ -15399,6 +15506,23 @@
                         "use_grad": false
                     },
                     "type": "scan_multi"
+                },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
                 },
                 "strobe": {
                     "config": {
@@ -15589,7 +15713,7 @@
             },
             "id": "single-tube",
             "is_device": false,
-            "last_effect": "tube_kick_strobe",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb08",
@@ -15622,28 +15746,18 @@
                 "config": {
                     "background_brightness": 1.0,
                     "background_color": "#000000",
-                    "background_mode": "additive",
                     "blur": 0.0,
                     "brightness": 1.0,
-                    "center_smoothing": 0.85,
+                    "color": "#ffffff",
                     "diag": false,
-                    "dump": false,
                     "flip": false,
-                    "flip_horizontal": false,
-                    "flip_vertical": false,
-                    "frequency_range": "Lows (beat+bass)",
-                    "gradient": "linear-gradient(90deg, #ff0000 0.00%, #00000e 42.00%, #00000d 43.00%, #000000 61.00%)",
-                    "gradient_roll": 0.0,
-                    "gradient_scale": 1.5,
-                    "idle_speed": 0.1,
-                    "invert": false,
                     "mirror": false,
-                    "power_multiplier": 0.25,
-                    "rotate": 0,
-                    "stretch_height": 1.0,
-                    "test": false
+                    "modulate": false,
+                    "modulation_effect": "sine",
+                    "modulation_speed": 0.5,
+                    "speed": 1.0
                 },
-                "type": "concentric"
+                "type": "singleColor"
             },
             "effects": {
                 "concentric": {
@@ -15698,11 +15812,28 @@
                         "twist": 0.25
                     },
                     "type": "plasma2d"
+                },
+                "singleColor": {
+                    "config": {
+                        "background_brightness": 1.0,
+                        "background_color": "#000000",
+                        "blur": 0.0,
+                        "brightness": 1.0,
+                        "color": "#ffffff",
+                        "diag": false,
+                        "flip": false,
+                        "mirror": false,
+                        "modulate": false,
+                        "modulation_effect": "sine",
+                        "modulation_speed": 0.5,
+                        "speed": 1.0
+                    },
+                    "type": "singleColor"
                 }
             },
             "id": "single-matrix",
             "is_device": false,
-            "last_effect": "concentric",
+            "last_effect": "singleColor",
             "segments": [
                 [
                     "wledbb08",

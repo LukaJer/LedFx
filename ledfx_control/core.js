@@ -159,6 +159,7 @@ function syncSceneDisplay(id){
     curPalette = {name: label, colors: cols};
     if($('#stPal')) $('#stPal').textContent = label;
   }
+  if(typeof syncPaletteDisplay === 'function') syncPaletteDisplay();
 }
 
 let layoutsCache = {};

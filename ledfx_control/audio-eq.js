@@ -730,7 +730,7 @@ async function toggleBlackout(){
     $('#briSlider').value = savedBri; $('#briVal').textContent = savedBri + '%';
   }
   const bVal = (Number($('#briSlider').value) || 0) / 100;
-  for(const id of targets()){
+  for(const id of Object.keys(virtualsCache || {})){
     if(!virtualsCache[id]?.active) continue;
     try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body:JSON.stringify({config:{brightness:bVal}})}); }catch(e){}
   }
@@ -738,6 +738,49 @@ async function toggleBlackout(){
 }
 $('#blackoutBtn')?.addEventListener('click', toggleBlackout);
 $('#stBlackoutBtn')?.addEventListener('click', toggleBlackout);
+
+let whiteoutOn = false, whiteoutBusy = false, whiteoutSnap = null;
+async function toggleWhiteout(){
+  if(guardLock() || whiteoutBusy) return;
+  whiteoutBusy = true;
+  try{
+    whiteoutOn = !whiteoutOn;
+    const wBtn = $('#stWhiteoutBtn');
+    if(wBtn){
+      wBtn.classList.toggle('on', whiteoutOn);
+      const b = wBtn.querySelector('b');
+      if(b) b.textContent = whiteoutOn ? 'WHITEOUT ON' : 'WHITEOUT';
+    }
+    if(whiteoutOn){
+      if(blackoutOn){
+        blackoutOn = false;
+        const bBtn = $('#blackoutBtn');
+        if(bBtn){ bBtn.classList.remove('on'); bBtn.textContent = 'Blackout OFF'; }
+        const bigB = $('#stBlackoutBtn');
+        if(bigB){ bigB.classList.remove('on'); const b = bigB.querySelector('b'); if(b) b.textContent = 'BLACKOUT'; }
+      }
+      let latest = virtualsCache;
+      try{ const d = await api('/virtuals'); latest = d.virtuals || d; }catch(e){}
+      const ids = Object.keys(latest || {}).filter(id => latest[id]?.active);
+      whiteoutSnap = {};
+      for(const id of ids) whiteoutSnap[id] = JSON.parse(JSON.stringify(latest[id]));
+      await Promise.all(ids.map(id => api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:'singleColor', config:{color:'#ffffff', brightness:1.0}})}).catch(()=>{})));
+    }else if(whiteoutSnap){
+      await Promise.all(Object.entries(whiteoutSnap).map(([id, v]) => {
+        if(v?.active && v?.effect?.type){
+          return api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type: v.effect.type, config: v.effect.config || {}})}).catch(()=>{});
+        }
+        return Promise.resolve();
+      }));
+      whiteoutSnap = null;
+    }
+    if(typeof loadVirtuals === 'function') loadVirtuals().catch(()=>{});
+    toast(whiteoutOn ? 'Whiteout ON' : 'Whiteout OFF');
+  }finally{
+    whiteoutBusy = false;
+  }
+}
+$('#stWhiteoutBtn')?.addEventListener('click', toggleWhiteout);
 
 document.addEventListener('keydown', e => {
   if(e.ctrlKey || e.metaKey || e.altKey) return;

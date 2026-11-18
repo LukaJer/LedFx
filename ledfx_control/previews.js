@@ -117,6 +117,38 @@ function scheduleTubePreview(){
   });
 }
 
+const deckOutMode = {}, deckOutSnapshot = {};
+async function toggleDeckOutMode(deckId, mode, card){
+  const cur = deckOutMode[deckId] || '';
+  const ids = targets(deckId).filter(vid => virtualsCache[vid]?.active);
+  if(cur === mode){
+    deckOutMode[deckId] = '';
+    const snap = deckOutSnapshot[deckId];
+    if(snap){
+      await Promise.all(Object.entries(snap).map(([vid, v]) => {
+        if(v?.active && v?.effect?.type){
+          return api(`/virtuals/${vid}/effects`, {method:'POST', body: JSON.stringify({type: v.effect.type, config: v.effect.config || {}})}).catch(()=>{});
+        }
+        return Promise.resolve();
+      }));
+      delete deckOutSnapshot[deckId];
+    }
+  }else{
+    if(!cur){
+      let latest = virtualsCache;
+      try{ const d = await api('/virtuals'); latest = d.virtuals || d; }catch(e){}
+      const snap = {};
+      for(const vid of ids) if(latest[vid]) snap[vid] = JSON.parse(JSON.stringify(latest[vid]));
+      deckOutSnapshot[deckId] = snap;
+    }
+    deckOutMode[deckId] = mode;
+    const col = mode === 'white' ? '#ffffff' : '#000000';
+    await Promise.all(ids.map(vid => api(`/virtuals/${vid}/effects`, {method:'POST', body: JSON.stringify({type:'singleColor', config:{color: col, brightness: 1.0}})}).catch(()=>{})));
+  }
+  const activeMode = deckOutMode[deckId] || '';
+  card?.querySelectorAll('[data-deck-out]').forEach(b => b.classList.toggle('on', b.dataset.deckOut === activeMode));
+}
+
 let multiPreviewKey = '', multiCardRefs = {};
 function drawTubePreview(){
   if(document.hidden || !isPreviewVisible()) return;
@@ -165,23 +197,38 @@ function drawTubePreview(){
         const dc = getDeckCycle(id);
         const palHtml = PALETTES.map((pal, pi) => {
           const inPool = dc.pool.has(pal.name);
+          const isCur = dc.pal?.name === pal.name;
           return `
-          <div class="swatch" data-pi="${pi}" title="${escHtml(pal.name)}">
+          <div class="swatch ${isCur?'cur':''}" data-pi="${pi}" title="${escHtml(pal.name)}">
             <span class="cyc-pick ${inPool?'on':''}" data-cyc="${pi}" title="Include in palette cycle">${inPool?'✓':''}</span>
             <div class="strip2">${pal.colors.map(c => `<span style="background:${c}"></span>`).join('')}</div>
             <div class="name">${escHtml(pal.name)}</div>
           </div>`;
         }).join('');
         const hitsHtml = HITS.map((h, hi) => `<button class="hit-btn" data-hi="${hi}">${escHtml(h.name)}</button>`).join('');
+        let deckCollapsed = {};
+        try{ deckCollapsed = JSON.parse(localStorage.getItem('ledfx_deck_collapsed') || '{}'); }catch(e){}
+        const scCol = !!deckCollapsed[id + ':scenes'];
+        const palCol = !!deckCollapsed[id + ':pal'];
+        const outMode = deckOutMode[id] || '';
         return `
         <div class="lprev-card" data-deck="${escHtml(id)}">
-          <div class="lprev-head">
-            <span class="lprev-title" data-open-tab title="Click to open ${escHtml(p.name || id)} tab">${escHtml(p.name || id)}</span>
-            <div class="lprev-bri"><input type="range" data-ctl="bri" min="0" max="100" value="80" title="Layout Brightness"><span class="lprev-bri-val" data-val="bri">80%</span></div>
-            <span class="status" data-meta></span>
+          <div class="lprev-top">
+            <div class="lprev-top-left">
+              <div class="lprev-head">
+                <span class="lprev-title" data-open-tab title="Click to open ${escHtml(p.name || id)} tab">${escHtml(p.name || id)}</span>
+                <span class="status" data-meta></span>
+              </div>
+              <div class="lprev-bri"><input type="range" data-ctl="bri" min="0" max="100" value="80" title="Layout Brightness"><span class="lprev-bri-val" data-val="bri">80%</span></div>
+            </div>
+            <div class="lprev-out-btns">
+              <button type="button" class="blackout-big ${outMode==='black'?'on':''}" data-deck-out="black" title="Blackout this layout">Blackout</button>
+              <button type="button" class="whiteout-big ${outMode==='white'?'on':''}" data-deck-out="white" title="Whiteout this layout">Whiteout</button>
+            </div>
           </div>
           <canvas data-open-tab title="Click to open ${escHtml(p.name || id)} tab"></canvas>
-          <div class="lprev-sub">Scenes</div>
+          <div class="lprev-sub"><span class="lprev-fold ${scCol?'collapsed':''}" data-fold-toggle="scenes"><span class="tri">&#9662;</span> Scenes</span></div>
+          <div data-fold-body="scenes" class="${scCol?'lprev-box-collapsed':''}">
           ${tagBarHtml}
           <div class="lprev-scenes">${zHtml}</div>
           <div class="pal-cyc" style="margin-top:6px">
@@ -199,7 +246,9 @@ function drawTubePreview(){
             <button class="btn" data-scyc-none style="padding:5px 9px;font-size:11px" title="Clear scene cycle selection">None</button>
             <label class="status" style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" data-scyc-rand ${scyc.rand?'checked':''}> Shuffle</label>
           </div>
-          <div class="lprev-sub">Palette</div>
+          </div>
+          <div class="lprev-sub" style="display:flex;align-items:center;justify-content:space-between"><span class="lprev-fold ${palCol?'collapsed':''}" data-fold-toggle="pal"><span class="tri">&#9662;</span> Palette</span><button type="button" class="btn full-color-btn" data-full-color style="${deckFullColor[id]?`border-color:${deckFullColor[id]}`:''}" title="Apply a solid pure color to this layout"><span class="fc-dot" style="${deckFullColor[id]?`background:${deckFullColor[id]}`:''}"></span><span>Full Color</span></button></div>
+          <div data-fold-body="pal" class="${palCol?'lprev-box-collapsed':''}">
           <div class="lprev-pal">${palHtml}</div>
           <div class="pal-cyc">
             <button class="tgl ${dc.on?'on':''}" data-cyc-btn>${dc.on?'Cycle ON':'Cycle OFF'}</button>
@@ -223,6 +272,7 @@ function drawTubePreview(){
           <div class="status" style="margin-top:6px;line-height:1.45;font-size:10px">
             <b>BPM</b>: steady beat timer &middot; <b>Audio Peak</b>: bass spike trigger &middot; <b>Next Palette</b>: next pooled palette &middot; <b>Rotate Colors</b>: shifts current palette stops.
           </div>
+          </div>
           <div class="lprev-sub">Controls</div>
           <div class="lprev-sliders">
             <div class="gcard"><label><span>Speed</span><span data-val="spd">50%</span></label><input type="range" data-ctl="spd" min="0" max="100" value="50"></div>
@@ -239,9 +289,26 @@ function drawTubePreview(){
           canvas: card.querySelector('canvas'),
           meta: card.querySelector('[data-meta]'),
         };
+        card.querySelectorAll('[data-deck-out]').forEach(ob => ob.addEventListener('click', e => {
+          e.stopPropagation();
+          toggleDeckOutMode(deckId, ob.dataset.deckOut, card);
+        }));
         card.querySelectorAll('[data-open-tab]').forEach(el => el.addEventListener('click', () => {
           const tabBtn = [...document.querySelectorAll('#tabs button[data-t="main"]')].find(b => (b.dataset.deck || '') === deckId);
           if(tabBtn) tabBtn.click();
+        }));
+        card.querySelectorAll('[data-fold-toggle]').forEach(ft => ft.addEventListener('click', e => {
+          e.stopPropagation();
+          const which = ft.dataset.foldToggle;
+          const body = card.querySelector(`[data-fold-body="${which}"]`);
+          const nowCol = !ft.classList.contains('collapsed');
+          ft.classList.toggle('collapsed', nowCol);
+          if(body) body.classList.toggle('lprev-box-collapsed', nowCol);
+          try{
+            const map = JSON.parse(localStorage.getItem('ledfx_deck_collapsed') || '{}');
+            map[deckId + ':' + which] = nowCol;
+            localStorage.setItem('ledfx_deck_collapsed', JSON.stringify(map));
+          }catch(err){}
         }));
         card.querySelectorAll('.tag-bar .tag-pill').forEach(tb => tb.addEventListener('click', e => {
           e.stopPropagation();
@@ -267,6 +334,20 @@ function drawTubePreview(){
           pk.classList.toggle('on', on);
           pk.textContent = on ? '✓' : '';
         }));
+        card.querySelector('[data-full-color]')?.addEventListener('click', e => {
+          e.stopPropagation();
+          const btn = e.currentTarget;
+          const curHex = deckFullColor[deckId] || getDeckCycle(deckId).pal?.colors?.[0] || '#ff0000';
+          openPureColorPopover(btn, curHex, hex => {
+            const pal = { name: `Full ${hex}`, colors: [hex, hex, hex, hex] };
+            deckFullColor[deckId] = hex;
+            getDeckCycle(deckId).pal = pal;
+            const dot = btn.querySelector('.fc-dot');
+            if(dot) dot.style.background = hex;
+            btn.style.borderColor = hex;
+            applyPalette(pal, false, deckId);
+          });
+        });
         card.querySelectorAll('.lprev-pal .swatch').forEach(sw => sw.addEventListener('click', e => {
           e.stopPropagation();
           if(e.target.closest('.cyc-pick')) return;

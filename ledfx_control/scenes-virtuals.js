@@ -88,16 +88,21 @@ async function activateScene(id, deckId){
   if(guardLock()) return;
   for(const vid of Object.keys(scenesCache[id]?.virtuals || {})) delete activePalettePatch[vid];
   await quantWait(S.trans==='Quantize'?(S.qnt==='Now'?'Bar':S.qnt):'Now');
-  syncSceneDisplay(id);
   const targetDeck = deckId || activeDeckId;
-  if(targetDeck) lastDeckScene[targetDeck] = id;
+  if(targetDeck){
+    lastDeckScene[targetDeck] = id;
+    if(typeof getDeckCycle === 'function') getDeckCycle(targetDeck).pal = null;
+  }
+  syncSceneDisplay(id);
   document.querySelectorAll('#scenes .scene').forEach(b=>b.classList.toggle('cur',b.dataset.id===id));
   document.querySelectorAll('.lprev-card').forEach(card=>{
     const cid = card.dataset.deck;
     if(targetDeck ? cid === targetDeck : card.querySelector(`.lprev-scenes .scene[data-id="${CSS.escape(id)}"]`)){
       card.querySelectorAll('.lprev-scenes .scene').forEach(b=>b.classList.toggle('cur',b.dataset.id===id));
+      if(!targetDeck && cid && typeof getDeckCycle === 'function') getDeckCycle(cid).pal = null;
     }
   });
+  if(typeof syncPaletteDisplay === 'function') syncPaletteDisplay();
   try{
     await api('/scenes', {method:'PUT', body: JSON.stringify({id, action:'activate'})});
     toast('Scene activated');
@@ -603,6 +608,25 @@ $('#toggleMainScenesBtn')?.addEventListener('keydown', e => {
   if(e.key === 'Enter' || e.key === ' '){
     e.preventDefault();
     $('#toggleMainScenesBtn').click();
+  }
+});
+
+let mainPaletteHidden = localStorage.getItem('ledfx_main_palette_hidden') === '1';
+function syncMainPaletteVisibility(){
+  const sec = $('#mainPaletteSec'), btn = $('#toggleMainPaletteBtn');
+  if(sec) sec.classList.toggle('collapsed', mainPaletteHidden);
+  if(btn) btn.setAttribute('aria-expanded', String(!mainPaletteHidden));
+}
+syncMainPaletteVisibility();
+$('#toggleMainPaletteBtn')?.addEventListener('click', ()=>{
+  mainPaletteHidden = !mainPaletteHidden;
+  localStorage.setItem('ledfx_main_palette_hidden', mainPaletteHidden ? '1' : '0');
+  syncMainPaletteVisibility();
+});
+$('#toggleMainPaletteBtn')?.addEventListener('keydown', e => {
+  if(e.key === 'Enter' || e.key === ' '){
+    e.preventDefault();
+    $('#toggleMainPaletteBtn').click();
   }
 });
 
