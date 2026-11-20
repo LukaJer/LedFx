@@ -366,6 +366,7 @@ class Effect(BaseRegistry):
     def update_config(self, config):
         if isinstance(config, PluginConfig):
             config = config.as_dict()  # effects are created from a validated model
+        virtual_id = None
         with self.lock:
             if self._config is not None:
                 config = self._config.as_dict() | config
@@ -411,9 +412,9 @@ class Effect(BaseRegistry):
             _LOGGER.debug("Effect %s config updated to %s.", self.NAME, self._config)
 
             if self._virtual:
-                self._ledfx.events.fire_event(
-                    EffectUpdatedEvent(self.id, self._virtual.id)
-                )
+                virtual_id = self._virtual.id
+        if virtual_id is not None:
+            self._ledfx.events.fire_event(EffectUpdatedEvent(self.id, virtual_id))
 
     def config_updated(self, config):
         """

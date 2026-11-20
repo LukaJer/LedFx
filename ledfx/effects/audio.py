@@ -877,15 +877,25 @@ class AudioInputSource:
                     **({"channels": channels} if channels is not None else {}),
                 )
 
-            self.resampler = samplerate.Resampler("sinc_fastest", channels=1)
+            try:
+                self.resampler = samplerate.Resampler("sinc_fastest", channels=1)
 
-            _LOGGER.info(
-                "Audio source opened: %s: %s",
-                hostapis[device["hostapi"]]["name"],
-                device.get("name", device.get("client")),
-            )
+                _LOGGER.info(
+                    "Audio source opened: %s: %s",
+                    hostapis[device["hostapi"]]["name"],
+                    device.get("name", device.get("client")),
+                )
 
-            AudioInputSource._stream.start()
+                AudioInputSource._stream.start()
+            except Exception:
+                stream = AudioInputSource._stream
+                AudioInputSource._stream = None
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except Exception as close_err:  # noqa: BLE001
+                        _LOGGER.debug("Failed closing failed audio stream: %s", close_err)
+                raise
             with AudioInputSource._class_lock:
                 AudioInputSource._audio_stream_active = True
 
@@ -1006,16 +1016,18 @@ class AudioInputSource:
                 self._timer.start()
 
     def check_and_deactivate(self):
-        if self._timer is not None:
-            self._timer.cancel()
-        self._timer = None
-        if self._should_always_keep_active():
-            _LOGGER.debug("Sendspin always-on active, skipping deactivate")
-            return
-        if (
-            len(self._callbacks) <= self._subscriber_threshold
-            and AudioInputSource._audio_stream_active
-        ):
+        with self.lock:
+            if self._timer is not None:
+                self._timer.cancel()
+            self._timer = None
+            if self._should_always_keep_active():
+                _LOGGER.debug("Sendspin always-on active, skipping deactivate")
+                return
+            should_deactivate = (
+                len(self._callbacks) <= self._subscriber_threshold
+                and AudioInputSource._audio_stream_active
+            )
+        if should_deactivate:
             self.deactivate()
 
     def get_device_index_by_name(self, device_name: str):
@@ -1417,17 +1429,20 @@ class AudioAnalysisSource(AudioInputSource):
         melbank = self.melbanks.melbanks[2]
 
         beat_slice = melbank[self.beat_power_min_idx : self.beat_power_max_idx]
+        low_slice = melbank[self.freq_mel_indexes[0] : self.freq_mel_indexes[1]]
+        mid_slice = melbank[self.freq_mel_indexes[1] : self.freq_mel_indexes[2]]
+        high_slice = melbank[self.freq_mel_indexes[2] : self.freq_mel_indexes[3]]
         self.freq_power_raw[0] = (
             np.average(beat_slice) if len(beat_slice) else 0.0
         )
-        self.freq_power_raw[1] = np.average(
-            melbank[self.freq_mel_indexes[0] : self.freq_mel_indexes[1]]
+        self.freq_power_raw[1] = (
+            np.average(low_slice) if len(low_slice) else 0.0
         )
-        self.freq_power_raw[2] = np.average(
-            melbank[self.freq_mel_indexes[1] : self.freq_mel_indexes[2]]
+        self.freq_power_raw[2] = (
+            np.average(mid_slice) if len(mid_slice) else 0.0
         )
-        self.freq_power_raw[3] = np.average(
-            melbank[self.freq_mel_indexes[2] : self.freq_mel_indexes[3]]
+        self.freq_power_raw[3] = (
+            np.average(high_slice) if len(high_slice) else 0.0
         )
         np.minimum(self.freq_power_raw, 1, out=self.freq_power_raw)
         self.freq_power_filter.update(self.freq_power_raw)
@@ -1549,6 +1564,8 @@ class AudioReactiveEffect(Effect):
         super().__init__(ledfx, config)
         # protect against possible deactivate race condition
         self.audio = None
+        self._melbank_cache_lock = threading.Lock()
+        self._melbank_cache: dict[tuple[bool, int], np.ndarray] = {}
 
     def activate(self, channel):
         _LOGGER.info("Activating AudioReactiveEffect.")
@@ -1583,7 +1600,8 @@ class AudioReactiveEffect(Effect):
         return ExpFilter(alpha_decay=alpha_decay, alpha_rise=alpha_rise)
 
     def _audio_data_updated(self):
-        self.melbank.cache_clear()
+        with self._melbank_cache_lock:
+            self._melbank_cache.clear()
         with self.lock:
             if self.is_active:
                 self.audio_data_updated(self.audio)
@@ -1614,15 +1632,14 @@ class AudioReactiveEffect(Effect):
 
     @cached_property
     def _selected_melbank(self):
+        max_freqs = self.audio.melbanks.melbanks_config.max_frequencies
         return next(
             (
                 i
-                for i, x in enumerate(
-                    self.audio.melbanks.melbanks_config.max_frequencies
-                )
+                for i, x in enumerate(max_freqs)
                 if x >= self._virtual.frequency_range.max
             ),
-            len(self.audio.melbanks.melbanks_config.max_frequencies),
+            max(0, len(max_freqs) - 1),
         )
 
     @cached_property
@@ -1693,7 +1710,6 @@ class AudioReactiveEffect(Effect):
             # Replace NaN values with 0
             np.nan_to_num(melbank, copy=False)
 
-    @cache  # noqa: B019
     def melbank(self, filtered=False, size=0):
         """
         This little bit of code pulls together information from the effect's
@@ -1703,21 +1719,31 @@ class AudioReactiveEffect(Effect):
         size, int      : interpolate the melbank to the target size. value of 0 is no interpolation
         filtered, bool : melbank with smoothed attack and decay
         """
+        key = (bool(filtered), int(size))
+        with self._melbank_cache_lock:
+            cached = self._melbank_cache.get(key)
+            if cached is not None:
+                return cached.copy()
+
         if filtered:
             melbank = self.audio.melbanks.melbanks_filtered[self._selected_melbank][
                 self._melbank_min_idx : self._melbank_max_idx
-            ]
+            ].copy()
         else:
             melbank = self.audio.melbanks.melbanks[self._selected_melbank][
                 self._melbank_min_idx : self._melbank_max_idx
-            ]
+            ].copy()
 
         self.melbank_no_nan(melbank)
 
         if size and (self._input_mel_length != size):
-            return np.interp(*self._melbank_interp_linspaces(size), melbank)
+            result = np.interp(*self._melbank_interp_linspaces(size), melbank)
         else:
-            return melbank
+            result = melbank
+
+        with self._melbank_cache_lock:
+            self._melbank_cache[key] = result
+            return result.copy()
 
     def melbank_thirds(self, **kwargs):
         """

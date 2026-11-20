@@ -162,7 +162,33 @@ async function applyPalette(p, quiet, zoneOverride){
     }catch(e){ skip++; }
   }
   if(activeDeckId && editingSceneId && runIds.some(id => id in sceneDraftVirtuals)){
-    renderSceneEditor(editingSceneId);
+    for(const id of runIds){
+      if(sceneDraftVirtuals[id]?.config && activePalettePatch[id]){
+        Object.assign(sceneDraftVirtuals[id].config, activePalettePatch[id]);
+      }
+    }
+    const body = $('#sceneEditorBody');
+    if(body){
+      for(const id of runIds){
+        const draft = sceneDraftVirtuals[id];
+        if(!draft) continue;
+        for(const [k, v] of Object.entries(activePalettePatch[id] || {})){
+          const field = body.querySelector(`.se-field[data-vid="${CSS.escape(id)}"][data-key="${CSS.escape(k)}"]`);
+          if(!field) continue;
+          const inp = field.querySelector('[data-se-input]');
+          if(inp){
+            if(inp.type === 'checkbox') inp.checked = Boolean(v);
+            else inp.value = String(v);
+          }
+          const gc = field.querySelector('[data-se-grad-canvas]');
+          if(gc && typeof drawGradCanvas === 'function' && typeof parseGradientStops === 'function'){
+            drawGradCanvas(gc, parseGradientStops(String(v)), -1, -1);
+          }
+          const hexEl = field.querySelector('.se-color-hex');
+          if(hexEl) hexEl.textContent = String(v);
+        }
+      }
+    }
   }
   if(!quiet) toast(skip ? `${p.name} applied to ${ok} virtual(s) (${skip} fixed-color skipped)` : `${p.name} applied`);
 }

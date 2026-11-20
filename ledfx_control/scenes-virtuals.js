@@ -23,7 +23,7 @@ function renderScenes(){
     syncSceneDisplay(chosenActive);
     if(activeDeckId) lastDeckScene[activeDeckId] = chosenActive;
   }
-  if(typeof renderSceneEditor === 'function'){
+  if(typeof renderSceneEditor === 'function' && !cloningVirtualInEditor){
     const edTarget = activeDeckId ? (chosenActive || '') : '';
     renderSceneEditor(edTarget);
   }
@@ -93,6 +93,8 @@ async function loadScenes(){
 
 const lastDeckScene = {};
 const activePalettePatch = {};
+const sceneActivateTokens = {};
+let cloningVirtualInEditor = false;
 async function activateScene(id, deckId){
   if(guardLock()) return;
   if(typeof whiteoutOn !== 'undefined' && whiteoutOn){
@@ -100,14 +102,17 @@ async function activateScene(id, deckId){
     whiteoutSnap = null;
     if(typeof syncWhiteoutUI === 'function') syncWhiteoutUI();
   }
+  const targetDeck = deckId || activeDeckId || '';
+  const scopeKey = targetDeck || '__global__';
+  const tok = (sceneActivateTokens[scopeKey] = (sceneActivateTokens[scopeKey] || 0) + 1);
   for(const vid of Object.keys(scenesCache[id]?.virtuals || {})) delete activePalettePatch[vid];
   await quantWait(S.trans==='Quantize'?(S.qnt==='Now'?'Bar':S.qnt):'Now');
-  const targetDeck = deckId || activeDeckId;
+  if(sceneActivateTokens[scopeKey] !== tok) return;
   if(targetDeck){
     lastDeckScene[targetDeck] = id;
     if(typeof getDeckCycle === 'function') getDeckCycle(targetDeck).pal = null;
   }
-  syncSceneDisplay(id);
+  if(!deckId || deckId === activeDeckId) syncSceneDisplay(id);
   document.querySelectorAll('#scenes .scene').forEach(b=>b.classList.toggle('cur',b.dataset.id===id));
   document.querySelectorAll('.lprev-card').forEach(card=>{
     const cid = card.dataset.deck;
@@ -119,12 +124,16 @@ async function activateScene(id, deckId){
   if(typeof syncPaletteDisplay === 'function') syncPaletteDisplay();
   try{
     await api('/scenes', {method:'PUT', body: JSON.stringify({id, action:'activate'})});
+    if(sceneActivateTokens[scopeKey] !== tok) return;
     toast('Scene activated');
     await loadVirtuals();
+    if(sceneActivateTokens[scopeKey] !== tok) return;
     if(typeof restoreSceneCtl === 'function') await restoreSceneCtl(id, deckId);
+    if(sceneActivateTokens[scopeKey] !== tok) return;
     if(typeof blackoutOn !== 'undefined' && blackoutOn && typeof applyBlackoutToVirtuals === 'function'){
       await applyBlackoutToVirtuals(Object.keys(scenesCache[id]?.virtuals || {}));
     }
+    if(sceneActivateTokens[scopeKey] !== tok) return;
     if(typeof renderSceneEditor === 'function' && activeDeckId) renderSceneEditor(id);
   }catch(e){ toast('Scene failed: ' + e.message, true); }
 }
@@ -738,8 +747,13 @@ function wireVirtualMappingBar(container, draftMap, onCloned){
         await api(`/virtuals/${vid}`, {method:'PUT', body: JSON.stringify({active: false})}).catch(()=>{});
         await api(`/virtuals/${newVid}/effects`, {method:'POST', body: JSON.stringify({type: draft.type, config: draft.config})});
       }
-      await loadLayouts();
-      await loadVirtuals();
+      cloningVirtualInEditor = true;
+      try{
+        await loadLayouts();
+        await loadVirtuals();
+      }finally{
+        cloningVirtualInEditor = false;
+      }
       toast(`Cloned "${newName.trim()}" (${newVid}) — click Save/Update Scene to bind it`);
       if(typeof onCloned === 'function') onCloned(vid, newVid);
     }catch(e){ toast('Clone virtual failed: ' + e.message, true); }
@@ -854,6 +868,7 @@ async function saveEditedScene(asNew){
         method: 'POST',
         body: JSON.stringify({ id: editingSceneId, virtuals: JSON.parse(JSON.stringify(mergedVirtuals)) }),
       });
+      for(const vid of Object.keys(mergedVirtuals)) delete activePalettePatch[vid];
       toast(`Updated scene "${orig.name || editingSceneId}"`);
       await loadScenes();
       renderSceneEditor(editingSceneId);
@@ -887,7 +902,7 @@ function toggleSceneHidden(sid, force){
   renderScenes();
 }
 
-let studioSceneId = '', studioDraftVirtuals = {};
+let studioSceneId = '', studioDraftVirtuals = {}, studioPreservedVirtuals = {};
 function loadStudioScene(sid){
   studioSceneId = sid || '';
   const sc = sid ? scenesCache[sid] : null;
@@ -899,6 +914,7 @@ function loadStudioScene(sid){
     $('#stHideLiveChk').checked = isSceneHidden(studioSceneId);
   }
   studioDraftVirtuals = {};
+  studioPreservedVirtuals = {};
   if(sc && sc.virtuals){
     for(const [vid, eff] of Object.entries(sc.virtuals)){
       if(eff && eff.type){
@@ -907,6 +923,8 @@ function loadStudioScene(sid){
           type: eff.type,
           config: { ...defaultEffectConfig(eff.type), ...(eff.config || {}) },
         };
+      }else if(eff && typeof eff === 'object'){
+        studioPreservedVirtuals[vid] = JSON.parse(JSON.stringify(eff));
       }
     }
   }
@@ -1072,6 +1090,7 @@ $('#stNewBtn')?.addEventListener('click', () => {
   if($('#stTagsIn')) $('#stTagsIn').value = '';
   if($('#stHideLiveChk')){ $('#stHideLiveChk').checked = false; $('#stHideLiveChk').disabled = true; }
   studioDraftVirtuals = {};
+  studioPreservedVirtuals = {};
   renderStudioPicker();
   renderStudioVirtuals();
 });
@@ -1087,6 +1106,7 @@ $('#stAddVirtBtn')?.addEventListener('click', () => {
   const vid = $('#stAddVirtSel')?.value;
   if(!vid){ toast('Choose a virtual first', true); return; }
   if(studioDraftVirtuals[vid]){ toast('Virtual already in scene'); return; }
+  delete studioPreservedVirtuals[vid];
   const liveEff = virtualsCache[vid]?.effect;
   const type = (liveEff && liveEff.type) || effectTypes[0] || 'fade';
   studioDraftVirtuals[vid] = {
@@ -1109,7 +1129,11 @@ async function saveStudioScene(forceNew){
   if(!name){ toast('Enter a scene name', true); return; }
   if(!Object.keys(studioDraftVirtuals).length){ toast('Add at least one virtual to the scene', true); return; }
   const tags = [...new Set(($('#stTagsIn')?.value || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean))].join(',');
-  const payload = { name, scene_tags: tags, virtuals: JSON.parse(JSON.stringify(studioDraftVirtuals)) };
+  const mergedVirtuals = {
+    ...JSON.parse(JSON.stringify(studioPreservedVirtuals)),
+    ...JSON.parse(JSON.stringify(studioDraftVirtuals)),
+  };
+  const payload = { name, scene_tags: tags, virtuals: mergedVirtuals };
   if(!forceNew && studioSceneId && scenesCache[studioSceneId]){
     if(!confirm(`Overwrite existing scene "${scenesCache[studioSceneId].name || studioSceneId}"?`)) return;
     payload.id = studioSceneId;
@@ -1136,6 +1160,7 @@ $('#stDelBtn')?.addEventListener('click', async () => {
     toast(`Deleted "${sName}"`);
     studioSceneId = '';
     studioDraftVirtuals = {};
+    studioPreservedVirtuals = {};
     await loadScenes();
     renderSceneStudio();
   }catch(e){ toast('Delete failed: ' + e.message, true); }

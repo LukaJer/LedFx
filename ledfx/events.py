@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import logging
+import threading
 from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -652,24 +654,32 @@ class EventListener:
 class Events:
     def __init__(self, ledfx):
         self._ledfx = ledfx
-        self._listeners = {}
+        self._listeners: dict[str, list[EventListener]] = {}
+        self._lock = threading.RLock()
 
     def has_listeners(self, event_type: str) -> bool:
         """Whether an event has consumers, before preparing an expensive payload."""
-        return bool(self._listeners.get(event_type))
+        with self._lock:
+            return bool(self._listeners.get(event_type))
 
     def fire_event(self, event: Event) -> None:
         event._automated = _EVENT_AUTOMATED.get()
-        listeners = self._listeners.get(event.event_type, [])
+        with self._lock:
+            listeners = list(self._listeners.get(event.event_type, ()))
 
         if not listeners:
+            return
+
+        loop = getattr(self._ledfx, "loop", None)
+        if loop is None or loop.is_closed():
             return
 
         for listener in listeners:
             filtered = listener.filter_event(event)
 
             if not filtered:
-                self._ledfx.loop.call_soon_threadsafe(listener.callback, event)
+                with contextlib.suppress(RuntimeError):
+                    loop.call_soon_threadsafe(listener.callback, event)
 
     @contextmanager
     def automated(self):
@@ -687,23 +697,25 @@ class Events:
         event_filter: dict | None = None,
     ) -> Callable[[], None]:
         listener = EventListener(callback, event_filter)
-        if event_type in self._listeners:
-            self._listeners[event_type].append(listener)
-        else:
-            self._listeners[event_type] = [listener]
+        with self._lock:
+            if event_type in self._listeners:
+                self._listeners[event_type].append(listener)
+            else:
+                self._listeners[event_type] = [listener]
 
         def remove_listener() -> None:
             self._remove_listener(event_type, listener)
 
         return remove_listener
 
-    def _remove_listener(self, event_type: str, listener: Callable) -> None:
-        try:
-            self._listeners[event_type].remove(listener)
-            if not self._listeners[event_type]:
-                self._listeners.pop(event_type)
-        except (KeyError, ValueError):
-            _LOGGER.warning("Failed to remove event listener %s", listener)
+    def _remove_listener(self, event_type: str, listener: EventListener) -> None:
+        with self._lock:
+            try:
+                self._listeners[event_type].remove(listener)
+                if not self._listeners[event_type]:
+                    self._listeners.pop(event_type)
+            except (KeyError, ValueError):
+                _LOGGER.warning("Failed to remove event listener %s", listener)
 
 
 # def get_event_types():

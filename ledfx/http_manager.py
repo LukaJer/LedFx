@@ -1,8 +1,8 @@
+import asyncio
 import logging
 import os
 import ssl
 import sys
-import time
 from pathlib import Path
 
 from aiohttp import web
@@ -36,6 +36,7 @@ class HttpServer:
         self.host = host
         self.port = port
         self.port_s = port_s
+        self.runner: web.AppRunner | None = None
 
     def register_routes(self):
         self.api.register_routes(self.app)
@@ -124,7 +125,8 @@ class HttpServer:
                 ssl_context.load_cert_chain(*ssl_certs)
                 await self.start_tcpsite(ssl_context)
         except OSError as error:
-            self.handle_start_error(error)
+            await self.handle_start_error(error)
+            raise
 
     async def start_tcpsite(self, ssl_context=None):
         port = self.port_s if ssl_context else self.port
@@ -139,7 +141,7 @@ class HttpServer:
             )
         _LOGGER.info("Started webinterface at %s", self.base_url)
 
-    def handle_start_error(self, error):
+    async def handle_start_error(self, error):
         _LOGGER.error(
             "Shutting down - Failed to create HTTP server at port %d: %s.",
             self.port,
@@ -150,8 +152,7 @@ class HttpServer:
             self._ledfx.icon.notify(
                 f"Failed to start: something is running on port {self.port}\nIs LedFx already running?"
             )
-        time.sleep(2)
-        self._ledfx.stop(1)
+        await asyncio.sleep(2)
 
     async def stop(self):
         await self.app.shutdown()

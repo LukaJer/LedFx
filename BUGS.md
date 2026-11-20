@@ -2,55 +2,9 @@
 
 Known bugs and review findings for the fork additions (DJ controller, physical layouts, 5-band EQ & autogain, auto-reconnect toggle, and tube-native effects). Reviewed at commit `4f4b440d` (+ uncommitted `ledfx_control/performance.js` and `config/config.json`). Keep this file up to date: add new findings, move fixed items to "Fixed".
 
-Severity: **H** = high (crash, race, data/state corruption, silent breakage), **M** = medium (real user-visible breakage), **L** = low (edge case / hardening / static checks).
-
-## TODO / Planned
-
-- **Audio Auto-Gain (AGC) improvements** — `ledfx/effects/audio.py`, `ledfx/effects/melbank.py`, `ledfx_control/audio-eq.js`:
-  - `autogain_speed` control is implemented; live AGC scale / `mel_gain` / `volume_threshold` readouts and tuning against pumping during breakdowns remain open (see also `L10`).
-- **Speed & Sensitivity controls** — `ledfx_control/performance.js`, `ledfx_control/previews.js`:
-  - `unscaleAroundDefault()`, `inferSceneCtlPct()`, double-click reset (including deck cards), and per-deck Sensitivity scoping are implemented; further tuning across custom effect ranges remains open.
-- **Separate Palette / Speed / Brightness controls per layer (Main, Background, Flash)** — `ledfx-control.html`, `ledfx_control/*`:
-  - Provide independent Palette, Speed, and Brightness controls for **Main elements**, **Background** (`background_color`, `background_brightness`, `bg_reactive_*`), and **Flash / Beat** (`beat_flash`, `flash_color`, `strobe_color`, `sparks_color`, `hit_color`), dynamically adapting the UI controls shown based on the active scene effect's schema.
+Severity: **H** = high (crash, race, data/state corruption, silent breakage), **M** = medium (real user-visible breakage), **L** = low (edge case / hardening / static checks). Feature TODOs live in [TODO.md](TODO.md).
 
 ## Open
-
-### High
-
-### H2. `LayoutsEndpoint.put()` is non-atomic on partial failure
-- **Where:** `ledfx/api/layouts.py:175-210`.
-- **Problem:** Virtuals are mutated sequentially via `set_config()` then `set_segments()`. If a later virtual fails (or `set_segments()` fails after `set_config()` changed `rows`/`grouping` on the same virtual), earlier virtuals remain altered while `active_layout_id` stays unchanged.
-- **Fix:** Pre-validate all target `VirtualConfig` models and `_v1_segments` constraints before applying changes, or snapshot and roll back all modified virtuals on error.
-
-### H3. `LayoutsEndpoint.post()` defaults `snapshot=True` on metadata-only updates
-- **Where:** `ledfx/api/layouts.py:55, 119-145`.
-- **Problem:** `snapshot = data.get("snapshot", virtuals_payload is None)` defaults to `True` even when `id` is passed to update an existing layout without `"virtuals"` (e.g. renaming or updating tags/grid), overwriting saved `virtuals` with current live virtuals and unconditionally setting `active_layout_id = layout_id`.
-- **Fix:** Default `snapshot` to `False` when updating an existing `raw_id`, and only change `active_layout_id` when creating/switching or explicitly requested.
-
-### H4. `LayoutsEndpoint` bypasses `SafeMode` and calls blocking `save_now()` on the event loop
-- **Where:** `ledfx/api/layouts.py:36-155, 157-228, 230-255`, `ledfx/configuration/store.py:268-278`.
-- **Problem:** `post()`, `delete()`, and `put()` (when `profile.virtuals` is empty or skipped) never call `ensure_writable(self._ledfx)`. In `SafeMode`, they mutate `self._ledfx.config`, ignore `save_now() == False`, and still return `200 {"status": "success"}`. Calling `request_save()` followed immediately by `save_now()` also executes synchronous `os.fsync()` on the event loop.
-- **Fix:** Call `ensure_writable(self._ledfx)` at the top of `post()`, `put()`, and `delete()`, and use `request_save()` (or `await config_store.flush()` off-thread) instead of blocking `save_now()`.
-
-### H8. Cloning a virtual in the Scene Editor wipes `sceneDraftVirtuals` mid-flow
-- **Where:** `ledfx_control/scenes-virtuals.js:689-730, 761-793`, `ledfx_control/core.js:467`.
-- **Problem:** `wireVirtualMappingBar` clones the virtual, stops `oldVid` / starts `newVid` (`:721-722`), then calls `await loadLayouts()` (`:724`), which triggers `renderScenes()` (`core.js:467`) → `renderSceneEditor()` (`scenes-virtuals.js:28`), clearing `sceneDraftVirtuals = {}` and `sceneReplacedVirtuals = new Set()` (`:761-762`) right before the `onCloned` callback (`:779-781`) runs.
-- **Fix:** Preserve `sceneDraftVirtuals`/`sceneReplacedVirtuals` across `loadLayouts()`/`renderScenes()` refreshes, or invoke `onCloned` against the preserved draft and re-render only after cloning finishes.
-
-### H9. Stale `activePalettePatch` reverts saved gradient edits; Scene Editor updates lose unsaved edits on palette click
-- **Where:** `ledfx_control/scenes-virtuals.js:89, 766, 796-847`, `ledfx_control/performance.js:160, 164-166`.
-- **Problem:** `applyPalette()` writes `activePalettePatch[id] = patch` and calls `renderSceneEditor(editingSceneId)` (`performance.js:165`), overwriting any other unsaved edits in `sceneDraftVirtuals`. Worse, `saveEditedScene()` (`scenes-virtuals.js:839-842`) persists changes and awaits `loadScenes()` → `renderSceneEditor()`, but never clears `activePalettePatch` — so line `:766` merges the stale `activePalettePatch[vid]` right back over the newly saved `eff.config`, reverting gradient edits in the editor and on a second Update click.
-- **Fix:** Clear saved virtuals from `activePalettePatch` in `saveEditedScene()`, and patch color fields in `sceneDraftVirtuals` in-place rather than discarding unsaved edits on `applyPalette()`.
-
-### H10. Scene Studio drops `stop` / `forceblack` / `ignore` virtual entries on save
-- **Where:** `ledfx_control/scenes-virtuals.js:885-895, 1090-1109`.
-- **Problem:** `loadStudioScene()` only loads virtuals with `eff && eff.type` into `studioDraftVirtuals`, dropping `stop`, `forceblack`, `ignore`, and `{}` entries. Saving via `saveStudioScene(false)` (`:1095, 1104`) overwrites `scene.virtuals` with `studioDraftVirtuals` alone, silently deleting those virtual actions.
-- **Fix:** Preserve non-activate virtual entries from the original scene and merge them back when building `payload.virtuals`.
-
-### H11. Async `activateScene()` race and cross-deck `lastScene` overwrite *(extends L6)*
-- **Where:** `ledfx_control/scenes-virtuals.js:87-113`, `ledfx_control/core.js:152-163`.
-- **Problem:** `activateScene()` has no request/sequence token across `await quantWait(...)`, `await api('/scenes', PUT)`, `await loadVirtuals()`, and `await restoreSceneCtl(...)`, so rapid or quantized calls can apply DOM `.cur`, `lastDeckScene`, `lastScene`, and `restoreSceneCtl` out of order. Deck-scoped activations (`activateScene(id, deckId)`) also overwrite global `lastScene` and `curPalette` via `syncSceneDisplay(id)`.
-- **Fix:** Track a monotonic activation token per target deck/global scope and ignore superseded continuations; keep deck-card activations from clobbering unrelated decks' `lastScene`/`curPalette`.
 
 ### Medium
 
@@ -165,16 +119,10 @@ Severity: **H** = high (crash, race, data/state corruption, silent breakage), **
 Remaining open findings from the full-codebase review (`28ad9d51`, excluding items already fixed in `da1af616`):
 
 ### High
-- **HTTP startup failure blocks event loop and races `async_start()` / `async_stop()`** — `ledfx/http_manager.py:104-138`, `ledfx/core.py:541-590` — `handle_start_error()` calls synchronous `time.sleep(2)` on the event loop, triggers `stop(1)`, and returns normally so `async_start()` keeps initializing during teardown.
-- **`HttpServer.runner` uninitialized before `start()`** — `ledfx/http_manager.py:23-37,140-144` — Early startup failures raise `AttributeError` in `http.stop()`, skipping `await self.app.cleanup()`.
-- **No re-entrancy guard in `LedFxCore.stop()` / `async_stop()`** — `ledfx/core.py:625-703` — Concurrent `stop()` calls spawn two `async_stop` tasks where the first cancels the second mid-cleanup.
 - **Unsynchronized `Virtual.replace_config()` & `force_frame()` vs. render/audio threads** — `ledfx/virtuals.py:765-772,1386-1443,2368-2372` — Mutates `_config`, `frame_transitions`, `complex_segments`, `_device_remap`, `assembled_frame`, and `oneshots` without `self.lock`.
 - **Unsynchronized `Virtual` fallback state** — `ledfx/virtuals.py:515-581,832-835` — `fallback_fire_set()` and `set_fallback()`/`fallback_clear()` run outside `self.lock`, racing with `set_effect(..., fallback=...)`.
-- **Event emission under `self.lock` deadlock risk** — `ledfx/virtuals.py:652-678`, `ledfx/effects/__init__.py:413-416` — `EffectSetEvent`/`EffectClearedEvent`/`EffectUpdatedEvent` fire while holding non-reentrant `threading.Lock`s.
 - **`Virtuals._apply_active()` rollback restores a destroyed effect** — `ledfx/virtuals.py:1959-1962,1983` — Restores `_active_effect = old_effect` after `set_effect()` already deactivated/unregistered it (`pixels=None`); `_set_active()` also skips restoring `{}` configs.
-- **Concurrent `AudioAnalysisSource.update_config()` / `initialise_analysis()` vs. audio thread** — `ledfx/effects/audio.py:582-601,1156-1228` — Rebuilds `freq_mel_indexes` in-place while `freq_power()` indexes it (`IndexError`).
 - **WASAPI multi-channel loopback fed to 1-channel `Resampler`** — `ledfx/effects/audio.py:801-815,1030-1089` — Loopback leaves `channels=None` (multi-channel) and passes flattened samples to a 1-channel `Resampler`.
-- **Out-of-bounds / empty-slice / zero-division in `AudioAnalysisSource` & `AudioReactiveEffect`** — `ledfx/effects/audio.py:1207-1216,1308-1317,1392-1394,1499-1509` — `_selected_melbank` can default to `len(max_frequencies)`, `beat_max_mel_index` can default to a Hz value or `0`, `freq_power()` empty-slice `np.average` produces `NaN`, and `bar_oscillator()` divides by `beat_period == 0.0`.
 - **`PlaylistManager` unsynchronized across `await self._task`** — `ledfx/playlists.py:384-608,677-717` — Concurrent `start()`/`next()`/`prev()` calls can spawn multiple concurrent `_runner` tasks.
 - **`LifxDevice` `activate()`/`deactivate()` async race & leaked connections** — `ledfx/devices/lifx.py:375-536,643-678` — `_create_animator()` / `_async_connect()` do not re-check `self._active` after `await`ing I/O.
 - **`OpenRGB` leaks TCP connections on `deactivate()` and blocks event loop** — `ledfx/devices/openrgb.py:81-88,122-150` — `OpenRGBClient(...)` blocks the loop, `deactivate()` never closes `openrgb_device`, and `flush()` calls `activate()` synchronously on `AttributeError`.
@@ -187,15 +135,11 @@ Remaining open findings from the full-codebase review (`28ad9d51`, excluding ite
 - **`LogWebsocket.handle()` can hang on `await self._sender_task` & races across connections** — `ledfx/api/log.py:28,141-193` — Shared instance across requests; `finally:` awaits `_sender_task` without cancelling it.
 
 ### Medium
-- **`LedFxCore` leaks `asyncio` event loops and `RollingQueueHandler`s on restart (`exit_code == 4`)** — `ledfx/core.py:110,391-399,692-703`.
-- **`Events.fire_event()` iterates `_listeners` unlocked and doesn't check `loop.is_closed()`** — `ledfx/events.py:649-703`.
 - **`assets.py` unlocked in-place `.asset_metadata_cache.json` writes & non-atomic Windows rename** — `ledfx/assets.py:119-135,396-401`.
 - **`Scenes.create()` crashes on `DummyEffect` during fade-out and collides on generated IDs** — `ledfx/scenes.py:69-74`.
 - **`Scenes.deactivate()` clears effects on virtuals marked `action="ignore"`** — `ledfx/scenes.py:286-288`.
 - **`PlaylistManager._advance_index()` bugs on 1-item playlists, pause timing, and empty `_order` `ZeroDivisionError`** — `ledfx/playlists.py:291,691-717`.
-- **`AudioReactiveEffect.melbank()` `@cache` race on `cache_clear()` and shared slice mutation** — `ledfx/effects/audio.py:1468-1472,1580-1603`.
 - **`SilenceSceneController` retry loop, `_operation` clobber, and unlocked shared flags** — `ledfx/silence_scene.py:224-234,448-457,616-630`.
-- **`AudioInputSource._timer` unsynchronized and failed `open_audio_stream()` leaks `_stream`** — `ledfx/effects/audio.py:816-881`.
 - **Missing `OUTPUT_KEYS` / `config_updated()` runtime handling** — `ledfx/devices/adalight.py:41-56`, `openrgb.py:63-65`, `zengge.py:31-43`.
 - **Unclipped pixel integer wraparound / channel bleed** — `ledfx/devices/lifx.py:57-99`, `rpi_ws281x.py:129-140`.
 - **`Govee.activate()` blocks event loop and `flush()` uses `udp_server` unlocked** — `ledfx/devices/govee.py:114-160`.
@@ -205,7 +149,6 @@ Remaining open findings from the full-codebase review (`28ad9d51`, excluding ite
 
 ### Low
 - **`ConfigStore.save_now()` / `flush_sync()` increment `_seq` and call `serialise()` unlocked; `replace()` doesn't reset `unreadable`** — `ledfx/configuration/store.py:234-278,344-359`.
-- **Second `KeyboardInterrupt` during shutdown aborts `loop.run_forever()` before cleanup** — `ledfx/core.py:466-478`.
 - **`SilenceSceneController` synchronous `fsync` on event loop** — `ledfx/silence_scene.py:555-586`.
 - **`smooth()` clamps kernel radius to roughly half the intended width** — `ledfx/effects/__init__.py:239-240`.
 - **`RPI_WS281X` lacks synchronization between `config_updated()` and `flush()`** — `ledfx/devices/rpi_ws281x.py:78-86`.
@@ -213,6 +156,8 @@ Remaining open findings from the full-codebase review (`28ad9d51`, excluding ite
 
 ## Fixed
 - **Fork / DJ Controller, Tube Effects & Audio:**
+  - **`H2`, `H3`, `H4` (`ledfx/api/layouts.py`, `tests/test_layouts.py`):** Added `SafeMode` (`ensure_writable()`) and non-blocking `request_save()` across `POST`/`PUT`/`DELETE`, defaulted `snapshot=False` when updating an existing layout by `id`, and added rollback in `PUT` on partial virtual failures.
+  - **`H8`, `H9`, `H10`, `H11` (`ledfx_control/scenes-virtuals.js`, `ledfx_control/performance.js`):** Preserved `sceneDraftVirtuals` across virtual cloning (`H8`); cleared `activePalettePatch` on save and patched color inputs in-place on `applyPalette()` (`H9`); preserved `stop`/`forceblack`/`ignore` virtual entries in Scene Studio (`H10`); added per-scope monotonic tokens in `activateScene()` and avoided overwriting global `lastScene` on deck-card clicks (`H11`, completing `L6`).
   - **`H1` (`ledfx/effects/audio.py`):** `AudioAnalysisSource.update_config()` now only runs `initialise_analysis()` when FFT/sample-rate/tempo/onset/pitch method settings change (keeping BPM/tempo intact on EQ/gain/beat-range edits), swaps `freq_mel_indexes` atomically, and guards `bar_oscillator()` against `beat_period <= 0`.
   - **`M5` & `M6` (`ledfx/effects/tube_base.py`):** Added `TubeEffectBase.config_updated()` delegating to `GradientEffect.config_updated()` (fixing live palette/gradient updates across all 14 tube effects) and forcing `self.mirror = False` so `Effect.get_pixels()` does not apply 1D strip folding.
   - **`M8` (`ledfx/effects/audio.py`, `tests/test_audio_eq.py`):** `_build_eq_curve()` now uses resampled `MIC_RATE` (`30000`) instead of `config.mic_rate` (`44100`).
@@ -225,7 +170,11 @@ Remaining open findings from the full-codebase review (`28ad9d51`, excluding ite
   - UI did not show disconnects / did not re-sync after reconnect.
   - Top status bar and palette strip did not follow scene changes.
   - Scene preview strip drew empty virtuals and missed colors stored under non-`gradient` keys.
-- **Core / Devices / Audio (`da1af616`):**
+- **Core / Devices / Audio (`da1af616` & follow-up):**
+  - `Events` (`ledfx/events.py`): protected `_listeners` with `RLock` and guarded `loop.is_closed()` in `fire_event()`.
+  - `Virtual` & `Effect` (`ledfx/virtuals.py`, `ledfx/effects/__init__.py`): moved `EffectSetEvent`, `EffectClearedEvent`, and `EffectUpdatedEvent` emission outside `self.lock`.
+  - `AudioInputSource` / `AudioAnalysisSource` / `AudioReactiveEffect` (`ledfx/effects/audio.py`): closed leaked `_stream` on failed `open_audio_stream()`, synchronized `check_and_deactivate()` timer state under `self.lock`, guarded empty slices in `freq_power()`, clamped `_selected_melbank` fallback, and replaced `@cache` on `melbank()` with a lock-protected cache returning copies.
+  - `HttpServer` & `LedFxCore` (`ledfx/http_manager.py`, `ledfx/core.py`): initialized `HttpServer.runner = None`, made `handle_start_error()` async + re-raise to abort `async_start()`, added `_stopping` re-entrancy guard in `stop()`/`async_stop()`, cleaned up `RollingQueueHandler` and `loop.close()` on exit, and handled second `KeyboardInterrupt` during shutdown.
   - Cross-thread calls from `SendspinAudioThread` into `NowPlayingService` and main event loop marshaled via `call_soon_threadsafe`.
   - `AudioInputSource._callbacks` mutation/iteration protected with `self.lock`; read-only audio buffers copied before NaN cleanup.
   - `Melbank` filterbank `coeffs` and `mel_gain` clamped to prevent division-by-zero `NaN` latching.

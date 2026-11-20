@@ -138,6 +138,9 @@ class LedFxCore:
         )
 
         self.exit_code = None
+        self._stopping = False
+        self._stop_task: asyncio.Task[int] | None = None
+        self._logqueue_handler: RollingQueueHandler | None = None
 
     @property
     def config(self) -> LedFxConfig:
@@ -398,6 +401,7 @@ class LedFxCore:
         logqueue_handler.addFilter(log_filter)
         root_logger = logging.getLogger()
         root_logger.addHandler(logqueue_handler)
+        self._logqueue_handler = logqueue_handler
 
     def check_and_notify_updates(self, show_check_notification=None):
         """
@@ -467,8 +471,12 @@ class LedFxCore:
         try:
             self.loop.run_forever()
         except KeyboardInterrupt:
-            self.loop.call_soon(self.loop.create_task, self.async_stop(exit_code=2))
-            self.loop.run_forever()
+            self._stop_task = self.loop.create_task(self.async_stop(exit_code=2))
+            try:
+                self.loop.run_forever()
+            except KeyboardInterrupt:
+                if self._stop_task is not None and not self._stop_task.done():
+                    self.loop.run_until_complete(self._stop_task)
         except BaseException:  # noqa: BLE001
             # Catch all other exceptions and terminate the application. The loop
             # exception handler will take care of logging the actual error and
@@ -476,6 +484,8 @@ class LedFxCore:
             self.loop.run_until_complete(self.async_stop(exit_code=1))
         finally:
             self.loop.stop()
+            if not self.loop.is_closed():
+                self.loop.close()
 
         return self.exit_code
 
@@ -624,11 +634,17 @@ class LedFxCore:
                 )
 
     def stop(self, exit_code):
-        async_fire_and_forget(self.async_stop(exit_code), self.loop)
+        if self._stopping:
+            return
+        self._stopping = True
+        self._stop_task = async_fire_and_forget(
+            self.async_stop(exit_code), self.loop
+        )
 
     async def async_stop(self, exit_code):
         if not self.loop:
             return
+        self._stopping = True
 
         _LOGGER.info("Stopping LedFx.")
         try:
@@ -697,6 +713,10 @@ class LedFxCore:
             except Exception:  # must not skip loop.stop() below
                 _LOGGER.exception("Failed to flush config on shutdown")
             self.thread_executor.shutdown()
+            if self._logqueue_handler is not None:
+                logging.getLogger().removeHandler(self._logqueue_handler)
+                self._logqueue_handler.close()
+                self._logqueue_handler = None
             # Don't overwrite error exit code
             if self.exit_code != 1:
                 self.exit_code = exit_code

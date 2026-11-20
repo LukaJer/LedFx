@@ -8,7 +8,7 @@ from ledfx.api import RestEndpoint
 from ledfx.api.virtual import _v1_segments
 from ledfx.configuration.fields import VirtualIdStr
 from ledfx.configuration.models import LayoutProfile, VirtualConfig
-from ledfx.errors import Invalid
+from ledfx.errors import Invalid, ensure_writable
 from ledfx.utils import generate_id
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ class LayoutsEndpoint(RestEndpoint):
 
     async def post(self, request: web.Request) -> web.Response:
         """Create or update a layout profile, snapshotting virtuals by default."""
+        ensure_writable(self._ledfx)
         try:
             data = await request.json()
         except JSONDecodeError:
@@ -52,7 +53,8 @@ class LayoutsEndpoint(RestEndpoint):
         grid_cells = data.get("grid_cells")
         virtual_ids = data.get("virtual_ids")
         virtuals_payload = data.get("virtuals")
-        snapshot = data.get("snapshot", virtuals_payload is None)
+        has_snapshot = "snapshot" in data
+        snapshot = data.get("snapshot")
 
         if raw_id is not None and not isinstance(raw_id, str):
             return await self.invalid_request('"id" must be a string')
@@ -73,6 +75,7 @@ class LayoutsEndpoint(RestEndpoint):
         ):
             return await self.invalid_request('"virtual_ids" must be a list of strings')
 
+        existing = None
         if raw_id:
             layout_id = generate_id(raw_id)
             existing = self._ledfx.config.layout_profiles.get(layout_id)
@@ -104,6 +107,9 @@ class LayoutsEndpoint(RestEndpoint):
                 "grid_cells": dict[str, object](),
                 "virtuals": dict[str, object](),
             }
+
+        if not has_snapshot:
+            snapshot = existing is None and virtuals_payload is None
 
         if enabled is not None:
             profile_dict["enabled"] = enabled
@@ -142,10 +148,9 @@ class LayoutsEndpoint(RestEndpoint):
             return await self.validation_error(err)
 
         self._ledfx.config.layout_profiles[layout_id] = profile
-        self._ledfx.config.active_layout_id = layout_id
+        if existing is None or bool(data.get("activate")):
+            self._ledfx.config.active_layout_id = layout_id
         self._ledfx.config_store.request_save()
-        if hasattr(self._ledfx.config_store, "save_now"):
-            self._ledfx.config_store.save_now()
         _LOGGER.info("Saved layout profile %s (%s)", layout_id, profile.name)
         return await self.bare_request_success(
             {
@@ -156,6 +161,7 @@ class LayoutsEndpoint(RestEndpoint):
 
     async def put(self, request: web.Request) -> web.Response:
         """Apply a saved layout profile to all matching logical virtuals."""
+        ensure_writable(self._ledfx)
         try:
             data = await request.json()
         except JSONDecodeError:
@@ -174,12 +180,15 @@ class LayoutsEndpoint(RestEndpoint):
 
         applied: list[str] = []
         skipped: list[str] = []
+        rollback: list[tuple[VirtualIdStr, VirtualConfig, list[object]]] = []
         for virtual_id, mapping in profile.virtuals.items():
             virtual = self._ledfx.virtuals.get(virtual_id)
             if virtual is None:
                 skipped.append(virtual_id)
                 continue
             vid = VirtualIdStr(virtual_id)
+            prev_cfg = virtual.config
+            prev_segs = list(virtual.segments)
             try:
                 if (
                     virtual.config.rows != mapping.rows
@@ -195,8 +204,22 @@ class LayoutsEndpoint(RestEndpoint):
                     self._ledfx.virtuals.set_config(vid, new_cfg)
                 segments = _v1_segments(virtual, mapping.segments)
                 self._ledfx.virtuals.set_segments(vid, segments)
+                rollback.append((vid, prev_cfg, prev_segs))
                 applied.append(virtual_id)
             except (ValueError, ValidationError, Invalid) as err:
+                # Roll back current virtual (if set_config succeeded before set_segments)
+                # plus all earlier virtuals so failed PUT never leaves partial state.
+                try:
+                    self._ledfx.virtuals.set_config(vid, prev_cfg)
+                    self._ledfx.virtuals.set_segments(vid, prev_segs)
+                except (ValueError, ValidationError, Invalid):
+                    pass
+                for rb_vid, rb_cfg, rb_segs in reversed(rollback):
+                    try:
+                        self._ledfx.virtuals.set_config(rb_vid, rb_cfg)
+                        self._ledfx.virtuals.set_segments(rb_vid, rb_segs)
+                    except (ValueError, ValidationError, Invalid):
+                        pass
                 detail = err.detail if isinstance(err, Invalid) else str(err)
                 _LOGGER.warning(
                     "Layout %s failed updating virtual %s: %s",
@@ -210,8 +233,6 @@ class LayoutsEndpoint(RestEndpoint):
 
         self._ledfx.config.active_layout_id = layout_id
         self._ledfx.config_store.request_save()
-        if hasattr(self._ledfx.config_store, "save_now"):
-            self._ledfx.config_store.save_now()
         _LOGGER.info(
             "Applied layout %s (applied=%d, skipped=%d)",
             layout_id,
@@ -229,6 +250,7 @@ class LayoutsEndpoint(RestEndpoint):
 
     async def delete(self, request: web.Request) -> web.Response:
         """Delete a saved layout profile by ID."""
+        ensure_writable(self._ledfx)
         try:
             data = await request.json()
         except JSONDecodeError:
@@ -248,8 +270,6 @@ class LayoutsEndpoint(RestEndpoint):
         if self._ledfx.config.active_layout_id == layout_id:
             self._ledfx.config.active_layout_id = ""
         self._ledfx.config_store.request_save()
-        if hasattr(self._ledfx.config_store, "save_now"):
-            self._ledfx.config_store.save_now()
         return await self.request_success(
             type="success", message=f"Deleted layout '{layout_id}'"
         )

@@ -649,16 +649,15 @@ class Virtual:
                 )
                 return
             self._active_effect.activate(self)
-            self._ledfx.events.fire_event(
-                EffectSetEvent(
-                    self._active_effect.name,
-                    self._active_effect.id,
-                    self.id,
-                    self._active_effect.type,
-                    self._active,
-                    self._streaming,
-                )
+            set_event = EffectSetEvent(
+                self._active_effect.name,
+                self._active_effect.id,
+                self.id,
+                self._active_effect.type,
+                self._active,
+                self._streaming,
             )
+        self._ledfx.events.fire_event(set_event)
         try:
             self.active = True
         except RuntimeError:
@@ -675,7 +674,6 @@ class Virtual:
 
     def clear_effect(self):
         with self.lock:
-            self._ledfx.events.fire_event(EffectClearedEvent(self.id))
             self.clear_transition_effect()
 
             if (
@@ -706,6 +704,7 @@ class Virtual:
                     self.clear_handle = loop.call_later(delay, self.clear_frame)
 
                 loop.call_soon_threadsafe(_arm_clear)
+        self._ledfx.events.fire_event(EffectClearedEvent(self.id))
 
     def flush_pending_clear_frame(self):
         handle = self.clear_handle
