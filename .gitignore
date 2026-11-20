@@ -62,7 +62,6 @@ debug_config
 config/*.log*
 config/*.bak*
 config/assets/
-config/config.json
 # spec file build may leave the ledfx.env behind
 ledfx.env
 # Misc
