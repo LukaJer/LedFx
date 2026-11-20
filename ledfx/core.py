@@ -167,6 +167,17 @@ class LedFxCore:
         if "sendspin_always_on" in event.config:
             self.reconcile_sendspin_always_on_runtime("base_config_update")
 
+        if event.config.get("auto_reconnect_devices") and getattr(
+            self, "devices", None
+        ) is not None:
+            for device in list(self.devices.values()):
+                if (
+                    not device.is_online()
+                    and getattr(device, "_requested", False)
+                    and hasattr(device, "resolve_address")
+                ):
+                    async_fire_and_forget(device.resolve_address(), self.loop)
+
     def reconcile_sendspin_always_on_runtime(self, trigger: str):
         """Reconcile runtime Sendspin always-on behavior from current config.
 

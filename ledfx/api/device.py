@@ -110,6 +110,7 @@ class DeviceEndpoint(RestEndpoint):
             return await self.internal_error(error_message, "error")
 
         device.activate()
+        response["online"] = device.is_online()
         return await self.bare_request_success(response)
 
     async def delete(self, device_id) -> web.Response:

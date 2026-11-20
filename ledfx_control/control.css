@@ -1,7 +1,7 @@
   :root{
     --bg:#0b0c0e; --panel:#15171a; --panel2:#1c1f23; --line:#2a2d31;
     --text:#eae7e0; --muted:#8b8e94; --amber:#f0a336; --amber2:#ff7a3d;
-    --ok:#3ecf8e; --bad:#e05a5a; --focus:#f0a336;
+    --ok:#3ecf8e; --bad:#e05a5a; --warn:#f59e0b; --focus:#f0a336;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:60px}

@@ -39,6 +39,7 @@ class Scenes:
         self._ledfx = ledfx
         # Delayed activations from activate_in, by scene id.
         self._pending: dict[str, asyncio.TimerHandle] = {}
+        self.active_scene_id: str | None = None
 
     @property
     def _scenes(self) -> dict[str, Scene]:
@@ -152,6 +153,9 @@ class Scenes:
                 )
 
         self._ledfx.events.fire_event(SceneActivatedEvent(scene_id))
+
+        if activation_succeeded or not strict:
+            self.active_scene_id = scene_id
 
         if save_config_after and persist:
             self._ledfx.config_store.request_save()
@@ -293,6 +297,9 @@ class Scenes:
                         "Scene %s: failed to clear virtual %r", scene_id, virtual_id
                     )
 
+        if self.active_scene_id == scene_id:
+            self.active_scene_id = None
+
         # Persist the change so that clearing effects is saved
         self._ledfx.config_store.request_save()
 
@@ -305,6 +312,8 @@ class Scenes:
         if not self._scenes.pop(scene_id, None):
             _LOGGER.warning("Cannot delete non-existent scene id: %s", scene_id)
             return
+        if self.active_scene_id == scene_id:
+            self.active_scene_id = None
         self._ledfx.events.fire_event(SceneDeletedEvent(scene_id))
         self.save_to_config()
 

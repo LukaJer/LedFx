@@ -563,7 +563,8 @@ function renderTubeCanvas(canvas, meta, deckLayout){
     for(const [vid, virt] of orderedVirtuals){
       const vFrame = virtualFrames[vid];
       const vCount = vFrame ? Math.floor(vFrame.length / 3) : 0;
-      if(!vCount || (now - (virtualFrameAt[vid] || 0) > 2000) || !Array.isArray(virt?.segments) || !virt.segments.length) continue;
+      if(!virt?.active || !vCount || (now - (virtualFrameAt[vid] || 0) > 2000) || !Array.isArray(virt?.segments) || !virt.segments.length) continue;
+      const isCopy = virt?.config?.mapping === 'copy';
       let totalPhys = 0;
       for(const seg of virt.segments) totalPhys += Math.max(0, (Number(seg[2]) || 0) - (Number(seg[1]) || 0) + 1);
       if(!totalPhys) continue;
@@ -598,7 +599,9 @@ function renderTubeCanvas(canvas, meta, deckLayout){
                 out[doff + 1] = vFrame[soff + 1];
                 out[doff + 2] = vFrame[soff + 2];
               }else{
-                const pos = (offset + k + 0.5) * (vCount / totalPhys) - 0.5;
+                const pos = isCopy
+                  ? (k + 0.5) * (vCount / segLen) - 0.5
+                  : (offset + k + 0.5) * (vCount / totalPhys) - 0.5;
                 const i0 = Math.max(0, Math.min(vCount - 1, Math.floor(pos)));
                 const i1 = Math.max(0, Math.min(vCount - 1, i0 + 1));
                 const t = Math.max(0, Math.min(1, pos - i0));
@@ -868,7 +871,10 @@ function drawLayoutPreview(){
           cr = frame[off]; cg = frame[off + 1]; cb = frame[off + 2];
         }
       }else if(vCount){
-        const pos = (vOffset + k + 0.5) * (vCount / totalPhys) - 0.5;
+        const isCopy = virt.config?.mapping === 'copy';
+        const pos = isCopy
+          ? (k + 0.5) * (vCount / count) - 0.5
+          : (vOffset + k + 0.5) * (vCount / totalPhys) - 0.5;
         const i0 = Math.max(0, Math.min(vCount - 1, Math.floor(pos)));
         const i1 = Math.max(0, Math.min(vCount - 1, i0 + 1));
         const t = Math.max(0, Math.min(1, pos - i0));

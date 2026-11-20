@@ -114,8 +114,12 @@ async function loadDevices(){
 
 async function connectDevice(id){
   try{
-    await api(`/devices/${id}`, {method:'POST'});
-    toast(`Connected ${id}`);
+    const res = await api(`/devices/${id}`, {method:'POST'});
+    if(res?.online === false){
+      toast(`Device ${id} is offline`, true);
+    }else{
+      toast(`Connected ${id}`);
+    }
     await Promise.all([loadDevices(), loadVirtuals()]);
   }catch(e){
     toast(`Connect ${id} failed: `+e.message, true);

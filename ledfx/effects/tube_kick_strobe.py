@@ -1,5 +1,5 @@
 import time
-from typing import override
+from typing import ClassVar, override
 
 import numpy as np
 from pydantic import Field
@@ -14,6 +14,12 @@ class TubeKickStrobeEffect(TubeEffectBase):
     """Dynamic gliding segment flashes on onsets + whole-background flashes on kicks."""
 
     NAME = "Tube Kick Strobe"
+    HIDDEN_KEYS: ClassVar[list[str]] = [
+        "speed",
+        "reactivity",
+        "color_by_intensity",
+        "beat_flash",
+    ]
 
     class Config(TubeEffectBase.Config):
         beat_flash: CoercedFloat = Field(

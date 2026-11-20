@@ -1186,7 +1186,9 @@ function stepDeckPalCycler(deckId){
   if(dc.busy || !dc.on || S.lock || !HOST) return;
   let nextPal;
   if(dc.mode.endsWith('_rot')){
-    const base = dc.pal || curPalette || PALETTES[0];
+    const deckSid = lastDeckScene[deckId];
+    const sceneCols = deckSid && typeof extractSceneColors === 'function' ? extractSceneColors(scenesCache[deckSid]) : null;
+    const base = dc.pal || (sceneCols ? { name: scenesCache[deckSid]?.name || deckSid, colors: sceneCols } : null) || curPalette || PALETTES[0];
     const cols = [...base.colors];
     cols.push(cols.shift());
     nextPal = { ...base, colors: cols };

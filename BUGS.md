@@ -13,16 +13,6 @@ Severity: **H** = high (crash, race, data/state corruption, silent breakage), **
 - **Problem:** Both `<repo root>/ledfx-control.html` and `<repo root>/ledfx_control/` live outside the `ledfx` package and are omitted from `includes`, so wheels and PyInstaller builds do not ship the DJ controller or its JS/CSS modules.
 - **Fix:** Move `ledfx-control.html` and `ledfx_control/` inside `ledfx/` or `ledfx_assets/` (or add them to `[tool.pdm.build].includes`) and update `ledfx/http_manager.py`.
 
-### M3. Several scenes can show as active at once
-- **Where:** `ledfx/scenes.py:311-392` (`is_active()`), partly mitigated in `ledfx_control/scenes-virtuals.js:10-25` and `ledfx_control/previews.js:166-177`.
-- **Problem:** Each scene is evaluated independently and `ignore`/`{}` virtuals always match, so overlapping scenes all report `active: true` (also in the stock LedFx UI). The controller relies on `lastScene`/`lastDeckScene` and most-active-effects heuristics rather than backend truth.
-- **Fix:** Track the last activated scene id in the backend (`Scenes.activate`) and expose it instead of inferring from live virtual state.
-
-### M7. `TubeKickStrobeEffect` exposes dead inherited config fields
-- **Where:** `ledfx/effects/tube_kick_strobe.py:18-46`, `ledfx/effects/tube_base.py:21-40`.
-- **Problem:** `TubeKickStrobeEffect` inherits `speed`, `reactivity`, `color_by_intensity`, and redeclares `beat_flash: 0.0` from `TubeEffectBase.Config`, none of which are read in `render()` or `_render_grid()`.
-- **Fix:** Avoid inheriting unused fields (or honor them in `render()`), keeping only active audio-envelope config (`decay`).
-
 ### M9. `beat_min_mel_index` / `beat_power_min_idx` wrap to `0` when `beat_min_freq` exceeds melbank 0 (~350 Hz)
 - **Where:** `ledfx/effects/audio.py:1272-1297, 1359-1363`, `ledfx/configuration/models.py:195-200`.
 - **Problem:** `AudioAnalysisConfig` allows `beat_min_freq` up to `5000` Hz and `beat_max_freq` `30..10000` Hz without validating `beat_min_freq < beat_max_freq`. Because melbank 0 ends at ~350 Hz, any `beat_min_hz > freqs_0[-1]` makes `next(..., 0)` fall back to `0` and max to `len(freqs_0)`, causing `volume_beat_now()` to average the entire `20–350 Hz` melbank. `beat_min_freq >= beat_max_freq` also silently collapses `beat_min_hz` to `beat_max_freq - 10`.
@@ -43,11 +33,6 @@ Severity: **H** = high (crash, race, data/state corruption, silent breakage), **
 - **Problem:** `--open-ui` defaults to `True`, attempting to open a browser on headless/test runs (including `tests/conftest.py`). Additionally, because `config/config.json` is tracked in git, `get_default_config_directory()` picks `<repo>/config` over `~/.ledfx` on any source run without `-c`, modifying the repository's personal config.
 - **Fix:** Restore `default=False` on `--open-ui` (or pass `--no-open-ui` in `tests/conftest.py`), and untrack personal `config/config.json` / require an explicit flag for repo-local config.
 
-### M19. `getTubePixelsFromVirtuals` ignores `virt.active` and both previews assume `mapping === 'span'`
-- **Where:** `ledfx_control/previews.js:527-589, 841-850`, `ledfx/virtuals.py:762-766`.
-- **Problem:** `getTubePixelsFromVirtuals` (`:537`) does not require `virt?.active`, so a recently deactivated virtual that emits an all-black `clear_frame` (`virtuals.py:765`) can shadow an active virtual within `2000ms` when `dt > 500`. Both `getTubePixelsFromVirtuals` (`:572`) and `drawLayoutPreview` (`:842`) assume `mapping === 'span'`, misrendering `mapping === 'copy'` virtuals.
-- **Fix:** Prioritize/require `virt?.active` in `getTubePixelsFromVirtuals`, and branch on `virt?.config?.mapping === 'copy'` in both previewers.
-
 ### M20. `connect()` / reconnect `Promise.all()` races `loadLayouts()` against `loadDevices()`, and layout editor cleanup leaks state
 - **Where:** `ledfx_control/core.js:52, 404-430, 459-472, 541-552`, `ledfx_control/audio-eq.js:85-95, 970-972`.
 - **Problem:** Concurrent `loadLayouts()` and `loadDevices()` in `connect()`/`connectWS()` lets `syncLayoutUI()` render raw device IDs and unfiltered device chips before `devicesCache` loads (`loadDevices()` only calls `refreshArranger()`, not `syncLayoutUI()`). Separately, `#delLayoutBtn` (`core.js:541-552`) fails to clear `activeDeckId` / `layoutEditingId` when deleting a layout, and `loadLayoutIntoEditor('')` (`+ New`, `:407-415`) retains previous `gridCells`, leaking them into `ledfx_stage_grid` and the next saved layout.
@@ -63,16 +48,6 @@ Severity: **H** = high (crash, race, data/state corruption, silent breakage), **
 - **Fix:** Support 3-digit hex / CSS color names in `parseGradientStops()`, guard `Number.isFinite` in `readStopsFromDOM()`, redraw `.se-grad-canvas` when shown/resized, preserve dirty Studio drafts on tab switch, refresh `#stSceneSel` in `saveStudioScene()`, and use `step=1` for `integer` sliders.
 
 ### Low
-
-### L1. `POST /api/devices/{id}` reports success when the device is still offline
-- **Where:** `ledfx/api/device.py:79-113` (`post`), `ledfx_control/audio-eq.js:113-121`.
-- **Problem:** `resolve_address()` swallows `ValueError` and sets `_online = False`, then `device.activate()` runs and the endpoint returns `{"status": "success"}`. The UI toast says "Connected" even when the device remains offline.
-- **Fix:** Check `device.is_online()` after resolving and return an error / `online: false`; have the UI check it.
-
-### L2. Re-enabling `auto_reconnect_devices` does not restart retries
-- **Where:** `ledfx/devices/native_packet.py:106-141`, `ledfx/devices/wled.py:177-194`.
-- **Problem:** With the toggle off, `_schedule_retry` / `trigger_reconnect` / the WLED retry stop scheduling. Turning it back on does not subscribe to `Event.BASE_CONFIG_UPDATE` or re-arm retries for devices that are already offline until connected manually or triggered by a send error.
-- **Fix:** Subscribe to `Event.BASE_CONFIG_UPDATE` and call `resolve_address()` for requested offline devices when re-enabled.
 
 ### L3. 5-band EQ silently disables itself on a size mismatch
 - **Where:** `ledfx/effects/audio.py:41-60, 1172-1176`.
@@ -108,11 +83,6 @@ Severity: **H** = high (crash, race, data/state corruption, silent breakage), **
 - **Where:** `ledfx/effects/tube_base.py:58-62, 100-101`, `ledfx/effects/tube_tiktok.py:110`, `ledfx/effects/gradient.py:139`, `ledfx/effects/tube_*.py`.
 - **Problem:** `TubeEffectBase._compute_grid(0)` returns `(1, 1, 1)`, causing `self.pixels.reshape(...)` `ValueError` in `TubeTikTokEffect` (`:110`) and `ZeroDivisionError` in `GradientEffect.roll_gradient()` (`:139`) when `pixel_count == 0`. `TubeEffectBase._flash *= 0.84` (`tube_base.py:101`) is frame-rate-dependent rather than `dt`-scaled, and `_phase` grows unboundedly in `tube_beat_pulse.py`, `tube_tiktok.py`, `tube_wave.py`, `tube_vortex.py`, `tube_strobe_helix.py`, `tube_lighthouse.py`, `tube_helix.py`, and `tube_gate.py`.
 - **Fix:** Guard `pixel_count <= 0`, convert `_flash` decay to exponential `dt`-based attenuation, and wrap `_phase` modulo `1.0` / `2π`.
-
-### L12. Minor UI polish: duplicate `#mainZoneBar`, per-deck palette rotate fallback, undefined `--warn`, stale `hiddenScenes`, Scene Editor draft loss
-- **Where:** `ledfx-control.html:43, 95`, `ledfx_control/core.js:270, 313`, `ledfx_control/control.css:1-5, 313`, `ledfx_control/performance.js:1074`, `ledfx_control/scenes-virtuals.js:68, 853-861, 935`.
-- **Problem:** `id="mainZoneBar"` appears twice (`ledfx-control.html:43, 95`), leaving the second div permanently hidden/unused (`core.js:270`). `stepDeckPalCycler()` (`performance.js:1074`) falls back to global `curPalette` when `dc.pal` is cleared instead of the deck's current scene colors (`extractSceneColors(scenesCache[lastDeckScene[deckId]])`). `--warn` is undefined in `control.css:1-5`. `hiddenScenes` (`localStorage`) never prunes deleted scene IDs, inflating `#stPickerCount` (`scenes-virtuals.js:935`). Clicking `.cyc-pick` in `renderScenes()` (`:68`) re-runs `renderSceneEditor()`, discarding unsaved drafts.
-- **Fix:** Remove duplicate `#mainZoneBar`, fall back to the deck's active scene colors, define `--warn` in `:root`, prune `hiddenScenes` against `scenesCache`, and avoid re-rendering Scene Editor on pool checkbox clicks.
 
 ## Open (Upstream / Core Codebase)
 
@@ -156,6 +126,7 @@ Remaining open findings from the full-codebase review (`28ad9d51`, excluding ite
 
 ## Fixed
 - **Fork / DJ Controller, Tube Effects & Audio:**
+  - **`M3`, `M7`, `M19`, `L1`, `L2`, `L12` (`ledfx/scenes.py`, `ledfx/api/scenes.py`, `ledfx/api/device.py`, `ledfx/core.py`, `ledfx/effects/tube_kick_strobe.py`, `ledfx-control.html`, `ledfx_control/*`):** Tracked `active_scene_id` on `Scenes.activate()` and exposed it on `GET /api/scenes` (`M3`); hid unused `TubeKickStrobeEffect` inherited keys via `HIDDEN_KEYS` (`M7`); required `virt?.active` in `getTubePixelsFromVirtuals` and added `mapping === 'copy'` handling in both tube/layout previews (`M19`); returned `online` from `POST /api/devices/{id}` and surfaced offline status in UI (`L1`); re-armed `resolve_address()` for offline `_requested` devices when `auto_reconnect_devices` is re-enabled (`L2`); removed duplicate `#mainZoneBar`, defined `--warn`, fixed per-deck `Rotate Colors` fallback to deck scene colors, pruned deleted `hiddenScenes`, and preserved `sceneDraftVirtuals` on `.cyc-pick` clicks (`L12`).
   - **`H2`, `H3`, `H4` (`ledfx/api/layouts.py`, `tests/test_layouts.py`):** Added `SafeMode` (`ensure_writable()`) and non-blocking `request_save()` across `POST`/`PUT`/`DELETE`, defaulted `snapshot=False` when updating an existing layout by `id`, and added rollback in `PUT` on partial virtual failures.
   - **`H8`, `H9`, `H10`, `H11` (`ledfx_control/scenes-virtuals.js`, `ledfx_control/performance.js`):** Preserved `sceneDraftVirtuals` across virtual cloning (`H8`); cleared `activePalettePatch` on save and patched color inputs in-place on `applyPalette()` (`H9`); preserved `stop`/`forceblack`/`ignore` virtual entries in Scene Studio (`H10`); added per-scope monotonic tokens in `activateScene()` and avoided overwriting global `lastScene` on deck-card clicks (`H11`, completing `L6`).
   - **`H1` (`ledfx/effects/audio.py`):** `AudioAnalysisSource.update_config()` now only runs `initialise_analysis()` when FFT/sample-rate/tempo/onset/pitch method settings change (keeping BPM/tempo intact on EQ/gain/beat-range edits), swaps `freq_mel_indexes` atomically, and guards `bar_oscillator()` against `beat_period <= 0`.

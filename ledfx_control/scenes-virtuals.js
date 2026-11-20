@@ -1,3 +1,4 @@
+let backendActiveSceneId = '';
 function renderScenes(){
   const el = $('#scenes');
   const allIds = Object.keys(scenesCache);
@@ -12,6 +13,8 @@ function renderScenes(){
   let chosenActive = null;
   if(deckLast && activeIds.includes(deckLast)){
     chosenActive = deckLast;
+  }else if(!activeDeckId && backendActiveSceneId && activeIds.includes(backendActiveSceneId)){
+    chosenActive = backendActiveSceneId;
   }else if(activeIds.length){
     chosenActive = activeIds.sort((a,b)=>{
       const ca = Object.values(scenesCache[a]?.virtuals||{}).filter(e=>e&&e.type).length;
@@ -23,7 +26,7 @@ function renderScenes(){
     syncSceneDisplay(chosenActive);
     if(activeDeckId) lastDeckScene[activeDeckId] = chosenActive;
   }
-  if(typeof renderSceneEditor === 'function' && !cloningVirtualInEditor){
+  if(typeof renderSceneEditor === 'function' && !cloningVirtualInEditor && !Object.keys(sceneDraftVirtuals).length){
     const edTarget = activeDeckId ? (chosenActive || '') : '';
     renderSceneEditor(edTarget);
   }
@@ -86,6 +89,14 @@ async function loadScenes(){
     const data = await api('/scenes');
     const scenes = data.scenes || data;
     scenesCache = scenes || {};
+    backendActiveSceneId = data.active_scene_id || '';
+    if(Object.keys(scenesCache).length){
+      let pruned = false;
+      for(const sid of [...hiddenScenes]){
+        if(!(sid in scenesCache)){ hiddenScenes.delete(sid); pruned = true; }
+      }
+      if(pruned) saveHiddenScenes();
+    }
     multiPreviewKey = '';
     renderScenes();
   }catch(e){ el.innerHTML = `<div class="empty">Failed to load scenes: ${e.message}</div>`; }

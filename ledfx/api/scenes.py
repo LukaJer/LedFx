@@ -63,6 +63,7 @@ class ScenesEndpoint(RestEndpoint):
 
         response = {
             "status": "success",
+            "active_scene_id": self._ledfx.scenes.active_scene_id,
             "scenes": scenes_with_state,
         }
         return await self.bare_request_success(response)
