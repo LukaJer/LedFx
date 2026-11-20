@@ -9,8 +9,8 @@
         "autogain": false,
         "autogain_speed": 0.3,
         "autogain_target": 0.5,
-        "beat_max_freq": 102,
-        "beat_min_freq": 64,
+        "beat_max_freq": 121,
+        "beat_min_freq": 86,
         "delay_ms": 0,
         "eq_enabled": true,
         "eq_high": 0.0,
@@ -22,7 +22,7 @@
         "input_gain": 2.35,
         "mic_rate": 44100,
         "min_volume": 0.0632,
-        "onset_method": "energy",
+        "onset_method": "complex",
         "pitch_method": "yinfast",
         "pitch_tolerance": 0.8,
         "sample_rate": 60,
@@ -6714,12 +6714,12 @@
                     "brightness": 1.0,
                     "diag": false,
                     "flip": false,
-                    "high_color": "#d9f99d",
-                    "high_sensitivity": 0.0651,
-                    "lows_color": "#042f2e",
-                    "lows_sensitivity": 0.0651,
-                    "mids_color": "#0d9488",
-                    "mids_sensitivity": 0.04,
+                    "high_color": "#0000ff",
+                    "high_sensitivity": 0.1506,
+                    "lows_color": "#000080",
+                    "lows_sensitivity": 0.1506,
+                    "mids_color": "#ff0000",
+                    "mids_sensitivity": 0.1132,
                     "mirror": true,
                     "pulse_strip": "Off",
                     "raindrop_animation": "Blob"
@@ -6968,12 +6968,12 @@
                         "brightness": 1.0,
                         "diag": false,
                         "flip": false,
-                        "high_color": "#d9f99d",
-                        "high_sensitivity": 0.0651,
-                        "lows_color": "#042f2e",
-                        "lows_sensitivity": 0.0651,
-                        "mids_color": "#0d9488",
-                        "mids_sensitivity": 0.04,
+                        "high_color": "#0000ff",
+                        "high_sensitivity": 0.1506,
+                        "lows_color": "#000080",
+                        "lows_sensitivity": 0.1506,
+                        "mids_color": "#ff0000",
+                        "mids_sensitivity": 0.1132,
                         "mirror": true,
                         "pulse_strip": "Off",
                         "raindrop_animation": "Blob"
@@ -7420,7 +7420,7 @@
                     "modulate": false,
                     "modulation_effect": "sine",
                     "modulation_speed": 0.5,
-                    "speed": 3.2768
+                    "speed": 0.2311
                 },
                 "type": "singleColor"
             },
@@ -7750,7 +7750,7 @@
                         "modulate": false,
                         "modulation_effect": "sine",
                         "modulation_speed": 0.5,
-                        "speed": 3.2768
+                        "speed": 0.2311
                     },
                     "type": "singleColor"
                 },
@@ -8608,30 +8608,32 @@
             },
             "effect": {
                 "config": {
-                    "advanced": true,
                     "background_brightness": 1.0,
-                    "background_color": "#000000",
+                    "background_color": "#141414",
                     "background_mode": "additive",
+                    "bg_reactive_brightness": false,
+                    "bg_reactive_color": false,
                     "blur": 0.0,
                     "brightness": 1.0,
                     "diag": false,
+                    "draw": "Lines",
                     "dump": false,
                     "flip": false,
                     "flip_horizontal": false,
-                    "flip_vertical": true,
+                    "flip_vertical": false,
                     "frequency_range": "Lows (beat+bass)",
-                    "gradient": "linear-gradient(90deg, #ff0000 0.00%,#ff00b2 50.00%,#0000ff 100.00%)",
+                    "grad_power": false,
+                    "gradient": "#df0000",
                     "gradient_roll": 0.0,
                     "mirror": false,
+                    "mirror_effect": true,
+                    "points": 64,
                     "rotate": 0,
-                    "size_multiplication": 0.5518,
-                    "speed": 160,
-                    "speed_multiplication": 0.5518,
-                    "stretch_horizontal": 128,
-                    "stretch_vertical": 98,
+                    "scroll_time": 0.1,
+                    "size": 3,
                     "test": false
                 },
-                "type": "plasmawled"
+                "type": "bleep"
             },
             "effects": {
                 "bands": {
@@ -8691,30 +8693,29 @@
                 },
                 "bleep": {
                     "config": {
-                        "advanced": true,
                         "background_brightness": 1.0,
-                        "background_color": "#ff2800",
-                        "background_mode": "overwrite",
-                        "bg_reactive_brightness": true,
-                        "bg_reactive_color": true,
+                        "background_color": "#141414",
+                        "background_mode": "additive",
+                        "bg_reactive_brightness": false,
+                        "bg_reactive_color": false,
                         "blur": 0.0,
                         "brightness": 1.0,
                         "diag": false,
-                        "draw": "Points",
+                        "draw": "Lines",
                         "dump": false,
                         "flip": false,
                         "flip_horizontal": false,
                         "flip_vertical": false,
                         "frequency_range": "Lows (beat+bass)",
                         "grad_power": false,
-                        "gradient": "#ffffff",
+                        "gradient": "#df0000",
                         "gradient_roll": 0.0,
                         "mirror": false,
                         "mirror_effect": true,
-                        "points": 62,
+                        "points": 64,
                         "rotate": 0,
                         "scroll_time": 0.1,
-                        "size": 1,
+                        "size": 3,
                         "test": false
                     },
                     "type": "bleep"
@@ -9149,9 +9150,9 @@
                         "gradient_roll": 0.0,
                         "mirror": false,
                         "rotate": 0,
-                        "size_multiplication": 0.5518,
-                        "speed": 160,
-                        "speed_multiplication": 0.5518,
+                        "size_multiplication": 0.2007,
+                        "speed": 19,
+                        "speed_multiplication": 0.2007,
                         "stretch_horizontal": 128,
                         "stretch_vertical": 98,
                         "test": false
@@ -9320,7 +9321,7 @@
             },
             "id": "remap",
             "is_device": false,
-            "last_effect": "plasmawled",
+            "last_effect": "bleep",
             "segments": [
                 [
                     "wledbb00",
@@ -11312,9 +11313,9 @@
                     "modulate": false,
                     "modulation_effect": "sine",
                     "modulation_speed": 0.5,
-                    "multiplier": 3.506,
+                    "multiplier": 1.5053,
                     "scan_width": 30,
-                    "speed": 63,
+                    "speed": 7,
                     "use_grad": true
                 },
                 "type": "scan"
@@ -11434,9 +11435,9 @@
                         "modulate": false,
                         "modulation_effect": "sine",
                         "modulation_speed": 0.5,
-                        "multiplier": 3.506,
+                        "multiplier": 1.5053,
                         "scan_width": 30,
-                        "speed": 63,
+                        "speed": 7,
                         "use_grad": true
                     },
                     "type": "scan"
@@ -11654,11 +11655,11 @@
                     "diag": false,
                     "flip": false,
                     "high_color": "#ff2800",
-                    "high_sensitivity": 0.0651,
+                    "high_sensitivity": 0.1506,
                     "lows_color": "#ff00b2",
-                    "lows_sensitivity": 0.0651,
+                    "lows_sensitivity": 0.1506,
                     "mids_color": "#ff2800",
-                    "mids_sensitivity": 0.04,
+                    "mids_sensitivity": 0.1132,
                     "mirror": true,
                     "pulse_strip": "Off",
                     "raindrop_animation": "Blob"
@@ -11760,11 +11761,11 @@
                         "diag": false,
                         "flip": false,
                         "high_color": "#ff2800",
-                        "high_sensitivity": 0.0651,
+                        "high_sensitivity": 0.1506,
                         "lows_color": "#ff00b2",
-                        "lows_sensitivity": 0.0651,
+                        "lows_sensitivity": 0.1506,
                         "mids_color": "#ff2800",
-                        "mids_sensitivity": 0.04,
+                        "mids_sensitivity": 0.1132,
                         "mirror": true,
                         "pulse_strip": "Off",
                         "raindrop_animation": "Blob"
@@ -12036,20 +12037,31 @@
             },
             "effect": {
                 "config": {
-                    "background_brightness": 1.0,
-                    "background_color": "#000000",
-                    "blur": 0.0,
+                    "advanced": false,
+                    "background_brightness": 0.45,
+                    "background_color": "#7a0040",
+                    "blur": 1.5,
+                    "bounce": false,
                     "brightness": 1.0,
-                    "color": "#ffffff",
+                    "color_intensity": false,
+                    "color_scan": "#ff0000",
+                    "count": 4,
                     "diag": false,
                     "flip": false,
-                    "mirror": false,
+                    "frequency_range": "Lows (beat+bass)",
+                    "full_grad": true,
+                    "gradient": "linear-gradient(90deg, #ff0000 0.00%,#ff00b2 50.00%,#0000ff 100.00%)",
+                    "gradient_roll": 1.0,
+                    "mirror": true,
                     "modulate": false,
                     "modulation_effect": "sine",
-                    "modulation_speed": 0.5,
-                    "speed": 3.2768
+                    "modulation_speed": 0.65,
+                    "multiplier": 1.5053,
+                    "scan_width": 22,
+                    "speed": 7,
+                    "use_grad": true
                 },
-                "type": "singleColor"
+                "type": "scan"
             },
             "effects": {
                 "bar": {
@@ -12190,9 +12202,9 @@
                         "modulate": false,
                         "modulation_effect": "sine",
                         "modulation_speed": 0.65,
-                        "multiplier": 5.0,
+                        "multiplier": 1.5053,
                         "scan_width": 22,
-                        "speed": 31,
+                        "speed": 7,
                         "use_grad": true
                     },
                     "type": "scan"
@@ -12333,7 +12345,7 @@
             },
             "id": "rotyator",
             "is_device": false,
-            "last_effect": "singleColor",
+            "last_effect": "scan",
             "segments": [
                 [
                     "wledbb00",
@@ -12404,7 +12416,7 @@
                     "gradient": "#ff00b2",
                     "gradient_roll": 0.0,
                     "mirror": false,
-                    "strobe_decay": 1.2509,
+                    "strobe_decay": 7.1317,
                     "strobe_frequency": "1/8 (◉◡◉ )",
                     "strobe_pattern": "*.*."
                 },
@@ -12752,7 +12764,7 @@
                         "gradient": "#ff00b2",
                         "gradient_roll": 0.0,
                         "mirror": false,
-                        "strobe_decay": 1.2509,
+                        "strobe_decay": 7.1317,
                         "strobe_frequency": "1/8 (◉◡◉ )",
                         "strobe_pattern": "*.*."
                     },
@@ -12828,7 +12840,7 @@
                     "gradient": "#00ffff",
                     "gradient_roll": 0.0,
                     "mirror": false,
-                    "strobe_decay": 1.2509,
+                    "strobe_decay": 7.1317,
                     "strobe_frequency": "1/8 (◉◡◉ )",
                     "strobe_pattern": ".*.*"
                 },
@@ -12898,7 +12910,7 @@
                         "gradient": "#00ffff",
                         "gradient_roll": 0.0,
                         "mirror": false,
-                        "strobe_decay": 1.2509,
+                        "strobe_decay": 7.1317,
                         "strobe_frequency": "1/8 (◉◡◉ )",
                         "strobe_pattern": ".*.*"
                     },
@@ -12962,6 +12974,24 @@
                 "transition_mode": "Add",
                 "transition_time": 0.4
             },
+            "effect": {
+                "config": {
+                    "background_brightness": 1.0,
+                    "background_color": "#000000",
+                    "blur": 2.0,
+                    "brightness": 0.9,
+                    "decay": 0.78,
+                    "diag": false,
+                    "fix_hues": true,
+                    "flip": false,
+                    "frequency_range": "Lows (beat+bass)",
+                    "gradient": "linear-gradient(90deg, rgb(255,65,54) 0%, rgb(240,163,54) 55%, rgb(255,90,160) 100%)",
+                    "gradient_roll": 0.0,
+                    "mirror": true,
+                    "multiplier": 0.9
+                },
+                "type": "blade_power_plus"
+            },
             "effects": {
                 "bar": {
                     "config": {
@@ -12987,7 +13017,7 @@
                     "config": {
                         "background_brightness": 1.0,
                         "background_color": "#000000",
-                        "blur": 0.6,
+                        "blur": 2.0,
                         "brightness": 0.9,
                         "decay": 0.78,
                         "diag": false,
@@ -13127,18 +13157,18 @@
                     "config": {
                         "background_brightness": 1.0,
                         "background_color": "#000000",
-                        "bass_strobe_decay_rate": 0.72,
+                        "bass_strobe_decay_rate": 0.55,
                         "blur": 0.0,
                         "brightness": 1.0,
                         "color_shift_delay": 1.0,
-                        "color_step": 0.1,
+                        "color_step": 0.0625,
                         "diag": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(255,255,255) 0%, rgb(180,220,255) 100%)",
+                        "gradient": "linear-gradient(90deg, rgb(255,255,255) 0%, rgb(255,0,0) 100%)",
                         "gradient_roll": 0.0,
-                        "mirror": false,
+                        "mirror": true,
                         "strobe_color": "#ffffff",
-                        "strobe_decay_rate": 0.72,
+                        "strobe_decay_rate": 0.55,
                         "strobe_width": 10
                     },
                     "type": "real_strobe"
@@ -13176,15 +13206,15 @@
                         "background_color": "#000000",
                         "blur": 1.5,
                         "brightness": 1.0,
-                        "color_high": "#c084fc",
-                        "color_lows": "#dc2626",
-                        "color_mids": "#f97316",
+                        "color_high": "#c7f2c1",
+                        "color_lows": "#2ec27e",
+                        "color_mids": "#1f7a3f",
                         "decay_per_sec": 0.45,
                         "diag": false,
                         "flip": false,
                         "mirror": true,
-                        "scroll_per_sec": 0.65,
-                        "threshold": 0.25
+                        "scroll_per_sec": 0.6085,
+                        "threshold": 0.0
                     },
                     "type": "scroll_plus"
                 },
@@ -13239,8 +13269,8 @@
                         "gradient": "Frost",
                         "gradient_roll": 0.0,
                         "mirror": true,
-                        "reactivity": 0.7012,
-                        "speed": 3.6503,
+                        "reactivity": 0.8,
+                        "speed": 2.5,
                         "step_size": 2
                     },
                     "type": "tube_gate"
@@ -13350,8 +13380,8 @@
                         "gradient": "Dancefloor",
                         "gradient_roll": 0.0,
                         "mirror": true,
-                        "reactivity": 0.7012,
-                        "speed": 3.6503
+                        "reactivity": 0.6,
+                        "speed": 1.5
                     },
                     "type": "tube_solid_beat"
                 },
@@ -13369,8 +13399,8 @@
                         "gradient": "linear-gradient(90deg, rgb(60,10,0) 0%, rgb(255,80,10) 60%, rgb(255,210,120) 100%)",
                         "gradient_roll": 0.0,
                         "mirror": true,
-                        "reactivity": 0.6,
-                        "speed": 1.5
+                        "reactivity": 0.7012,
+                        "speed": 3.6503
                     },
                     "type": "tube_split_vu"
                 },
@@ -13385,7 +13415,7 @@
                         "decay": 0.78,
                         "diag": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(15, 23, 42) 0.00%, rgb(29, 78, 216) 33.33%, rgb(224, 242, 254) 66.67%, rgb(255, 255, 255) 100.00%)",
+                        "gradient": "linear-gradient(90deg, rgb(255,0,40) 0%, rgb(255,255,255) 100%)",
                         "gradient_roll": 0.0,
                         "mirror": true,
                         "reactivity": 0.8,
@@ -13411,7 +13441,7 @@
             },
             "id": "front-pillars",
             "is_device": false,
-            "last_effect": "lava_lamp",
+            "last_effect": "blade_power_plus",
             "segments": [
                 [
                     "wledbb07",
@@ -13585,7 +13615,7 @@
                         "flip_horizontal": false,
                         "flip_vertical": false,
                         "frequency_range": "Lows (beat+bass)",
-                        "gradient": "linear-gradient(90deg, rgb(11, 61, 31) 0.00%, rgb(31, 122, 63) 33.33%, rgb(95, 191, 107) 66.67%, rgb(199, 242, 193) 100.00%)",
+                        "gradient": "linear-gradient(90deg, rgb(20,220,180) 0%, rgb(70,120,255) 50%, rgb(180,70,255) 100%)",
                         "gradient_roll": 0.0,
                         "lower": 0.1,
                         "mirror": false,
@@ -14071,25 +14101,6 @@
                 "transition_mode": "Add",
                 "transition_time": 0.4
             },
-            "effect": {
-                "config": {
-                    "background_brightness": 1.0,
-                    "background_color": "#000000",
-                    "beat_flash": 0.0,
-                    "blur": 1.5,
-                    "brightness": 1.0,
-                    "color_by_intensity": false,
-                    "decay": 0.82,
-                    "diag": false,
-                    "flip": false,
-                    "gradient": "linear-gradient(90deg, rgb(253, 186, 116) 0.00%, rgb(39, 39, 42) 33.33%, rgb(82, 82, 91) 66.67%, rgb(234, 88, 12) 100.00%)",
-                    "gradient_roll": 0.0,
-                    "mirror": true,
-                    "reactivity": 0.6,
-                    "speed": 1.5
-                },
-                "type": "tube_split_vu"
-            },
             "effects": {
                 "bar": {
                     "config": {
@@ -14222,18 +14233,18 @@
                     "config": {
                         "background_brightness": 1.0,
                         "background_color": "#000000",
-                        "bass_strobe_decay_rate": 0.72,
+                        "bass_strobe_decay_rate": 0.55,
                         "blur": 0.0,
                         "brightness": 1.0,
                         "color_shift_delay": 1.0,
-                        "color_step": 0.1,
+                        "color_step": 0.0625,
                         "diag": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(255,255,255) 0%, rgb(180,220,255) 100%)",
+                        "gradient": "linear-gradient(90deg, rgb(255,255,255) 0%, rgb(255,0,0) 100%)",
                         "gradient_roll": 0.0,
-                        "mirror": false,
+                        "mirror": true,
                         "strobe_color": "#ffffff",
-                        "strobe_decay_rate": 0.72,
+                        "strobe_decay_rate": 0.55,
                         "strobe_width": 10
                     },
                     "type": "real_strobe"
@@ -14414,18 +14425,18 @@
                 },
                 "tube_solid_beat": {
                     "config": {
-                        "alternate": false,
+                        "alternate": true,
                         "background_brightness": 1.0,
                         "background_color": "#000000",
-                        "base_level": 0.12,
-                        "beat_flash": 0.9,
+                        "base_level": 0.1,
+                        "beat_flash": 0.95,
                         "blur": 0.0,
                         "brightness": 1.0,
                         "color_by_intensity": true,
-                        "decay": 0.72,
+                        "decay": 0.7,
                         "diag": false,
                         "flip": false,
-                        "gradient": "Dancefloor",
+                        "gradient": "linear-gradient(90deg, rgb(255,0,0) 0%, rgb(255,255,255) 100%)",
                         "gradient_roll": 0.0,
                         "mirror": true,
                         "reactivity": 0.6,
@@ -14444,7 +14455,7 @@
                         "decay": 0.82,
                         "diag": false,
                         "flip": false,
-                        "gradient": "linear-gradient(90deg, rgb(253, 186, 116) 0.00%, rgb(39, 39, 42) 33.33%, rgb(82, 82, 91) 66.67%, rgb(234, 88, 12) 100.00%)",
+                        "gradient": "linear-gradient(90deg, rgb(60,10,0) 0%, rgb(255,80,10) 60%, rgb(255,210,120) 100%)",
                         "gradient_roll": 0.0,
                         "mirror": true,
                         "reactivity": 0.6,
@@ -14475,7 +14486,7 @@
             },
             "id": "back-pillars",
             "is_device": false,
-            "last_effect": "tube_split_vu",
+            "last_effect": "energy",
             "segments": [
                 [
                     "wledbb09",
@@ -15330,7 +15341,7 @@
                     "decay": 0.78,
                     "diag": false,
                     "flip": false,
-                    "gradient": "Sunset",
+                    "gradient": "linear-gradient(90deg, rgb(255, 46, 136) 0.00%, rgb(255, 110, 199) 33.33%, rgb(192, 38, 211) 66.67%, rgb(126, 34, 206) 100.00%)",
                     "gradient_roll": 0.0,
                     "mirror": true,
                     "orientation": "Horizontal",
@@ -15347,7 +15358,7 @@
                         "background_color": "#000000",
                         "blur": 0.0,
                         "brightness": 1.0,
-                        "color": "#ffffff",
+                        "color": "#000000",
                         "diag": false,
                         "flip": false,
                         "mirror": false,
@@ -15369,7 +15380,7 @@
                         "decay": 0.78,
                         "diag": false,
                         "flip": false,
-                        "gradient": "Sunset",
+                        "gradient": "linear-gradient(90deg, rgb(255, 46, 136) 0.00%, rgb(255, 110, 199) 33.33%, rgb(192, 38, 211) 66.67%, rgb(126, 34, 206) 100.00%)",
                         "gradient_roll": 0.0,
                         "mirror": true,
                         "orientation": "Horizontal",
