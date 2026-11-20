@@ -469,19 +469,41 @@ class Melbanks:
 
     def send_melbank_event(self, i):
         bpm = None
-        tempo = getattr(self._audio, "_tempo", None)
-        if tempo is not None:
-            try:
-                val = float(tempo.get_bpm())
-                if 30.0 <= val <= 240.0:
-                    bpm = round(val, 1)
-            except (TypeError, ValueError):
-                bpm = None
+        detected_bpm_fn = getattr(self._audio, "detected_bpm", None)
+        if callable(detected_bpm_fn):
+            bpm = detected_bpm_fn()
+        else:
+            tempo = getattr(self._audio, "_tempo", None)
+            if tempo is not None:
+                try:
+                    val = float(tempo.get_bpm())
+                    if 30.0 <= val <= 240.0:
+                        bpm = round(val, 1)
+                except (TypeError, ValueError):
+                    bpm = None
+        agc_gain = None
+        if getattr(self._audio._config, "autogain", False):
+            agc_gain = round(float(getattr(self._audio, "_auto_scale", 1.0)), 2)
+        proc = (
+            self.melbank_processors[i]
+            if 0 <= i < len(self.melbank_processors)
+            else None
+        )
+        mel_gain_obj = getattr(proc, "mel_gain", None) if proc is not None else None
+        mel_gain_val = getattr(mel_gain_obj, "value", None)
+        mel_gain = (
+            round(float(mel_gain_val), 2) if mel_gain_val is not None else None
+        )
+        vol_val = self._audio.volume(filtered=True)
+        volume = round(float(vol_val), 2) if vol_val is not None else None
         self._ledfx.events.fire_event(
             GraphUpdateEvent(
                 f"melbank_{i}",
                 self.melbanks_filtered[i],
                 self.melbank_processors[i].melbank_frequencies,
                 bpm=bpm,
+                agc_gain=agc_gain,
+                mel_gain=mel_gain,
+                volume=volume,
             )
         )

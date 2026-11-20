@@ -74,11 +74,6 @@ Severity: **H** = high (crash, race, data/state corruption, silent breakage), **
 - **Problem:** `post()` does not check `isinstance(snapshot, bool)`, accepts empty/unstripped `name` when updating an existing layout, and `LayoutVirtualMapping.segments: list[list[object]]` defers segment tuple validation until `PUT`. `tests/test_layouts.py` only tests mocked happy-path CRUD.
 - **Fix:** Validate `snapshot` as `bool`, strip/reject blank `name` on updates, type-validate segments in `LayoutVirtualMapping`, and add tests for error, rollback, `SafeMode`, and metadata updates.
 
-### L10. `AudioInputSource._autogain_env` shared class attribute never reset on stream open or AGC toggle
-- **Where:** `ledfx/effects/audio.py:76, 1136-1149`.
-- **Problem:** `_autogain_env = 0.1` is defined at class level, never reset on stream `activate()` or `autogain` `False → True` transitions, and `rms > 1e-4` lets low room noise boost `auto_scale` up to `6.0x`.
-- **Fix:** Initialize/reset `_autogain_env = 0.1` per instance on `activate()` and AGC enable, and raise or gate the noise floor.
-
 ### L11. `TubeTikTokEffect` & `GradientEffect.roll_gradient()` fail on `pixel_count == 0`, dt-less `_flash`, and unbounded `_phase`
 - **Where:** `ledfx/effects/tube_base.py:58-62, 100-101`, `ledfx/effects/tube_tiktok.py:110`, `ledfx/effects/gradient.py:139`, `ledfx/effects/tube_*.py`.
 - **Problem:** `TubeEffectBase._compute_grid(0)` returns `(1, 1, 1)`, causing `self.pixels.reshape(...)` `ValueError` in `TubeTikTokEffect` (`:110`) and `ZeroDivisionError` in `GradientEffect.roll_gradient()` (`:139`) when `pixel_count == 0`. `TubeEffectBase._flash *= 0.84` (`tube_base.py:101`) is frame-rate-dependent rather than `dt`-scaled, and `_phase` grows unboundedly in `tube_beat_pulse.py`, `tube_tiktok.py`, `tube_wave.py`, `tube_vortex.py`, `tube_strobe_helix.py`, `tube_lighthouse.py`, `tube_helix.py`, and `tube_gate.py`.
@@ -144,7 +139,7 @@ Remaining open findings from the full-codebase review (`28ad9d51`, excluding ite
 - **Core / Devices / Audio (`da1af616` & follow-up):**
   - `Events` (`ledfx/events.py`): protected `_listeners` with `RLock` and guarded `loop.is_closed()` in `fire_event()`.
   - `Virtual` & `Effect` (`ledfx/virtuals.py`, `ledfx/effects/__init__.py`): moved `EffectSetEvent`, `EffectClearedEvent`, and `EffectUpdatedEvent` emission outside `self.lock`.
-  - `AudioInputSource` / `AudioAnalysisSource` / `AudioReactiveEffect` (`ledfx/effects/audio.py`): closed leaked `_stream` on failed `open_audio_stream()`, synchronized `check_and_deactivate()` timer state under `self.lock`, guarded empty slices in `freq_power()`, clamped `_selected_melbank` fallback, and replaced `@cache` on `melbank()` with a lock-protected cache returning copies.
+  - `AudioInputSource` / `AudioAnalysisSource` / `AudioReactiveEffect` (`ledfx/effects/audio.py`, `ledfx/effects/melbank.py`, `ledfx/events.py`, `ledfx_control/audio-eq.js`): closed leaked `_stream` on failed `open_audio_stream()`, synchronized `check_and_deactivate()` timer state under `self.lock`, guarded empty slices in `freq_power()`, clamped `_selected_melbank` fallback, replaced `@cache` on `melbank()` with a lock-protected cache returning copies, reset `_autogain_env`/`_auto_scale` per instance (`L10`), and exposed live `agc_gain`/`mel_gain`/`volume` telemetry to `#agcReadout`.
   - `HttpServer` & `LedFxCore` (`ledfx/http_manager.py`, `ledfx/core.py`): initialized `HttpServer.runner = None`, made `handle_start_error()` async + re-raise to abort `async_start()`, added `_stopping` re-entrancy guard in `stop()`/`async_stop()`, cleaned up `RollingQueueHandler` and `loop.close()` on exit, and handled second `KeyboardInterrupt` during shutdown.
   - Cross-thread calls from `SendspinAudioThread` into `NowPlayingService` and main event loop marshaled via `call_soon_threadsafe`.
   - `AudioInputSource._callbacks` mutation/iteration protected with `self.lock`; read-only audio buffers copied before NaN cleanup.

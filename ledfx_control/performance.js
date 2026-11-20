@@ -683,7 +683,10 @@ function connectWS(){
       const rounded = Math.round(detBpm);
       if(rounded !== bpm){ bpm = rounded; updateStatus(); }
     }
-    updateSpectrumData(arr, freqs);
+    const agcGain = m.agc_gain ?? m.data?.agc_gain;
+    const melGain = m.mel_gain ?? m.data?.mel_gain;
+    const audioVol = m.volume ?? m.data?.volume;
+    updateSpectrumData(arr, freqs, { agcGain, melGain, audioVol });
   };
   sock.onerror=()=>logCall('websocket error','WS','err',0);
   sock.onclose=()=>{
@@ -714,7 +717,7 @@ $('#guardBtn').addEventListener('click',e=>{ S.guard=!S.guard; e.target.classLis
 $('#lockBtn').addEventListener('click',e=>{ S.lock=!S.lock; e.target.classList.toggle('on',S.lock); e.target.textContent='Perform-Lock '+(S.lock?'ON':'OFF'); document.body.classList.toggle('locked',S.lock); updateStatus(); });
 $('#apBtn').addEventListener('click',()=>{ toggleSceneCycle(); });
 // tap & auto tempo
-let autoBpm = true;
+let autoBpm = false;
 function syncBpmModeUI(){
   const b = $('#autoBpmBtn');
   if(b){

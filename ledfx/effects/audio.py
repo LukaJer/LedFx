@@ -1,4 +1,5 @@
 import logging
+import math
 import queue
 import threading
 import time
@@ -477,6 +478,8 @@ class AudioInputSource:
         # We must not inherit legacy _callbacks from prior instances
         self._callbacks = []
         self._eq_curve: NDArray[np.float32] | None = None
+        self._autogain_env = 0.1
+        self._auto_scale = 1.0
         self.update_config(config)
 
         def shutdown_event(e):
@@ -615,6 +618,11 @@ class AudioInputSource:
             self.deactivate()
 
         self._config = new_config
+        if old_config is not None and not getattr(
+            old_config, "autogain", False
+        ) and getattr(new_config, "autogain", False):
+            self._autogain_env = 0.1
+            self._auto_scale = 1.0
         self._eq_curve = _build_eq_curve(self._config)
         # Resolve device by name if available (handles index drift across restarts)
         self._resolve_device_from_name()
@@ -898,6 +906,8 @@ class AudioInputSource:
                 raise
             with AudioInputSource._class_lock:
                 AudioInputSource._audio_stream_active = True
+            self._autogain_env = 0.1
+            self._auto_scale = 1.0
 
         def try_open_device(dev_idx, reinit=False):
             """
@@ -1147,7 +1157,7 @@ class AudioInputSource:
             self._raw_audio_sample = self._raw_audio_sample * gain
         if bool(getattr(self._config, "autogain", False)):
             rms = float(np.sqrt(np.mean(self._raw_audio_sample ** 2)))
-            if rms > 1e-4:
+            if rms > 5e-4:
                 speed = max(
                     0.05,
                     min(1.0, float(getattr(self._config, "autogain_speed", 0.5) or 0.5)),
@@ -1158,7 +1168,12 @@ class AudioInputSource:
                 self._autogain_env = (1.0 - alpha) * self._autogain_env + alpha * rms
                 target = float(getattr(self._config, "autogain_target", 0.5) or 0.5)
                 auto_scale = max(0.25, min(6.0, target / max(1e-4, self._autogain_env)))
+                self._auto_scale = auto_scale
                 self._raw_audio_sample = self._raw_audio_sample * auto_scale
+            else:
+                self._auto_scale = 1.0
+        else:
+            self._auto_scale = 1.0
 
         # Calculate the current volume for silence detection
         self._volume = 1 + aubio.db_spl(self._raw_audio_sample) / 100
@@ -1245,6 +1260,10 @@ class AudioAnalysisSource(AudioInputSource):
 
         # pitch, tempo, onset
         self._tempo = aubio.tempo(self._config.tempo_method, *fft_params)
+        self._tempo_lpf = self._make_lowpass_biquad(160.0, MIC_RATE)
+        self._bpm_history: deque[float] = deque(maxlen=12)
+        self._stable_bpm: float | None = None
+        self._bpm_last_sample_ts: float = 0.0
         self._onset = aubio.onset(self._config.onset_method, *fft_params)
         self._pitch = aubio.pitch(self._config.pitch_method, *fft_params)
         self._pitch.set_unit("midi")
@@ -1373,16 +1392,89 @@ class AudioAnalysisSource(AudioInputSource):
             _LOGGER.warning("%s", e)
             return 0
 
+    @staticmethod
+    def _make_lowpass_biquad(
+        cutoff_hz: float, sample_rate: int, q: float = 0.70710678
+    ) -> aubio.digital_filter:
+        """Build a 2nd-order Butterworth low-pass filter for kick/bass tempo tracking."""
+        w0 = 2.0 * math.pi * cutoff_hz / sample_rate
+        cos_w0 = math.cos(w0)
+        alpha = math.sin(w0) / (2.0 * q)
+        a0 = 1.0 + alpha
+        filt = aubio.digital_filter(3)
+        filt.set_biquad(
+            ((1.0 - cos_w0) / 2.0) / a0,
+            (1.0 - cos_w0) / a0,
+            ((1.0 - cos_w0) / 2.0) / a0,
+            (-2.0 * cos_w0) / a0,
+            (1.0 - alpha) / a0,
+        )
+        return filt
+
     @cache  # noqa: B019
     def bpm_beat_now(self):
         """
         Returns True if a beat is expected now based on BPM data
         """
         try:
-            return bool(self._tempo(self.audio_sample(raw=True))[0])
+            sample = self.audio_sample(raw=True)
+            lpf = getattr(self, "_tempo_lpf", None)
+            if lpf is not None:
+                sample = lpf(sample)
+            return bool(self._tempo(sample)[0])
         except ValueError as e:
             _LOGGER.warning("%s", e)
             return False
+
+    def detected_bpm(self) -> float | None:
+        """Return a confidence-gated, octave-normalized, smoothed BPM."""
+        tempo = getattr(self, "_tempo", None)
+        if tempo is None:
+            return None
+        if self.volume(filtered=True) <= self._config.min_volume:
+            return self._stable_bpm
+        now = time.monotonic()
+        if now - self._bpm_last_sample_ts < 0.25:
+            return self._stable_bpm
+        self._bpm_last_sample_ts = now
+        try:
+            raw_bpm = float(tempo.get_bpm())
+            conf = float(tempo.get_confidence())
+        except (TypeError, ValueError):
+            return self._stable_bpm
+        if not (30.0 <= raw_bpm <= 300.0) or conf < 0.12:
+            return self._stable_bpm
+
+        # Fold only clear double-time (>195) / half-time (<62) estimates so
+        # tempos in 120-190 BPM aren't mistakenly halved into the 80-95 range.
+        val = raw_bpm
+        while val > 195.0:
+            val *= 0.5
+        while val < 62.0:
+            val *= 2.0
+        if self._stable_bpm is not None:
+            if (
+                val * 0.5 >= 65.0
+                and abs(val * 0.5 - self._stable_bpm) < 0.06 * self._stable_bpm
+            ):
+                val *= 0.5
+            elif (
+                val * 2.0 <= 190.0
+                and abs(val * 2.0 - self._stable_bpm) < 0.06 * self._stable_bpm
+            ):
+                val *= 2.0
+
+        self._bpm_history.append(val)
+        if len(self._bpm_history) < 3 and self._stable_bpm is None:
+            return None
+        med = float(np.median(self._bpm_history))
+        if self._stable_bpm is None:
+            self._stable_bpm = round(med, 1)
+        elif abs(med - self._stable_bpm) >= 0.4:
+            self._stable_bpm = round(
+                self._stable_bpm + 0.5 * (med - self._stable_bpm), 1
+            )
+        return self._stable_bpm
 
     @cache  # noqa: B019
     def volume_beat_now(self):

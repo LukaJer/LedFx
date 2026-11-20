@@ -322,6 +322,9 @@ class GraphUpdateEvent(Event):
         melbank: np.ndarray,
         frequencies: np.ndarray,
         bpm: float | None = None,
+        agc_gain: float | None = None,
+        mel_gain: float | None = None,
+        volume: float | None = None,
     ):
         super().__init__(Event.GRAPH_UPDATE)
         self.graph_id = graph_id
@@ -329,6 +332,12 @@ class GraphUpdateEvent(Event):
         self.frequencies = frequencies.tolist()
         if bpm is not None:
             self.bpm = bpm
+        if agc_gain is not None:
+            self.agc_gain = agc_gain
+        if mel_gain is not None:
+            self.mel_gain = mel_gain
+        if volume is not None:
+            self.volume = volume
 
 
 class VisualisationUpdateEvent(Event):

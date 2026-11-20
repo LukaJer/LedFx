@@ -329,7 +329,21 @@ $('#specResetZones')?.addEventListener('click', ()=>{
 });
 
 let beatZoneAvg = 0, beatPulse = 0, lastBeatPulseAt = 0;
-function updateSpectrumData(mel, freqs){
+function updateAgcReadout(telemetry){
+  const el = $('#agcReadout');
+  if(!el || !telemetry) return;
+  const parts = [];
+  if(typeof telemetry.agcGain === 'number') parts.push(`AGC ${telemetry.agcGain.toFixed(2)}x`);
+  else parts.push(eqState.autogain ? 'AGC 1.00x' : 'AGC off');
+  if(typeof telemetry.melGain === 'number') parts.push(`Mel ${telemetry.melGain.toFixed(2)}`);
+  if(typeof telemetry.audioVol === 'number') parts.push(`Vol ${telemetry.audioVol.toFixed(2)}`);
+  el.textContent = parts.join(' · ');
+  const gated = typeof telemetry.audioVol === 'number' && telemetry.audioVol <= (eqState.min_volume ?? 0.2);
+  el.classList.toggle('gated', gated);
+  el.classList.toggle('active', !gated && !!eqState.autogain);
+}
+function updateSpectrumData(mel, freqs, telemetry){
+  updateAgcReadout(telemetry);
   specMel = mel;
   if(freqs && freqs.length === mel.length) specFreqs = freqs;
   if(specPeaks.length !== mel.length) specPeaks = new Array(mel.length).fill(0);

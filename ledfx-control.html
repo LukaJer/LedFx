@@ -26,7 +26,7 @@
 <div class="tabs-bar">
   <nav class="tabs" id="tabs"><button data-t="main" data-deck="" class="on">Main</button><span id="deckTabs" style="display:contents"></span><button data-t="virtuals">Virtuals &amp; Tubes</button><button data-t="scenes">Scenes</button><button data-t="eq">EQ &amp; Spectrum</button><button data-t="layout">Layouts &amp; Tubes</button><button data-t="lab">Palette Lab</button><button data-t="diag">Diagnostics</button></nav>
   <div class="statusbar">
-    <div class="stc" id="stBpmBox" role="button" tabindex="0" title="Click box to tap BPM · Click number to type BPM" style="cursor:pointer;user-select:none"><small>BPM</small><b id="stBpm" title="Click to enter BPM manually">—</b><input type="number" id="stBpmInput" min="30" max="240" hidden><button type="button" class="tgl on" id="autoBpmBtn" style="padding:3px 8px;font-size:11px" title="Auto-detect BPM from LedFx audio">Auto</button></div>
+    <div class="stc" id="stBpmBox" role="button" tabindex="0" title="Click box to tap BPM · Click number to type BPM" style="cursor:pointer;user-select:none"><small>BPM</small><b id="stBpm" title="Click to enter BPM manually">—</b><input type="number" id="stBpmInput" min="30" max="240" hidden><button type="button" class="tgl" id="autoBpmBtn" style="padding:3px 8px;font-size:11px" title="Auto-detect BPM from LedFx audio">Tap</button></div>
     <button class="stc blackout-big" id="stBlackoutBtn" type="button" title="Toggle Master Blackout (B)"><small>Master</small><b>BLACKOUT</b></button>
     <button class="stc whiteout-big" id="stWhiteoutBtn" type="button" title="Toggle Master Whiteout"><small>Master</small><b>WHITEOUT</b></button>
     <div class="stc"><small>Audio</small><span class="status" id="stAudio">no stream</span></div>
@@ -288,12 +288,13 @@
       <div class="row2" style="margin:0">
         <select id="audioDevSel" title="Audio Input Device" style="max-width:240px"><option value="">Audio input…</option></select>
         <span class="spec-meta" id="specMeta">waiting for audio…</span>
+        <span class="agc-readout" id="agcReadout" title="Live AGC multiplier, Melbank gain, and filtered volume vs Min Vol">AGC — · Mel — · Vol —</span>
         <button class="tgl on" id="specPeakBtn">Peak Hold</button>
         <button class="btn" id="specResetPeaks">Reset Peaks</button>
         <button class="btn" id="specResetZones" title="Reset Beat, Bass, Mid, and High frequency zones to defaults">Reset Zones</button>
       </div>
     </div>
-    <div class="audio-strip">
+    <div class="audio-strip audio-gain-strip">
       <div class="audio-ctrl">
         <span class="ac-lbl">Gain</span>
         <input type="range" id="audioGainSlider" min="0.1" max="5.0" step="0.05" value="1.0" title="Double-click to reset to 1.0x">
@@ -301,11 +302,12 @@
       </div>
       <div class="audio-ctrl">
         <button type="button" class="tgl" id="audioAutogainBtn" style="padding:4px 9px;font-size:11px;white-space:nowrap">Auto OFF</button>
+        <span class="ac-lbl">Target</span>
         <input type="range" id="audioAutogainTarget" min="0.1" max="1.0" step="0.05" value="0.5" title="Autogain target level">
         <span class="ac-val" id="audioAutogainVal">0.50</span>
       </div>
       <div class="audio-ctrl">
-        <span class="ac-lbl">Auto Spd</span>
+        <span class="ac-lbl">Auto Speed</span>
         <input type="range" id="audioAutogainSpeed" min="0.05" max="1.0" step="0.05" value="0.5" title="Autogain response speed (0.05 = slow/smooth, 1.0 = fast)">
         <span class="ac-val" id="audioAutogainSpeedVal">0.50</span>
       </div>
