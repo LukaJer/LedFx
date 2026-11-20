@@ -17,6 +17,8 @@ let eqState = {eq_enabled:false, eq_low:0, eq_low_mid:0, eq_mid:0, eq_high_mid:0
 let melbanksState = {max_frequencies:[350, 2000, 15000], min_frequency:20, peak_isolation:0.4};
 let melbanksSaveTimer = null;
 let eqSaveTimer = null;
+const dirtyEqKeys = new Set();
+const dirtyMelbanksKeys = new Set();
 let specMel = [];
 let specFreqs = null;
 let specPeaks = [];
@@ -149,27 +151,27 @@ async function loadAudioConfig(){
       syncAutoConnBtn();
     }
     const a = cfg.audio || {};
-    eqState.eq_enabled = Boolean(a.eq_enabled);
+    if(!dirtyEqKeys.has('eq_enabled')) eqState.eq_enabled = Boolean(a.eq_enabled);
     EQ_BANDS.forEach(b=>{
-      if(typeof a[b.key] === 'number') eqState[b.key] = a[b.key];
+      if(!dirtyEqKeys.has(b.key) && typeof a[b.key] === 'number') eqState[b.key] = a[b.key];
     });
-    if(typeof a.input_gain === 'number') eqState.input_gain = a.input_gain;
-    if(typeof a.autogain === 'boolean') eqState.autogain = a.autogain;
-    if(typeof a.autogain_target === 'number') eqState.autogain_target = a.autogain_target;
-    if(typeof a.autogain_speed === 'number') eqState.autogain_speed = a.autogain_speed;
-    if(typeof a.min_volume === 'number') eqState.min_volume = a.min_volume;
-    if(typeof a.pitch_method === 'string') eqState.pitch_method = a.pitch_method;
-    if(typeof a.onset_method === 'string') eqState.onset_method = a.onset_method;
-    if(typeof a.pitch_tolerance === 'number') eqState.pitch_tolerance = a.pitch_tolerance;
-    if(typeof a.delay_ms === 'number') eqState.delay_ms = a.delay_ms;
-    if(typeof a.beat_min_freq === 'number') eqState.beat_min_freq = a.beat_min_freq;
-    if(typeof a.beat_max_freq === 'number') eqState.beat_max_freq = a.beat_max_freq;
+    if(!dirtyEqKeys.has('input_gain') && typeof a.input_gain === 'number') eqState.input_gain = a.input_gain;
+    if(!dirtyEqKeys.has('autogain') && typeof a.autogain === 'boolean') eqState.autogain = a.autogain;
+    if(!dirtyEqKeys.has('autogain_target') && typeof a.autogain_target === 'number') eqState.autogain_target = a.autogain_target;
+    if(!dirtyEqKeys.has('autogain_speed') && typeof a.autogain_speed === 'number') eqState.autogain_speed = a.autogain_speed;
+    if(!dirtyEqKeys.has('min_volume') && typeof a.min_volume === 'number') eqState.min_volume = a.min_volume;
+    if(!dirtyEqKeys.has('pitch_method') && typeof a.pitch_method === 'string') eqState.pitch_method = a.pitch_method;
+    if(!dirtyEqKeys.has('onset_method') && typeof a.onset_method === 'string') eqState.onset_method = a.onset_method;
+    if(!dirtyEqKeys.has('pitch_tolerance') && typeof a.pitch_tolerance === 'number') eqState.pitch_tolerance = a.pitch_tolerance;
+    if(!dirtyEqKeys.has('delay_ms') && typeof a.delay_ms === 'number') eqState.delay_ms = a.delay_ms;
+    if(!dirtyEqKeys.has('beat_min_freq') && typeof a.beat_min_freq === 'number') eqState.beat_min_freq = a.beat_min_freq;
+    if(!dirtyEqKeys.has('beat_max_freq') && typeof a.beat_max_freq === 'number') eqState.beat_max_freq = a.beat_max_freq;
     const mb = cfg.melbanks || {};
-    if(Array.isArray(mb.max_frequencies) && mb.max_frequencies.length >= 3){
+    if(!dirtyMelbanksKeys.has('max_frequencies') && Array.isArray(mb.max_frequencies) && mb.max_frequencies.length >= 3){
       melbanksState.max_frequencies = mb.max_frequencies.slice(0, 3).map(Number);
     }
-    if(typeof mb.min_frequency === 'number') melbanksState.min_frequency = mb.min_frequency;
-    if(typeof mb.peak_isolation === 'number') melbanksState.peak_isolation = mb.peak_isolation;
+    if(!dirtyMelbanksKeys.has('min_frequency') && typeof mb.min_frequency === 'number') melbanksState.min_frequency = mb.min_frequency;
+    if(!dirtyMelbanksKeys.has('peak_isolation') && typeof mb.peak_isolation === 'number') melbanksState.peak_isolation = mb.peak_isolation;
     syncEqUI();
     if(devRes && devRes.devices){
       const sel = $('#audioDevSel');
@@ -193,12 +195,19 @@ $('#audioDevSel').addEventListener('change', async ()=>{
   }
 });
 
-function scheduleEqSave(){
+function scheduleEqSave(...keys){
+  for(const k of keys) dirtyEqKeys.add(k);
   clearTimeout(eqSaveTimer);
   eqSaveTimer = setTimeout(async ()=>{
     if(!HOST) return;
+    const patch = {};
+    const sendKeys = dirtyEqKeys.size ? [...dirtyEqKeys] : Object.keys(eqState);
+    for(const k of sendKeys){
+      patch[k] = eqState[k];
+      dirtyEqKeys.delete(k);
+    }
     try{
-      await api('/config', {method:'PUT', body:JSON.stringify({audio:eqState})});
+      await api('/config', {method:'PUT', body:JSON.stringify({audio:patch})});
     }catch(e){
       toast('EQ update failed: '+e.message, true);
     }
@@ -208,67 +217,75 @@ function scheduleEqSave(){
 $('#eqEnableBtn').addEventListener('click', ()=>{
   eqState.eq_enabled = !eqState.eq_enabled;
   syncEqUI();
-  scheduleEqSave();
+  scheduleEqSave('eq_enabled');
 });
 
 $('#audioGainSlider')?.addEventListener('input', e => {
   eqState.input_gain = Number(e.target.value);
   syncEqUI();
-  scheduleEqSave();
+  scheduleEqSave('input_gain');
 });
 $('#audioGainSlider')?.addEventListener('dblclick', () => {
   eqState.input_gain = 1.0;
   syncEqUI();
-  scheduleEqSave();
+  scheduleEqSave('input_gain');
 });
 $('#audioAutogainBtn')?.addEventListener('click', () => {
   eqState.autogain = !eqState.autogain;
   syncEqUI();
-  scheduleEqSave();
+  scheduleEqSave('autogain');
 });
 $('#audioAutogainTarget')?.addEventListener('input', e => {
   eqState.autogain_target = Number(e.target.value);
   syncEqUI();
-  scheduleEqSave();
+  scheduleEqSave('autogain_target');
 });
 $('#audioAutogainSpeed')?.addEventListener('input', e => {
   eqState.autogain_speed = Number(e.target.value);
   syncEqUI();
-  scheduleEqSave();
+  scheduleEqSave('autogain_speed');
 });
 $('#audioMinVolSlider')?.addEventListener('input', e => {
   eqState.min_volume = Number(e.target.value);
   syncEqUI();
-  scheduleEqSave();
+  scheduleEqSave('min_volume');
 });
-function scheduleMelbanksSave(){
+function scheduleMelbanksSave(...keys){
+  for(const k of keys) dirtyMelbanksKeys.add(k);
   clearTimeout(melbanksSaveTimer);
   melbanksSaveTimer = setTimeout(async () => {
     if(!HOST) return;
+    const patch = {};
+    const sendKeys = dirtyMelbanksKeys.size ? [...dirtyMelbanksKeys] : Object.keys(melbanksState);
+    for(const k of sendKeys){
+      patch[k] = melbanksState[k];
+      dirtyMelbanksKeys.delete(k);
+    }
     try{
-      await api('/config', {method:'PUT', body:JSON.stringify({melbanks:melbanksState})});
+      await api('/config', {method:'PUT', body:JSON.stringify({melbanks:patch})});
     }catch(e){ toast('Melbanks update failed: ' + e.message, true); }
   }, 80);
 }
-$('#onsetMethodSel')?.addEventListener('change', e => { eqState.onset_method = e.target.value; scheduleEqSave(); });
-$('#pitchMethodSel')?.addEventListener('change', e => { eqState.pitch_method = e.target.value; scheduleEqSave(); });
-$('#pitchTolSlider')?.addEventListener('input', e => { eqState.pitch_tolerance = Number(e.target.value); syncEqUI(); scheduleEqSave(); });
-$('#peakIsolSlider')?.addEventListener('input', e => { melbanksState.peak_isolation = Number(e.target.value); syncEqUI(); scheduleMelbanksSave(); });
-$('#audioDelaySlider')?.addEventListener('input', e => { eqState.delay_ms = Number(e.target.value); syncEqUI(); scheduleEqSave(); });
+$('#onsetMethodSel')?.addEventListener('change', e => { eqState.onset_method = e.target.value; scheduleEqSave('onset_method'); });
+$('#pitchMethodSel')?.addEventListener('change', e => { eqState.pitch_method = e.target.value; scheduleEqSave('pitch_method'); });
+$('#pitchTolSlider')?.addEventListener('input', e => { eqState.pitch_tolerance = Number(e.target.value); syncEqUI(); scheduleEqSave('pitch_tolerance'); });
+$('#peakIsolSlider')?.addEventListener('input', e => { melbanksState.peak_isolation = Number(e.target.value); syncEqUI(); scheduleMelbanksSave('peak_isolation'); });
+$('#audioDelaySlider')?.addEventListener('input', e => { eqState.delay_ms = Number(e.target.value); syncEqUI(); scheduleEqSave('delay_ms'); });
 
 document.querySelectorAll('.eq-slider').forEach(sl=>{
   sl.addEventListener('input', ()=>{
     const band = sl.dataset.band;
     eqState[band] = parseFloat(sl.value);
-    if(!eqState.eq_enabled){ eqState.eq_enabled = true; }
+    const changed = [band];
+    if(!eqState.eq_enabled){ eqState.eq_enabled = true; changed.push('eq_enabled'); }
     syncEqUI();
-    scheduleEqSave();
+    scheduleEqSave(...changed);
   });
   sl.addEventListener('dblclick', ()=>{
     const band = sl.dataset.band;
     eqState[band] = 0;
     syncEqUI();
-    scheduleEqSave();
+    scheduleEqSave(band);
   });
 });
 
@@ -277,9 +294,10 @@ document.querySelectorAll('.eq-pre').forEach(btn=>{
     const p = EQ_PRESETS[btn.dataset.pre];
     if(!p) return;
     Object.assign(eqState, p);
-    eqState.eq_enabled = btn.dataset.pre !== 'flat' ? true : eqState.eq_enabled;
+    const changed = Object.keys(p);
+    if(btn.dataset.pre !== 'flat'){ eqState.eq_enabled = true; changed.push('eq_enabled'); }
     syncEqUI();
-    scheduleEqSave();
+    scheduleEqSave(...changed);
   });
 });
 
@@ -301,8 +319,8 @@ $('#specResetZones')?.addEventListener('click', ()=>{
   eqState.beat_min_freq = 20;
   eqState.beat_max_freq = 100;
   scheduleSpectrumDraw();
-  scheduleMelbanksSave();
-  scheduleEqSave();
+  scheduleMelbanksSave('min_frequency', 'max_frequencies');
+  scheduleEqSave('beat_min_freq', 'beat_max_freq');
   toast('Frequency zones reset');
 });
 
@@ -481,28 +499,37 @@ let hoverZoneIdx = -1;
     }
     let hz = Math.max(20, Math.min(15000, r.hzForX(lx)));
     if(dragZoneIdx === 0){
-      eqState.beat_min_freq = Math.min(hz, (eqState.beat_max_freq || 100) - 10);
+      eqState.beat_min_freq = Math.min(5000, hz, (eqState.beat_max_freq || 100) - 10);
       scheduleSpectrumDraw();
-      scheduleEqSave();
+      scheduleEqSave('beat_min_freq');
     }else if(dragZoneIdx === 1){
-      eqState.beat_max_freq = Math.max((eqState.beat_min_freq || 20) + 10, Math.min(hz, 10000));
+      eqState.beat_max_freq = Math.max(30, (eqState.beat_min_freq || 20) + 10, Math.min(hz, 10000));
       scheduleSpectrumDraw();
-      scheduleEqSave();
+      scheduleEqSave('beat_max_freq');
     }else{
       const nextMax = [...(melbanksState.max_frequencies || [350, 2000, 15000])];
       const minFreq = melbanksState.min_frequency || 20;
       if(dragZoneIdx === 2){
         melbanksState.min_frequency = Math.min(hz, nextMax[0] - 20);
+        melbanksState.max_frequencies = nextMax;
+        scheduleSpectrumDraw();
+        scheduleMelbanksSave('min_frequency');
       }else if(dragZoneIdx === 3){
         nextMax[0] = Math.max(minFreq + 20, Math.min(hz, nextMax[1] - 50));
+        melbanksState.max_frequencies = nextMax;
+        scheduleSpectrumDraw();
+        scheduleMelbanksSave('max_frequencies');
       }else if(dragZoneIdx === 4){
         nextMax[1] = Math.max(nextMax[0] + 50, Math.min(hz, nextMax[2] - 100));
+        melbanksState.max_frequencies = nextMax;
+        scheduleSpectrumDraw();
+        scheduleMelbanksSave('max_frequencies');
       }else if(dragZoneIdx === 5){
-        nextMax[2] = Math.max(nextMax[1] + 100, hz);
+        nextMax[2] = Math.max(10000, nextMax[1] + 100, hz);
+        melbanksState.max_frequencies = nextMax;
+        scheduleSpectrumDraw();
+        scheduleMelbanksSave('max_frequencies');
       }
-      melbanksState.max_frequencies = nextMax;
-      scheduleSpectrumDraw();
-      scheduleMelbanksSave();
     }
   });
   const endDrag = () => { if(dragZoneIdx >= 0){ dragZoneIdx = -1; scheduleSpectrumDraw(); } };
@@ -717,10 +744,19 @@ function drawSpectrum(){
 window.addEventListener('resize', ()=>{ const p=$('#pane-eq'); if(p && !p.hidden) scheduleSpectrumDraw(); });
 
 // blackout & keyboard shortcuts
-let blackoutOn = false, savedBri = 80;
-async function toggleBlackout(){
-  if(guardLock()) return;
-  blackoutOn = !blackoutOn;
+let blackoutOn = false, blackoutBusy = false, savedBri = 80, blackoutBriSnap = {};
+try{
+  const savedBo = JSON.parse(localStorage.getItem('ledfx_blackout_state') || 'null');
+  if(savedBo && typeof savedBo === 'object'){
+    blackoutOn = !!savedBo.on;
+    if(typeof savedBo.savedBri === 'number') savedBri = savedBo.savedBri;
+    if(savedBo.snap && typeof savedBo.snap === 'object') blackoutBriSnap = savedBo.snap;
+  }
+}catch(e){}
+function saveBlackoutState(){
+  try{ localStorage.setItem('ledfx_blackout_state', JSON.stringify({on: blackoutOn, savedBri, snap: blackoutBriSnap})); }catch(e){}
+}
+function syncBlackoutUI(){
   const btn = $('#blackoutBtn');
   if(btn){
     btn.classList.toggle('on', blackoutOn);
@@ -733,17 +769,73 @@ async function toggleBlackout(){
     if(b) b.textContent = blackoutOn ? 'BLACKOUT ON' : 'BLACKOUT';
   }
   if(blackoutOn){
-    savedBri = Number($('#briSlider').value) || 80;
-    $('#briSlider').value = 0; $('#briVal').textContent = '0%';
-  }else{
-    $('#briSlider').value = savedBri; $('#briVal').textContent = savedBri + '%';
+    if($('#briSlider')) $('#briSlider').value = 0;
+    if($('#briVal')) $('#briVal').textContent = '0%';
   }
-  const bVal = (Number($('#briSlider').value) || 0) / 100;
-  for(const id of Object.keys(virtualsCache || {})){
-    if(!virtualsCache[id]?.active) continue;
-    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body:JSON.stringify({config:{brightness:bVal}})}); }catch(e){}
+}
+function syncWhiteoutUI(){
+  const wBtn = $('#stWhiteoutBtn');
+  if(wBtn){
+    wBtn.classList.toggle('on', whiteoutOn);
+    const b = wBtn.querySelector('b');
+    if(b) b.textContent = whiteoutOn ? 'WHITEOUT ON' : 'WHITEOUT';
   }
-  toast(blackoutOn ? 'Blackout ON' : 'Blackout OFF');
+}
+syncBlackoutUI();
+async function applyBlackoutToVirtuals(ids){
+  const targetIds = ids || Object.keys(virtualsCache || {});
+  const errs = [];
+  await Promise.all(targetIds.map(async id => {
+    const v = virtualsCache[id];
+    if(!v?.active) return;
+    if(!(id in blackoutBriSnap)){
+      const curB = typeof v?.effect?.config?.brightness === 'number' ? v.effect.config.brightness : (savedBri / 100);
+      blackoutBriSnap[id] = curB;
+    }
+    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body:JSON.stringify({config:{brightness:0}})}); }
+    catch(e){ errs.push(e.message); }
+  }));
+  saveBlackoutState();
+  return errs;
+}
+async function toggleBlackout(){
+  if(guardLock() || blackoutBusy) return;
+  blackoutBusy = true;
+  try{
+    if(!blackoutOn && whiteoutOn){
+      whiteoutOn = false;
+      whiteoutSnap = null;
+      syncWhiteoutUI();
+    }
+    blackoutOn = !blackoutOn;
+    if(blackoutOn){
+      const curSlider = Number($('#briSlider')?.value);
+      savedBri = curSlider > 0 ? curSlider : (savedBri || 80);
+      blackoutBriSnap = {};
+      syncBlackoutUI();
+      const errs = await applyBlackoutToVirtuals();
+      if(errs.length) toast(`Blackout ON (${errs.length} virtual(s) failed: ${errs[0]})`, true);
+      else toast('Blackout ON');
+    }else{
+      syncBlackoutUI();
+      if($('#briSlider')) $('#briSlider').value = savedBri;
+      if($('#briVal')) $('#briVal').textContent = savedBri + '%';
+      const errs = [];
+      const fallbackBri = savedBri / 100;
+      await Promise.all(Object.keys(virtualsCache || {}).map(async id => {
+        if(!virtualsCache[id]?.active) return;
+        const restoreB = typeof blackoutBriSnap[id] === 'number' ? blackoutBriSnap[id] : fallbackBri;
+        try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body:JSON.stringify({config:{brightness:restoreB}})}); }
+        catch(e){ errs.push(e.message); }
+      }));
+      blackoutBriSnap = {};
+      saveBlackoutState();
+      if(errs.length) toast(`Blackout OFF (${errs.length} virtual(s) failed: ${errs[0]})`, true);
+      else toast('Blackout OFF');
+    }
+  }finally{
+    blackoutBusy = false;
+  }
 }
 $('#blackoutBtn')?.addEventListener('click', toggleBlackout);
 $('#stBlackoutBtn')?.addEventListener('click', toggleBlackout);
@@ -753,26 +845,31 @@ async function toggleWhiteout(){
   if(guardLock() || whiteoutBusy) return;
   whiteoutBusy = true;
   try{
+    const wasBlackout = blackoutOn;
     whiteoutOn = !whiteoutOn;
-    const wBtn = $('#stWhiteoutBtn');
-    if(wBtn){
-      wBtn.classList.toggle('on', whiteoutOn);
-      const b = wBtn.querySelector('b');
-      if(b) b.textContent = whiteoutOn ? 'WHITEOUT ON' : 'WHITEOUT';
-    }
+    syncWhiteoutUI();
     if(whiteoutOn){
-      if(blackoutOn){
+      if(wasBlackout){
         blackoutOn = false;
-        const bBtn = $('#blackoutBtn');
-        if(bBtn){ bBtn.classList.remove('on'); bBtn.textContent = 'Blackout OFF'; }
-        const bigB = $('#stBlackoutBtn');
-        if(bigB){ bigB.classList.remove('on'); const b = bigB.querySelector('b'); if(b) b.textContent = 'BLACKOUT'; }
+        syncBlackoutUI();
+        if($('#briSlider')) $('#briSlider').value = savedBri;
+        if($('#briVal')) $('#briVal').textContent = savedBri + '%';
       }
       let latest = virtualsCache;
       try{ const d = await api('/virtuals'); latest = d.virtuals || d; }catch(e){}
       const ids = Object.keys(latest || {}).filter(id => latest[id]?.active);
       whiteoutSnap = {};
-      for(const id of ids) whiteoutSnap[id] = JSON.parse(JSON.stringify(latest[id]));
+      for(const id of ids){
+        const snap = JSON.parse(JSON.stringify(latest[id]));
+        if(wasBlackout && snap?.effect?.config && typeof blackoutBriSnap[id] === 'number'){
+          snap.effect.config.brightness = blackoutBriSnap[id];
+        }
+        whiteoutSnap[id] = snap;
+      }
+      if(wasBlackout){
+        blackoutBriSnap = {};
+        saveBlackoutState();
+      }
       await Promise.all(ids.map(id => api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:'singleColor', config:{color:'#ffffff', brightness:1.0}})}).catch(()=>{})));
     }else if(whiteoutSnap){
       await Promise.all(Object.entries(whiteoutSnap).map(([id, v]) => {

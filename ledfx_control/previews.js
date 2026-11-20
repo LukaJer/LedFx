@@ -117,36 +117,45 @@ function scheduleTubePreview(){
   });
 }
 
-const deckOutMode = {}, deckOutSnapshot = {};
+const deckOutMode = {}, deckOutSnapshot = {}, deckOutBusy = {};
 async function toggleDeckOutMode(deckId, mode, card){
-  const cur = deckOutMode[deckId] || '';
-  const ids = targets(deckId).filter(vid => virtualsCache[vid]?.active);
-  if(cur === mode){
-    deckOutMode[deckId] = '';
-    const snap = deckOutSnapshot[deckId];
-    if(snap){
-      await Promise.all(Object.entries(snap).map(([vid, v]) => {
-        if(v?.active && v?.effect?.type){
-          return api(`/virtuals/${vid}/effects`, {method:'POST', body: JSON.stringify({type: v.effect.type, config: v.effect.config || {}})}).catch(()=>{});
-        }
-        return Promise.resolve();
-      }));
-      delete deckOutSnapshot[deckId];
-    }
-  }else{
-    if(!cur){
+  if(guardLock() || deckOutBusy[deckId]) return;
+  deckOutBusy[deckId] = true;
+  try{
+    const cur = deckOutMode[deckId] || '';
+    if(cur === mode){
+      deckOutMode[deckId] = '';
+      const snap = deckOutSnapshot[deckId];
+      if(snap){
+        await Promise.all(Object.entries(snap).map(([vid, v]) => {
+          if(v?.active && v?.effect?.type){
+            return api(`/virtuals/${vid}/effects`, {method:'POST', body: JSON.stringify({type: v.effect.type, config: v.effect.config || {}})}).catch(()=>{});
+          }
+          return Promise.resolve();
+        }));
+        delete deckOutSnapshot[deckId];
+      }
+    }else{
       let latest = virtualsCache;
       try{ const d = await api('/virtuals'); latest = d.virtuals || d; }catch(e){}
-      const snap = {};
-      for(const vid of ids) if(latest[vid]) snap[vid] = JSON.parse(JSON.stringify(latest[vid]));
-      deckOutSnapshot[deckId] = snap;
+      const deck = layoutsCache[deckId];
+      const deckVirts = deck?.virtuals && Object.keys(deck.virtuals).length ? Object.keys(deck.virtuals) : targets(deckId);
+      const ids = deckVirts.filter(vid => latest[vid]?.active);
+      if(!cur){
+        const snap = {};
+        for(const vid of ids) if(latest[vid]) snap[vid] = JSON.parse(JSON.stringify(latest[vid]));
+        deckOutSnapshot[deckId] = snap;
+      }
+      deckOutMode[deckId] = mode;
+      const col = mode === 'white' ? '#ffffff' : '#000000';
+      await Promise.all(ids.map(vid => api(`/virtuals/${vid}/effects`, {method:'POST', body: JSON.stringify({type:'singleColor', config:{color: col, brightness: 1.0}})}).catch(()=>{})));
     }
-    deckOutMode[deckId] = mode;
-    const col = mode === 'white' ? '#ffffff' : '#000000';
-    await Promise.all(ids.map(vid => api(`/virtuals/${vid}/effects`, {method:'POST', body: JSON.stringify({type:'singleColor', config:{color: col, brightness: 1.0}})}).catch(()=>{})));
+    const activeMode = deckOutMode[deckId] || '';
+    card?.querySelectorAll('[data-deck-out]').forEach(b => b.classList.toggle('on', b.dataset.deckOut === activeMode));
+    await loadVirtuals();
+  }finally{
+    deckOutBusy[deckId] = false;
   }
-  const activeMode = deckOutMode[deckId] || '';
-  card?.querySelectorAll('[data-deck-out]').forEach(b => b.classList.toggle('on', b.dataset.deckOut === activeMode));
 }
 
 let multiPreviewKey = '', multiCardRefs = {};
@@ -161,6 +170,7 @@ function drawTubePreview(){
     const key = enabledLayouts.map(([id, p]) => `${id}:${p.name}:${p.scene_tag||''}`).join('|') + '::' + Object.keys(scenesCache).map(k => `${k}=${scenesCache[k]?.scene_tags||''}`).join(',');
     if(key !== multiPreviewKey){
       multiPreviewKey = key;
+      if(typeof cancelActiveHits === 'function') cancelActiveHits();
       multiGrid.innerHTML = enabledLayouts.map(([id, p]) => {
         const zIds = Object.keys(scenesCache).filter(sid => !isSceneHidden(sid) && sceneMatchesLayoutFor(scenesCache[sid], id));
         const activeIds = zIds.filter(sid => isSceneLiveActive(scenesCache[sid]));
@@ -216,6 +226,7 @@ function drawTubePreview(){
         const scCol = !!deckCollapsed[id + ':scenes'];
         const palCol = !!deckCollapsed[id + ':pal'];
         const outMode = deckOutMode[id] || '';
+        const ctl = typeof getDeckCardCtl === 'function' ? getDeckCardCtl(id) : { bri: 80, spd: 50, sns: 50 };
         return `
         <div class="lprev-card" data-deck="${escHtml(id)}">
           <div class="lprev-top">
@@ -224,7 +235,7 @@ function drawTubePreview(){
                 <span class="lprev-title" data-open-tab title="Click to open ${escHtml(p.name || id)} tab">${escHtml(p.name || id)}</span>
                 <span class="status" data-meta></span>
               </div>
-              <div class="lprev-bri"><input type="range" data-ctl="bri" min="0" max="100" value="80" title="Layout Brightness"><span class="lprev-bri-val" data-val="bri">80%</span></div>
+              <div class="lprev-bri"><input type="range" data-ctl="bri" min="0" max="100" value="${ctl.bri}" title="Layout Brightness"><span class="lprev-bri-val" data-val="bri">${ctl.bri}%</span></div>
             </div>
             <div class="lprev-out-btns">
               <button type="button" class="blackout-big ${outMode==='black'?'on':''}" data-deck-out="black" title="Blackout this layout">Blackout</button>
@@ -283,8 +294,8 @@ function drawTubePreview(){
           </div>
           <div class="lprev-sub">Controls</div>
           <div class="lprev-sliders">
-            <div class="gcard"><label><span>Speed</span><span data-val="spd">50%</span></label><input type="range" data-ctl="spd" min="0" max="100" value="50"></div>
-            <div class="gcard"><label><span>Sens</span><span data-val="sns">50%</span></label><input type="range" data-ctl="sns" min="0" max="100" value="50"></div>
+            <div class="gcard"><label><span>Speed</span><span data-val="spd">${ctl.spd}%</span></label><input type="range" data-ctl="spd" min="0" max="100" value="${ctl.spd}"></div>
+            <div class="gcard"><label><span>Sens</span><span data-val="sns">${ctl.sns}%</span></label><input type="range" data-ctl="sns" min="0" max="100" value="${ctl.sns}"></div>
           </div>
           <div class="lprev-sub">Hits</div>
           <div class="lprev-hits">${hitsHtml}</div>
@@ -434,10 +445,28 @@ function drawTubePreview(){
           const lbl = card.querySelector('[data-val="spd"]'); if(lbl) lbl.textContent = v + '%';
           clearTimeout(zSpdT); zSpdT = setTimeout(() => setSpeed(v / 100, deckId), 150);
         });
+        card.querySelector('[data-ctl="spd"]')?.addEventListener('dblclick', e => {
+          clearTimeout(zSpdT);
+          const sid = lastDeckScene[deckId];
+          if(sid && sceneCtlMemory[sid]){ delete sceneCtlMemory[sid].spd; saveSceneCtlMemory(); }
+          const { spd } = inferSceneCtlPct(sid);
+          e.target.value = spd;
+          const lbl = card.querySelector('[data-val="spd"]'); if(lbl) lbl.textContent = spd + '%';
+          setSpeed(spd / 100, deckId, true);
+        });
         card.querySelector('[data-ctl="sns"]')?.addEventListener('input', e => {
           const v = Number(e.target.value);
           const lbl = card.querySelector('[data-val="sns"]'); if(lbl) lbl.textContent = v + '%';
           clearTimeout(zSnsT); zSnsT = setTimeout(() => setSensitivity(v / 100, deckId), 150);
+        });
+        card.querySelector('[data-ctl="sns"]')?.addEventListener('dblclick', e => {
+          clearTimeout(zSnsT);
+          const sid = lastDeckScene[deckId];
+          if(sid && sceneCtlMemory[sid]){ delete sceneCtlMemory[sid].sns; saveSceneCtlMemory(); }
+          const { sns } = inferSceneCtlPct(sid);
+          e.target.value = sns;
+          const lbl = card.querySelector('[data-val="sns"]'); if(lbl) lbl.textContent = sns + '%';
+          setSensitivity(sns / 100, deckId, true);
         });
         card.querySelector('[data-scyc-btn]')?.addEventListener('click', e => {
           e.stopPropagation();

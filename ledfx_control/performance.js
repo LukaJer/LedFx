@@ -173,9 +173,25 @@ $('#speedSlider').addEventListener('input', e=>{
   $('#speedVal').textContent = e.target.value+'%';
   clearTimeout(speedT); speedT = setTimeout(()=>setSpeed(e.target.value/100), 150);
 });
+$('#speedSlider').addEventListener('dblclick', ()=>{
+  clearTimeout(speedT);
+  const sid = activeDeckId && lastDeckScene[activeDeckId] ? lastDeckScene[activeDeckId] : lastScene;
+  if(sid && sceneCtlMemory[sid]){ delete sceneCtlMemory[sid].spd; saveSceneCtlMemory(); }
+  const { spd } = inferSceneCtlPct(sid);
+  $('#speedSlider').value = spd; $('#speedVal').textContent = spd + '%';
+  setSpeed(spd / 100, undefined, true);
+});
 $('#sensSlider').addEventListener('input', e=>{
   $('#sensVal').textContent = e.target.value+'%';
   clearTimeout(sensT); sensT = setTimeout(()=>setSensitivity(e.target.value/100), 150);
+});
+$('#sensSlider').addEventListener('dblclick', ()=>{
+  clearTimeout(sensT);
+  const sid = activeDeckId && lastDeckScene[activeDeckId] ? lastDeckScene[activeDeckId] : lastScene;
+  if(sid && sceneCtlMemory[sid]){ delete sceneCtlMemory[sid].sns; saveSceneCtlMemory(); }
+  const { sns } = inferSceneCtlPct(sid);
+  $('#sensSlider').value = sns; $('#sensVal').textContent = sns + '%';
+  setSensitivity(sns / 100, undefined, true);
 });
 function scaleAroundDefault(prop, val, inv){
   if(!prop || typeof prop !== 'object') return null;
@@ -235,6 +251,83 @@ try{ sceneCtlMemory = JSON.parse(localStorage.getItem('ledfx_scene_ctl_memory') 
 function saveSceneCtlMemory(){
   try{ localStorage.setItem('ledfx_scene_ctl_memory', JSON.stringify(sceneCtlMemory)); }catch(e){}
 }
+function unscaleAroundDefault(prop, curVal, inv){
+  if(!prop || typeof prop !== 'object' || typeof curVal !== 'number') return null;
+  const min = typeof prop.minimum === 'number' ? prop.minimum : 0;
+  const max = typeof prop.maximum === 'number' ? prop.maximum : 1;
+  if(max <= min) return null;
+  let def = typeof prop.default === 'number' ? prop.default : (min + (max - min) * 0.5);
+  def = Math.max(min, Math.min(max, def));
+  const clamped = Math.max(min, Math.min(max, curVal));
+  let u;
+  if(clamped <= def){
+    const denom = Math.max(1e-6, def - min);
+    u = 0.5 * Math.pow((clamped - min) / denom, 1 / 1.35);
+  }else{
+    const denom = Math.max(1e-6, max - def);
+    u = 0.5 + 0.5 * Math.pow((clamped - def) / denom, 1 / 1.5);
+  }
+  const val = inv ? (1 - u) : u;
+  return Math.max(0, Math.min(100, Math.round(val * 100)));
+}
+const deckCardCtl = {};
+function getDeckCardCtl(deckId){
+  if(!deckCardCtl[deckId]) deckCardCtl[deckId] = { bri: 80, spd: 50, sns: 50 };
+  return deckCardCtl[deckId];
+}
+const SPEED_INFER_KEYS = [
+  ['step_period', true], ['scroll_time', true],
+  ['speed', false], ['scroll_per_sec', false], ['gradient_speed', false], ['roll_speed', false],
+  ['base_game_speed', false], ['add_speed', false],
+  ['strobe_decay', true], ['decay', true], ['strobe_decay_rate', true], ['gradient_roll', false],
+];
+const SENS_INFER_KEYS = [
+  ['reactivity', false], ['sensitivity', false], ['multiplier', false], ['power_multiplier', false],
+  ['spin_multiplier', false], ['size_multiplication', false], ['speed_multiplication', false],
+  ['lows_sensitivity', true], ['mids_sensitivity', true], ['high_sensitivity', true],
+  ['threshold', true], ['threshold_lows', true], ['threshold_mids', true],
+  ['sparkles_threshold', true], ['strobe_threshold', true],
+];
+function inferSceneCtlPct(sceneId){
+  const sc = scenesCache[sceneId];
+  if(!sc || !sc.virtuals) return { spd: 50, sns: 50 };
+  let spd = null, sns = null;
+  for(const eff of Object.values(sc.virtuals)){
+    if(!eff || !eff.type) continue;
+    const props = effectsSchema[eff.type]?.schema?.properties || {};
+    const cfg = eff.config || {};
+    if(spd === null){
+      for(const [k, inv] of SPEED_INFER_KEYS){
+        if(typeof cfg[k] === 'number' && props[k]){
+          const p = unscaleAroundDefault(props[k], cfg[k], inv);
+          if(p !== null){ spd = p; break; }
+        }
+      }
+    }
+    if(sns === null){
+      for(const [k, inv] of SENS_INFER_KEYS){
+        if(typeof cfg[k] === 'number' && props[k]){
+          const p = unscaleAroundDefault(props[k], cfg[k], inv);
+          if(p !== null){ sns = p; break; }
+        }
+      }
+    }
+    if(spd !== null && sns !== null) break;
+  }
+  return { spd: spd ?? 50, sns: sns ?? 50 };
+}
+function syncMainCtlSliders(){
+  const sid = activeDeckId ? lastDeckScene[activeDeckId] : lastScene;
+  const dc = activeDeckId ? getDeckCardCtl(activeDeckId) : null;
+  const mem = sid ? (sceneCtlMemory[sid] || {}) : {};
+  const inferred = sid ? inferSceneCtlPct(sid) : { spd: 50, sns: 50 };
+  const spdPct = mem.spd !== undefined ? mem.spd : (dc ? dc.spd : inferred.spd);
+  const snsPct = mem.sns !== undefined ? mem.sns : (dc ? dc.sns : inferred.sns);
+  if($('#speedSlider')) $('#speedSlider').value = spdPct;
+  if($('#speedVal')) $('#speedVal').textContent = spdPct + '%';
+  if($('#sensSlider')) $('#sensSlider').value = snsPct;
+  if($('#sensVal')) $('#sensVal').textContent = snsPct + '%';
+}
 function recordSceneCtl(key, pct, zoneOverride){
   const sid = (zoneOverride && lastDeckScene[zoneOverride]) ? lastDeckScene[zoneOverride] : (activeDeckId && lastDeckScene[activeDeckId] ? lastDeckScene[activeDeckId] : lastScene);
   if(!sid || sid === '—' || !scenesCache[sid]) return;
@@ -244,15 +337,21 @@ function recordSceneCtl(key, pct, zoneOverride){
 }
 async function restoreSceneCtl(sceneId, deckId){
   const mem = sceneCtlMemory[sceneId] || {};
-  const spdPct = mem.spd !== undefined ? mem.spd : 50;
-  const snsPct = mem.sns !== undefined ? mem.sns : 50;
+  const inferred = inferSceneCtlPct(sceneId);
+  const spdPct = mem.spd !== undefined ? mem.spd : inferred.spd;
+  const snsPct = mem.sns !== undefined ? mem.sns : inferred.sns;
+  const targetDeck = deckId || activeDeckId;
+  if(targetDeck){
+    const dc = getDeckCardCtl(targetDeck);
+    dc.spd = spdPct;
+    dc.sns = snsPct;
+  }
   if(!deckId || deckId === activeDeckId){
     if($('#speedSlider')) $('#speedSlider').value = spdPct;
     if($('#speedVal')) $('#speedVal').textContent = spdPct + '%';
     if($('#sensSlider')) $('#sensSlider').value = snsPct;
     if($('#sensVal')) $('#sensVal').textContent = snsPct + '%';
   }
-  const targetDeck = deckId || activeDeckId;
   if(targetDeck){
     const card = document.querySelector(`.lprev-card[data-deck="${CSS.escape(targetDeck)}"]`);
     if(card){
@@ -269,6 +368,8 @@ async function restoreSceneCtl(sceneId, deckId){
 }
 
 async function setSpeed(val, zoneOverride, skipRecord){
+  const z = zoneOverride || activeDeckId || '';
+  if(z) getDeckCardCtl(z).spd = Math.round(val * 100);
   if(!skipRecord) recordSceneCtl('spd', val * 100, zoneOverride);
   for(const id of targets(zoneOverride)){
     const v = virtualsCache[id];
@@ -279,6 +380,8 @@ async function setSpeed(val, zoneOverride, skipRecord){
   }
 }
 async function setZoneBrightness(val, zoneOverride){
+  const z = zoneOverride || activeDeckId || '';
+  if(z) getDeckCardCtl(z).bri = Math.round(val * 100);
   for(const id of targets(zoneOverride)){
     const v = virtualsCache[id];
     if(!v?.effect?.type) continue;
@@ -286,9 +389,17 @@ async function setZoneBrightness(val, zoneOverride){
   }
 }
 async function setSensitivity(val, zoneOverride, skipRecord){
+  const z = zoneOverride || activeDeckId || '';
+  if(z) getDeckCardCtl(z).sns = Math.round(val * 100);
   if(!skipRecord) recordSceneCtl('sns', val * 100, zoneOverride);
-  const min_volume = Number((Math.pow(1 - val, 1.5) * 0.25).toFixed(4));
-  const jobs = [api('/config', {method:'PUT', body: JSON.stringify({audio:{min_volume}})}).catch(e=>{ toast('Sensitivity update failed: '+e.message, true); })];
+  const jobs = [];
+  if(!zoneOverride && !activeDeckId && !mainTargetZone && S.target === 'All'){
+    const min_volume = Number((Math.pow(1 - val, 1.5) * 0.25).toFixed(4));
+    if(typeof eqState !== 'undefined') eqState.min_volume = min_volume;
+    if($('#audioMinVolSlider')) $('#audioMinVolSlider').value = min_volume;
+    if($('#audioMinVolVal')) $('#audioMinVolVal').textContent = min_volume.toFixed(2);
+    jobs.push(api('/config', {method:'PUT', body: JSON.stringify({audio:{min_volume}})}).catch(e=>{ toast('Sensitivity update failed: '+e.message, true); }));
+  }
   for(const id of targets(zoneOverride)){
     const v = virtualsCache[id];
     if(!v?.effect?.type) continue;
@@ -310,7 +421,17 @@ const HITS = [
   {name:'Palette Punch', kind:'punch'},
   {name:'Build', kind:'build'},
 ];
-let strobeInterval=null, snapshot=null;
+const hitSnapshots = {}, hitIntervals = {}, hitPressTokens = {};
+function hitKey(h, zoneOverride){ return `${zoneOverride || 'main'}:${h.name}`; }
+function cancelActiveHits(){
+  for(const btn of document.querySelectorAll('.hit-btn.active')){
+    btn.dispatchEvent(new PointerEvent('pointercancel', {bubbles:false}));
+  }
+  for(const k of Object.keys(hitIntervals)){
+    clearInterval(hitIntervals[k]);
+    delete hitIntervals[k];
+  }
+}
 function renderHits(){
   $('#hits').innerHTML = HITS.map((h,i)=>`<button class="hit-btn" data-i="${i}">${h.name}</button>`).join('');
   document.querySelectorAll('.hit-btn').forEach(btn=>{
@@ -327,57 +448,74 @@ async function tool(body, method, zoneOverride){
   const ids = targets(zoneOverride).filter(id=>virtualsCache[id]?.active || virtualsCache[id]?.effect?.type);
   await Promise.all(ids.map(id=>api(`/virtuals_tools/${id}`, {method:m, body: JSON.stringify(body)}).catch(()=>{})));
 }
-async function takeSnapshot(){
-  try{ const d = await api('/virtuals'); snapshot = d.virtuals || d; }catch(e){ snapshot = virtualsCache; }
+async function takeSnapshot(key){
+  let raw;
+  try{ const d = await api('/virtuals'); raw = d.virtuals || d; }catch(e){ raw = virtualsCache; }
+  hitSnapshots[key] = JSON.parse(JSON.stringify(raw || {}));
 }
-async function restoreSnapshot(zoneOverride){
-  if(!snapshot) return;
+async function restoreSnapshot(key, zoneOverride){
+  const snap = hitSnapshots[key];
+  delete hitSnapshots[key];
+  if(!snap) return;
   const allow = new Set(targets(zoneOverride));
   const jobs = [];
-  for(const id of Object.keys(snapshot)){
+  for(const id of Object.keys(snap)){
     if(!allow.has(id)) continue;
-    const v = snapshot[id];
-    if(v.active && v.effect && v.effect.type){
+    const v = snap[id];
+    if(v?.active && v.effect && v.effect.type){
       jobs.push(api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:v.effect.type, config:v.effect.config||{}})}).catch(()=>{}));
+    }else if(v && !v.active){
+      jobs.push(api(`/virtuals/${id}`, {method:'PUT', body: JSON.stringify({active:false})}).catch(()=>{}));
     }
   }
   await Promise.all(jobs);
 }
+function readHitSpeed(btn){
+  const cardSpd = btn?.closest('.lprev-card')?.querySelector('[data-ctl="spd"]');
+  return Number((cardSpd || $('#speedSlider'))?.value || 50) / 100;
+}
 async function hitDown(h, btn, zoneOverride){
+  const key = hitKey(h, zoneOverride);
+  const tok = (hitPressTokens[key] = (hitPressTokens[key] || 0) + 1);
   btn.classList.add('active');
   if(h.kind==='oneshot'||h.kind==='punch'){
     await quantWait(S.qnt);
-    if(!btn.classList.contains('active')) return;
+    if(hitPressTokens[key] !== tok || !btn.classList.contains('active')) return;
   }
   try{
     if(h.kind==='oneshot'){ const m=INT[S.int]; await tool({tool:'oneshot', color:h.color, ramp:h.ramp, hold:Math.round(h.hold*m), fade:Math.round(h.fade*m)}, undefined, zoneOverride); }
     else if(h.kind==='punch'){ const c = curPalette.colors[2]; const m=INT[S.int]; await tool({tool:'oneshot', color:c, ramp:10, hold:Math.round(120*m), fade:Math.round(250*m)}, undefined, zoneOverride); }
     else if(h.kind==='build'){
-      if(buildT){ clearInterval(buildT); buildT=null; }
-      let v=+$('#speedSlider').value/100;
-      buildT=setInterval(()=>{ v=Math.min(1,v+.05); setSpeed(v, zoneOverride); },250);
+      if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
+      let v = readHitSpeed(btn);
+      hitIntervals[key] = setInterval(()=>{ v=Math.min(1,v+.05); setSpeed(v, zoneOverride, true); },250);
     }
     else if(h.kind==='hold'){
-      await takeSnapshot();
-      if(!btn.classList.contains('active')) return;
+      await takeSnapshot(key);
+      if(hitPressTokens[key] !== tok || !btn.classList.contains('active')){ delete hitSnapshots[key]; return; }
       const col = h.color === 'black' ? '#000000' : (h.color === 'white' ? '#ffffff' : h.color);
       const ids = targets(zoneOverride).filter(id => virtualsCache[id]?.active || virtualsCache[id]?.effect?.type);
       await Promise.all(ids.map(id => api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:'singleColor', config:{color: col, brightness: 1.0}})}).catch(()=>{})));
     }
     else if(h.kind==='strobe'){
-      await takeSnapshot();
-      if(!btn.classList.contains('active')) return;
-      if(strobeInterval){ clearInterval(strobeInterval); strobeInterval=null; }
-      strobeInterval = setInterval(()=>tool({tool:'oneshot', color:'white', ramp:1, hold:30, fade:30}, undefined, zoneOverride).catch(()=>{}), S.guard?260:110);
+      if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
+      hitIntervals[key] = setInterval(()=>tool({tool:'oneshot', color:'white', ramp:1, hold:30, fade:30}, undefined, zoneOverride).catch(()=>{}), S.guard?260:110);
     }
   }catch(e){ toast(h.name+' failed: '+e.message, true); }
 }
 async function hitUp(h, btn, zoneOverride){
   if(!btn.classList.contains('active')) return;
+  const key = hitKey(h, zoneOverride);
+  hitPressTokens[key] = (hitPressTokens[key] || 0) + 1;
   btn.classList.remove('active');
-  if(h.kind==='build'){ if(buildT){ clearInterval(buildT); buildT=null; } setSpeed(+$('#speedSlider').value/100, zoneOverride); }
-  if(h.kind==='hold'){ await restoreSnapshot(zoneOverride); }
-  if(h.kind==='strobe'){ if(strobeInterval){ clearInterval(strobeInterval); strobeInterval=null; } await restoreSnapshot(zoneOverride); }
+  if(h.kind==='build'){
+    if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
+    setSpeed(readHitSpeed(btn), zoneOverride, true);
+  }
+  if(h.kind==='hold'){ await restoreSnapshot(key, zoneOverride); }
+  if(h.kind==='strobe'){
+    if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
+  }
 }
 
 renderHits();
@@ -561,7 +699,11 @@ function syncBpmModeUI(){
 function tapBpm(){
   autoBpm = false; syncBpmModeUI();
   const now=Date.now(); if(taps.length&&now-taps[taps.length-1]>2000) taps=[]; taps.push(now); if(taps.length>6) taps.shift(); beatRef=now;
-  if(taps.length>1){ bpm=Math.round(60000/((taps[taps.length-1]-taps[0])/(taps.length-1))); updateStatus(); }
+  if(taps.length>1){
+    const raw = Math.round(60000/((taps[taps.length-1]-taps[0])/(taps.length-1)));
+    bpm = Math.max(30, Math.min(240, raw));
+    updateStatus();
+  }
 }
 $('#autoBpmBtn')?.addEventListener('click', e => {
   e.stopPropagation();
@@ -569,6 +711,7 @@ $('#autoBpmBtn')?.addEventListener('click', e => {
   syncBpmModeUI();
   toast(autoBpm ? 'Auto BPM ON' : 'Manual Tap BPM');
 });
+$('#autoBpmBtn')?.addEventListener('keydown', e => { e.stopPropagation(); });
 $('#stBpm')?.addEventListener('click', e => {
   e.stopPropagation();
   const inp = $('#stBpmInput'), lbl = $('#stBpm');
@@ -595,6 +738,7 @@ function commitManualBpm(){
 $('#stBpmInput')?.addEventListener('click', e => e.stopPropagation());
 $('#stBpmInput')?.addEventListener('blur', commitManualBpm);
 $('#stBpmInput')?.addEventListener('keydown', e => {
+  e.stopPropagation();
   if(e.key === 'Enter'){ e.preventDefault(); commitManualBpm(); }
   else if(e.key === 'Escape'){
     e.preventDefault();
@@ -605,9 +749,12 @@ $('#stBpmInput')?.addEventListener('keydown', e => {
 });
 $('#tapBtn').addEventListener('click', tapBpm);
 $('#stBpmBox')?.addEventListener('click', tapBpm);
-$('#stBpmBox')?.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tapBpm(); } });
-$('#bpmDn').addEventListener('click',()=>{ autoBpm=false; syncBpmModeUI(); if(bpm){bpm--; updateStatus();} });
-$('#bpmUp').addEventListener('click',()=>{ autoBpm=false; syncBpmModeUI(); if(bpm){bpm++; updateStatus();} });
+$('#stBpmBox')?.addEventListener('keydown', e => {
+  if(e.target !== e.currentTarget) return;
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tapBpm(); }
+});
+$('#bpmDn').addEventListener('click',()=>{ autoBpm=false; syncBpmModeUI(); bpm = Math.max(30, (bpm || 120) - 1); updateStatus(); });
+$('#bpmUp').addEventListener('click',()=>{ autoBpm=false; syncBpmModeUI(); bpm = Math.min(240, (bpm || 120) + 1); updateStatus(); });
 // brightness
 let briT; $('#briSlider').addEventListener('input',e=>{ $('#briVal').textContent=e.target.value+'%'; clearTimeout(briT); briT=setTimeout(async()=>{
   for(const id of targets()){ if(!virtualsCache[id].active) continue; try{ await api(`/virtuals/${id}/effects`,{method:'PUT',body:JSON.stringify({config:{brightness:e.target.value/100}})}); }catch(err){} } },150); });
@@ -1155,11 +1302,11 @@ function saveSceneCyclePool(){
   if(!sceneCycleSelected) return;
   try{ localStorage.setItem('ledfx_scene_cycle_pool', JSON.stringify([...sceneCycleSelected])); }catch(e){}
 }
-let sceneCycleOn = false, sceneCycleIdx = 0, sceneCycleNextAt = 0;
+let sceneCycleOn = false, sceneCycleIdx = 0, sceneCycleNextAt = 0, sceneCycleBusy = false;
 const deckSceneCycleState = {};
 function getDeckSceneCycle(deckId){
   if(!deckSceneCycleState[deckId]){
-    deckSceneCycleState[deckId] = { on: false, div: '16b', rand: false, idx: 0, nextAt: 0, pool: null };
+    deckSceneCycleState[deckId] = { on: false, div: '16b', rand: false, idx: 0, nextAt: 0, busy: false, pool: null };
   }
   return deckSceneCycleState[deckId];
 }
@@ -1169,69 +1316,112 @@ function sceneIntervalMs(val){
   const beats = Number(s.replace('b','')) || 16;
   return (60000 / (bpm || 120)) * beats;
 }
+function getSceneCycleTargetIds(deckId){
+  const all = Object.keys(scenesCache || {});
+  if(deckId){
+    return all.filter(id => !isSceneHidden(id) && sceneMatchesLayoutFor(scenesCache[id], deckId));
+  }
+  return all.filter(id => !isSceneHidden(id) && sceneMatchesLayout(scenesCache[id]));
+}
 function syncSceneCycleUI(){
+  const scyc = activeDeckId ? getDeckSceneCycle(activeDeckId) : null;
+  const on = scyc ? scyc.on : sceneCycleOn;
+  const div = scyc ? scyc.div : ($('#sceneCycleDiv')?.value || '16b');
+  const rand = scyc ? !!scyc.rand : !!$('#sceneCycleRand')?.checked;
+  const pool = scyc ? scyc.pool : sceneCycleSelected;
+  const nextAt = scyc ? scyc.nextAt : sceneCycleNextAt;
+  if(scyc){
+    if($('#sceneCycleDiv')) $('#sceneCycleDiv').value = div;
+    if($('#sceneCycleRand')) $('#sceneCycleRand').checked = rand;
+  }
   const btn = $('#sceneCycleBtn');
   if(btn){
-    btn.classList.toggle('on', sceneCycleOn);
-    btn.textContent = sceneCycleOn ? 'Scene Cycle ON' : 'Scene Cycle OFF';
+    btn.classList.toggle('on', on);
+    btn.textContent = on ? 'Scene Cycle ON' : 'Scene Cycle OFF';
   }
   const apBtn = $('#apBtn');
   if(apBtn){
-    apBtn.classList.toggle('on', sceneCycleOn);
-    apBtn.textContent = 'Auto-pilot ' + (sceneCycleOn ? 'ON' : 'OFF');
+    apBtn.classList.toggle('on', on);
+    apBtn.textContent = 'Auto-pilot ' + (on ? 'ON' : 'OFF');
   }
   const info = $('#sceneCycleInfo');
   if(info){
-    const visIds = [...document.querySelectorAll('#scenes .scene')].map(b => b.dataset.id).filter(Boolean);
-    const poolCnt = sceneCycleSelected ? visIds.filter(id => sceneCycleSelected.has(id)).length : visIds.length;
-    if(!sceneCycleOn){ info.textContent = `${poolCnt} selected`; }
+    const visIds = getSceneCycleTargetIds(activeDeckId);
+    const poolCnt = pool ? visIds.filter(id => pool.has(id)).length : visIds.length;
+    if(!on){ info.textContent = `${poolCnt} selected`; }
     else{
-      const divLbl = $('#sceneCycleDiv')?.selectedOptions?.[0]?.textContent || '16b';
-      const left = Math.max(0, Math.ceil((sceneCycleNextAt - Date.now()) / 1000));
+      const divLbl = $('#sceneCycleDiv')?.selectedOptions?.[0]?.textContent || div;
+      const left = Math.max(0, Math.ceil((nextAt - Date.now()) / 1000));
       info.textContent = `${divLbl} · ${poolCnt} selected · ${left}s`;
     }
   }
 }
 function toggleSceneCycle(){
-  sceneCycleOn = !sceneCycleOn;
-  sceneCycleNextAt = Date.now() + sceneIntervalMs($('#sceneCycleDiv')?.value);
+  if(activeDeckId){
+    const scyc = getDeckSceneCycle(activeDeckId);
+    scyc.on = !scyc.on;
+    scyc.nextAt = Date.now() + sceneIntervalMs(scyc.div);
+    multiPreviewKey = '';
+  }else{
+    sceneCycleOn = !sceneCycleOn;
+    sceneCycleNextAt = Date.now() + sceneIntervalMs($('#sceneCycleDiv')?.value);
+  }
   syncSceneCycleUI();
 }
 function stepSceneCycler(){
-  if(S.lock) return;
-  let ids = [...document.querySelectorAll('#scenes .scene')].map(b => b.dataset.id).filter(Boolean);
+  if(S.lock || sceneCycleBusy) return;
+  let ids = getSceneCycleTargetIds('');
   if(sceneCycleSelected) ids = ids.filter(id => sceneCycleSelected.has(id));
   if(!ids.length) return;
-  const rand = $('#sceneCycleRand')?.checked;
-  sceneCycleIdx = rand ? Math.floor(Math.random() * ids.length) : (sceneCycleIdx + 1) % ids.length;
-  activateScene(ids[sceneCycleIdx]);
+  const rand = !!$('#sceneCycleRand')?.checked;
+  sceneCycleIdx = pickNextIdx(ids.length, sceneCycleIdx, rand);
+  sceneCycleBusy = true;
+  Promise.resolve(activateScene(ids[sceneCycleIdx])).finally(() => { sceneCycleBusy = false; });
 }
 function stepDeckSceneCycler(deckId){
-  if(S.lock) return;
   const scyc = getDeckSceneCycle(deckId);
-  const deck = layoutsCache[deckId];
-  const deckTag = (deck?.scene_tag || '').trim().toLowerCase();
-  let ids = Object.keys(scenesCache || {});
-  if(deckTag){
-    const tagged = ids.filter(id => String(scenesCache[id]?.scene_tags || scenesCache[id]?.tags || '').toLowerCase().split(',').map(s=>s.trim()).includes(deckTag));
-    if(tagged.length) ids = tagged;
-  }
+  if(S.lock || scyc.busy || !scyc.on) return;
+  let ids = getSceneCycleTargetIds(deckId);
   if(scyc.pool) ids = ids.filter(id => scyc.pool.has(id));
   if(!ids.length) return;
-  scyc.idx = scyc.rand ? Math.floor(Math.random() * ids.length) : (scyc.idx + 1) % ids.length;
-  activateScene(ids[scyc.idx], deckId);
+  scyc.idx = pickNextIdx(ids.length, scyc.idx, scyc.rand);
+  scyc.busy = true;
+  Promise.resolve(activateScene(ids[scyc.idx], deckId)).finally(() => { scyc.busy = false; });
 }
 $('#sceneCycleBtn')?.addEventListener('click', toggleSceneCycle);
-$('#sceneCycleDiv')?.addEventListener('change', () => { sceneCycleNextAt = Date.now() + sceneIntervalMs($('#sceneCycleDiv').value); syncSceneCycleUI(); });
+$('#sceneCycleDiv')?.addEventListener('change', e => {
+  if(activeDeckId){
+    const scyc = getDeckSceneCycle(activeDeckId);
+    scyc.div = e.target.value;
+    scyc.nextAt = Date.now() + sceneIntervalMs(scyc.div);
+    multiPreviewKey = '';
+  }else{
+    sceneCycleNextAt = Date.now() + sceneIntervalMs(e.target.value);
+  }
+  syncSceneCycleUI();
+});
+$('#sceneCycleRand')?.addEventListener('change', e => {
+  if(activeDeckId){ getDeckSceneCycle(activeDeckId).rand = e.target.checked; multiPreviewKey = ''; }
+});
 $('#scenePoolAllBtn')?.addEventListener('click', () => {
-  sceneCycleSelected = new Set(Object.keys(scenesCache || {}));
-  saveSceneCyclePool();
+  if(activeDeckId){
+    getDeckSceneCycle(activeDeckId).pool = new Set(getSceneCycleTargetIds(activeDeckId));
+    multiPreviewKey = '';
+  }else{
+    sceneCycleSelected = new Set(Object.keys(scenesCache || {}));
+    saveSceneCyclePool();
+  }
   renderScenes();
   syncSceneCycleUI();
 });
 $('#scenePoolNoneBtn')?.addEventListener('click', () => {
-  sceneCycleSelected = new Set();
-  saveSceneCyclePool();
+  if(activeDeckId){
+    getDeckSceneCycle(activeDeckId).pool = new Set();
+    multiPreviewKey = '';
+  }else{
+    sceneCycleSelected = new Set();
+    saveSceneCyclePool();
+  }
   renderScenes();
   syncSceneCycleUI();
 });
@@ -1280,7 +1470,7 @@ $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(
   document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!=='pane-'+b.dataset.t);
   if(b.dataset.t==='diag') $('#log').textContent=callLog.join('\n')||'no calls yet';
   if(b.dataset.t==='eq') requestAnimationFrame(drawSpectrum);
-  if(b.dataset.t==='main'){ renderDeckTabs(); renderScenes(); renderPalettes(); syncPalCycleUI(); syncSceneCycleUI(); syncFullColorUI(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
+  if(b.dataset.t==='main'){ renderDeckTabs(); renderScenes(); renderPalettes(); syncPalCycleUI(); syncSceneCycleUI(); syncFullColorUI(); syncMainCtlSliders(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
   if(b.dataset.t==='scenes'){ if(typeof renderSceneStudio === 'function') renderSceneStudio(); }
   if(b.dataset.t==='layout'){ if(typeof renderLayoutEditorBoxes === 'function') renderLayoutEditorBoxes(); if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview(); } });
 $('#resync').addEventListener('click',()=>connect());
@@ -1295,5 +1485,5 @@ function updateStatus(){
 }
 setInterval(()=>{
   updateStatus();
-  if(sceneCycleOn) syncSceneCycleUI();
+  if(sceneCycleOn || (activeDeckId && getDeckSceneCycle(activeDeckId).on)) syncSceneCycleUI();
 },1000);

@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from ledfx.configuration.models import AudioConfig
 from ledfx.effects.audio import AudioInputSource, _build_eq_curve
+from ledfx.effects.melbank import MIC_RATE
 
 
 def test_audio_config_eq_defaults_and_bounds():
@@ -47,7 +48,7 @@ def test_build_eq_curve_gains():
     assert curve.dtype == np.float32
     assert curve.shape == (4096 // 2 + 1,)
 
-    freqs = np.fft.rfftfreq(4096, 1.0 / 44100)
+    freqs = np.fft.rfftfreq(4096, 1.0 / MIC_RATE)
     low_bin = int(np.argmin(np.abs(freqs - 60.0)))
     mid_bin = int(np.argmin(np.abs(freqs - 1000.0)))
     high_bin = int(np.argmin(np.abs(freqs - 12000.0)))

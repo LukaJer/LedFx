@@ -44,7 +44,8 @@ function renderScenes(){
       : 'No active effects in this scene';
     const isCur = id === chosenActive;
     const tags = getSceneTags(s);
-    const inPool = !sceneCycleSelected || sceneCycleSelected.has(id);
+    const activePool = activeDeckId ? getDeckSceneCycle(activeDeckId).pool : sceneCycleSelected;
+    const inPool = !activePool || activePool.has(id);
     return `<button class="scene ${isCur?'cur':''}" data-id="${escHtml(id)}" data-tags="${escHtml(tags.join(','))}" data-fullname="${escHtml(s.name || id)}" title="${escHtml(tip)}">
       <div class="scene-head"><span class="scene-name">${escHtml(s.name || id)}</span><span class="cyc-pick ${inPool?'on':''}" data-scyc="${escHtml(id)}" title="Include in scene cycle">${inPool?'&#10003;':''}</span></div>
       <div class="scene-meta">${escHtml(summary)}</div>
@@ -61,14 +62,21 @@ function renderScenes(){
   el.querySelectorAll('.cyc-pick[data-scyc]').forEach(pk => pk.addEventListener('click', e => {
     e.stopPropagation();
     const sid = pk.dataset.scyc;
-    if(!sceneCycleSelected) sceneCycleSelected = new Set(Object.keys(scenesCache || {}));
-    if(sceneCycleSelected.has(sid)) sceneCycleSelected.delete(sid);
-    else sceneCycleSelected.add(sid);
-    saveSceneCyclePool();
+    if(activeDeckId){
+      const scyc = getDeckSceneCycle(activeDeckId);
+      if(!scyc.pool) scyc.pool = new Set(getSceneCycleTargetIds(activeDeckId));
+      if(scyc.pool.has(sid)) scyc.pool.delete(sid);
+      else scyc.pool.add(sid);
+      multiPreviewKey = '';
+    }else{
+      if(!sceneCycleSelected) sceneCycleSelected = new Set(Object.keys(scenesCache || {}));
+      if(sceneCycleSelected.has(sid)) sceneCycleSelected.delete(sid);
+      else sceneCycleSelected.add(sid);
+      saveSceneCyclePool();
+    }
     renderScenes();
     if(typeof syncSceneCycleUI === 'function') syncSceneCycleUI();
   }));
-  multiPreviewKey = '';
   if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
 }
 
@@ -78,6 +86,7 @@ async function loadScenes(){
     const data = await api('/scenes');
     const scenes = data.scenes || data;
     scenesCache = scenes || {};
+    multiPreviewKey = '';
     renderScenes();
   }catch(e){ el.innerHTML = `<div class="empty">Failed to load scenes: ${e.message}</div>`; }
 }
@@ -86,6 +95,11 @@ const lastDeckScene = {};
 const activePalettePatch = {};
 async function activateScene(id, deckId){
   if(guardLock()) return;
+  if(typeof whiteoutOn !== 'undefined' && whiteoutOn){
+    whiteoutOn = false;
+    whiteoutSnap = null;
+    if(typeof syncWhiteoutUI === 'function') syncWhiteoutUI();
+  }
   for(const vid of Object.keys(scenesCache[id]?.virtuals || {})) delete activePalettePatch[vid];
   await quantWait(S.trans==='Quantize'?(S.qnt==='Now'?'Bar':S.qnt):'Now');
   const targetDeck = deckId || activeDeckId;
@@ -108,6 +122,9 @@ async function activateScene(id, deckId){
     toast('Scene activated');
     await loadVirtuals();
     if(typeof restoreSceneCtl === 'function') await restoreSceneCtl(id, deckId);
+    if(typeof blackoutOn !== 'undefined' && blackoutOn && typeof applyBlackoutToVirtuals === 'function'){
+      await applyBlackoutToVirtuals(Object.keys(scenesCache[id]?.virtuals || {}));
+    }
     if(typeof renderSceneEditor === 'function' && activeDeckId) renderSceneEditor(id);
   }catch(e){ toast('Scene failed: ' + e.message, true); }
 }

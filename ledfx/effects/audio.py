@@ -54,7 +54,7 @@ def _build_eq_curve(config: AudioConfig) -> NDArray[np.float32] | None:
     )
     if not np.any(band_dbs):
         return None
-    freqs = np.fft.rfftfreq(config.fft_size, 1.0 / config.mic_rate)
+    freqs = np.fft.rfftfreq(config.fft_size, 1.0 / MIC_RATE)
     log_freqs = np.log10(np.maximum(freqs, 20.0))
     db_curve = np.interp(log_freqs, _LOG_EQ_BAND_FREQS, band_dbs)
     return np.power(10.0, db_curve / 20.0).astype(np.float32)
@@ -1250,12 +1250,12 @@ class AudioAnalysisSource(AudioInputSource):
         self.freq_power_filter = ExpFilter(
             np.zeros(len(self.freq_max_mels)), alpha_decay=0.2, alpha_rise=0.97
         )
-        self.freq_mel_indexes = []
+        new_freq_mel_indexes: list[int] = []
 
         for freq in self.freq_max_mels:
             assert self.melbanks.melbanks_config.max_frequencies[2] >= freq
 
-            self.freq_mel_indexes.append(
+            new_freq_mel_indexes.append(
                 next(
                     (
                         i
@@ -1267,34 +1267,9 @@ class AudioAnalysisSource(AudioInputSource):
                     len(self.melbanks.melbank_processors[2].melbank_frequencies),
                 )
             )
+        self.freq_mel_indexes = new_freq_mel_indexes
 
-        # volume based beat detection
-        beat_min_hz = min(self._config.beat_min_freq, self._config.beat_max_freq - 10)
-        beat_max_hz = max(beat_min_hz + 10, self._config.beat_max_freq)
-        freqs_0 = self.melbanks.melbank_processors[0].melbank_frequencies
-        self.beat_min_mel_index = next(
-            (i for i, f in enumerate(freqs_0) if f >= beat_min_hz),
-            0,
-        )
-        self.beat_max_mel_index = max(
-            self.beat_min_mel_index + 1,
-            next(
-                (i for i, f in enumerate(freqs_0) if f > beat_max_hz),
-                len(freqs_0),
-            ),
-        )
-        freqs_2 = self.melbanks.melbank_processors[2].melbank_frequencies
-        self.beat_power_min_idx = next(
-            (i for i, f in enumerate(freqs_2) if f >= beat_min_hz),
-            0,
-        )
-        self.beat_power_max_idx = max(
-            self.beat_power_min_idx + 1,
-            next(
-                (i for i, f in enumerate(freqs_2) if f > beat_max_hz),
-                len(freqs_2),
-            ),
-        )
+        self._update_beat_freq_indexes()
 
         self.beat_min_percent_diff = 0.5
         self.beat_min_time_since = 0.1
@@ -1304,9 +1279,60 @@ class AudioAnalysisSource(AudioInputSource):
         self.beat_prev_time = time.time()
         self.beat_power_history = deque(maxlen=self.beat_power_history_len)
 
+    def _update_beat_freq_indexes(self) -> None:
+        beat_min_hz = min(self._config.beat_min_freq, self._config.beat_max_freq - 10)
+        beat_max_hz = max(beat_min_hz + 10, self._config.beat_max_freq)
+        freqs_0 = self.melbanks.melbank_processors[0].melbank_frequencies
+        min_0 = next(
+            (i for i, f in enumerate(freqs_0) if f >= beat_min_hz),
+            0,
+        )
+        max_0 = max(
+            min_0 + 1,
+            next(
+                (i for i, f in enumerate(freqs_0) if f > beat_max_hz),
+                len(freqs_0),
+            ),
+        )
+        freqs_2 = self.melbanks.melbank_processors[2].melbank_frequencies
+        min_2 = next(
+            (i for i, f in enumerate(freqs_2) if f >= beat_min_hz),
+            0,
+        )
+        max_2 = max(
+            min_2 + 1,
+            next(
+                (i for i, f in enumerate(freqs_2) if f > beat_max_hz),
+                len(freqs_2),
+            ),
+        )
+        self.beat_min_mel_index = min_0
+        self.beat_max_mel_index = max_0
+        self.beat_power_min_idx = min_2
+        self.beat_power_max_idx = max_2
+
+    _ANALYSIS_REBUILD_KEYS: ClassVar[tuple[str, ...]] = (
+        "fft_size",
+        "sample_rate",
+        "tempo_method",
+        "onset_method",
+        "pitch_method",
+        "pitch_tolerance",
+    )
+
     def update_config(self, config):
+        old_config = getattr(self, "_config", None)
         super().update_config(config)
-        self.initialise_analysis()
+        if old_config is None or any(
+            getattr(old_config, k) != getattr(self._config, k)
+            for k in self._ANALYSIS_REBUILD_KEYS
+        ):
+            self.initialise_analysis()
+        elif (
+            old_config.beat_min_freq != self._config.beat_min_freq
+            or old_config.beat_max_freq != self._config.beat_max_freq
+        ):
+            self._update_beat_freq_indexes()
 
     def _invalidate_caches(self):
         """Invalidates the cache for all melbank related data"""
@@ -1476,9 +1502,12 @@ class AudioAnalysisSource(AudioInputSource):
             self.beat_timestamp = time.time()
             oscillator = self.beat_counter
         else:
+            beat_period = self.beat_period
+            if beat_period <= 0:
+                return self.beat_counter
             time_since_beat = time.time() - self.beat_timestamp
             oscillator = (
-                1 - (self.beat_period - time_since_beat) / self.beat_period
+                1 - (beat_period - time_since_beat) / beat_period
             ) + self.beat_counter
             # ensure it's between [0 and 4). useful when audio cuts
             oscillator = oscillator % 4
