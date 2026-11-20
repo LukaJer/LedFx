@@ -56,8 +56,6 @@ class TubeEffectBase(AudioReactiveEffect, GradientEffect):
     @override
     def config_updated(self, config: object) -> None:
         GradientEffect.config_updated(self, config)
-        # Keep tube-level symmetry separate from Effect.get_pixels() 1D strip folding.
-        self.mirror = False
 
     @staticmethod
     def _compute_grid(pixel_count: int) -> tuple[int, int, int]:
