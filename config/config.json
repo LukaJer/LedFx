@@ -4,7 +4,7 @@
     "allowed_hosts": [],
     "allowed_origins": [],
     "audio": {
-        "audio_device": 6,
+        "audio_device": 19,
         "audio_device_name": "ALSA: HD-Audio Generic: ALC1220 Analog (hw:1,0)",
         "autogain": false,
         "autogain_speed": 0.3,
@@ -6681,6 +6681,126 @@
             "segments": [
                 [
                     "wledbb02",
+                    0,
+                    35,
+                    false
+                ]
+            ]
+        },
+        {
+            "auto_generated": false,
+            "config": {
+                "center_offset": 0,
+                "complex_segments": false,
+                "frequency_max": 15000,
+                "frequency_min": 20,
+                "grouping": 1,
+                "icon_name": "wled",
+                "mapping": "span",
+                "max_brightness": 1.0,
+                "name": "WLEDBB06",
+                "preview_only": false,
+                "rotate": 0,
+                "rows": 1,
+                "transition_mode": "Add",
+                "transition_time": 0.4
+            },
+            "effects": {},
+            "id": "wledbb06",
+            "is_device": "wledbb06",
+            "segments": [
+                [
+                    "wledbb06",
+                    0,
+                    35,
+                    false
+                ]
+            ]
+        },
+        {
+            "auto_generated": false,
+            "config": {
+                "center_offset": 0,
+                "complex_segments": false,
+                "frequency_max": 15000,
+                "frequency_min": 20,
+                "grouping": 1,
+                "icon_name": "wled",
+                "mapping": "span",
+                "max_brightness": 1.0,
+                "name": "WLEDBB07",
+                "preview_only": false,
+                "rotate": 0,
+                "rows": 1,
+                "transition_mode": "Add",
+                "transition_time": 0.4
+            },
+            "effects": {},
+            "id": "wledbb07",
+            "is_device": "wledbb07",
+            "segments": [
+                [
+                    "wledbb07",
+                    0,
+                    35,
+                    false
+                ]
+            ]
+        },
+        {
+            "auto_generated": false,
+            "config": {
+                "center_offset": 0,
+                "complex_segments": false,
+                "frequency_max": 15000,
+                "frequency_min": 20,
+                "grouping": 1,
+                "icon_name": "wled",
+                "mapping": "span",
+                "max_brightness": 1.0,
+                "name": "WLEDBB08",
+                "preview_only": false,
+                "rotate": 0,
+                "rows": 1,
+                "transition_mode": "Add",
+                "transition_time": 0.4
+            },
+            "effects": {},
+            "id": "wledbb08",
+            "is_device": "wledbb08",
+            "segments": [
+                [
+                    "wledbb08",
+                    0,
+                    35,
+                    false
+                ]
+            ]
+        },
+        {
+            "auto_generated": false,
+            "config": {
+                "center_offset": 0,
+                "complex_segments": false,
+                "frequency_max": 15000,
+                "frequency_min": 20,
+                "grouping": 1,
+                "icon_name": "wled",
+                "mapping": "span",
+                "max_brightness": 1.0,
+                "name": "WLEDBB09",
+                "preview_only": false,
+                "rotate": 0,
+                "rows": 1,
+                "transition_mode": "Add",
+                "transition_time": 0.4
+            },
+            "effects": {},
+            "id": "wledbb09",
+            "is_device": "wledbb09",
+            "segments": [
+                [
+                    "wledbb09",
                     0,
                     35,
                     false
