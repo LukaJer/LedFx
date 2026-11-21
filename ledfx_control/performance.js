@@ -30,6 +30,12 @@ const PALETTES = [
   {name:'Sodium Concrete', colors:['#27272a','#52525b','#ea580c','#fdba74']},
   {name:'Hardgroove', colors:['#dc2626','#f97316','#7c3aed','#c084fc']},
   {name:'Subzero Pulse', colors:['#0f172a','#1d4ed8','#e0f2fe','#ffffff']},
+  {name:'Deep Ember', colors:['#5c0800','#e83b00']},
+  {name:'Campfire', colors:['#8f1100','#ff6a00']},
+  {name:'Molten Gold', colors:['#b82900','#ff9900']},
+  {name:'Smoldering Coal', colors:['#3d0400','#c42400']},
+  {name:'Sunset Ember', colors:['#6b0a00','#ff4d00']},
+  {name:'Amber Glow', colors:['#991b00','#ff7b00']},
 ];
 let palCycleSelected = null;
 try{
@@ -510,7 +516,7 @@ async function hitDown(h, btn, zoneOverride){
   }
   try{
     if(h.kind==='oneshot'){ const m=INT[S.int]; await tool({tool:'oneshot', color:h.color, ramp:h.ramp, hold:Math.round(h.hold*m), fade:Math.round(h.fade*m)}, undefined, zoneOverride); }
-    else if(h.kind==='punch'){ const c = curPalette.colors[2]; const m=INT[S.int]; await tool({tool:'oneshot', color:c, ramp:10, hold:Math.round(120*m), fade:Math.round(250*m)}, undefined, zoneOverride); }
+    else if(h.kind==='punch'){ const c = curPalette.colors[2] || curPalette.colors[curPalette.colors.length - 1] || '#e84a0c'; const m=INT[S.int]; await tool({tool:'oneshot', color:c, ramp:10, hold:Math.round(120*m), fade:Math.round(250*m)}, undefined, zoneOverride); }
     else if(h.kind==='build'){
       if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
       let v = readHitSpeed(btn);
