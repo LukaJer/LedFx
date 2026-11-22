@@ -90,6 +90,7 @@ Project Tracking & Docs
 =======================
 
 - `TODO.md <TODO.md>`_ — Planned features and follow-up tasks.
+- `IDEAS.md <IDEAS.md>`_ — Ideas, similar to TODO.
 - `BUGS.md <BUGS.md>`_ — Known open issues and resolved bug log.
 - `AGENTS.md <AGENTS.md>`_ — Repository conventions and fork architecture.
 
