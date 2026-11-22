@@ -783,10 +783,18 @@ class Virtual:
         if frame is None:
             frame = self.assembled_frame
 
+        phys = self._effective_to_physical_pixels(frame)
+        if self._oneshots:
+            phys = phys.copy()
+            stop = len(phys)
+            for oneshot in tuple(self._oneshots):
+                if oneshot.active:
+                    oneshot.apply(phys, 0, stop)
+
         self._ledfx.events.fire_event(
             VirtualUpdateEvent(
                 self.id,
-                self._effective_to_physical_pixels(frame),
+                phys,
                 rows=self.rows,
             )
         )
@@ -863,6 +871,8 @@ class Virtual:
                                 #     self._ledfx.thread_executor, self.flush
                                 # )
                                 self.flush()
+                            else:
+                                self._update_oneshots()
 
                             self._fire_update_event()
             except Exception:
@@ -1015,14 +1025,7 @@ class Virtual:
     #     z = np.apply_along_axis(self.interp_channel, 0, pixels, x_new, x_old)
     #     return z
 
-    def flush(self, pixels=None):
-        """
-        Flushes the provided data to the devices.
-        """
-        if pixels is None:
-            pixels = self.assembled_frame
-
-        # Where we update oneshots
+    def _update_oneshots(self):
         oneshot_index = 0
         while oneshot_index < len(self._oneshots):
             oneshot = self._oneshots[oneshot_index]
@@ -1031,6 +1034,15 @@ class Virtual:
                 self._oneshots.remove(oneshot)
             else:
                 oneshot_index += 1
+
+    def flush(self, pixels=None):
+        """
+        Flushes the provided data to the devices.
+        """
+        if pixels is None:
+            pixels = self.assembled_frame
+
+        self._update_oneshots()
 
         if self._config.mapping == "span":
             # In span mode we can calculate the final pixels once for all segments
@@ -1095,8 +1107,10 @@ class Virtual:
                     ) in segments:
                         seg = pixels[start:stop:step]
                         # Where we override segment
-                        for oneshot in self._oneshots:
-                            oneshot.apply(seg, start, stop)
+                        if self._oneshots:
+                            seg = seg.copy()
+                            for oneshot in self._oneshots:
+                                oneshot.apply(seg, start, stop)
                         data.append((seg, device_start, device_end))
                 elif self._config.mapping == "copy":
                     for (

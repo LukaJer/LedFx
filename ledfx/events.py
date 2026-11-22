@@ -325,6 +325,9 @@ class GraphUpdateEvent(Event):
         agc_gain: float | None = None,
         mel_gain: float | None = None,
         volume: float | None = None,
+        energy_state: str | None = None,
+        drop_now: bool = False,
+        bass_ratio: float | None = None,
     ):
         super().__init__(Event.GRAPH_UPDATE)
         self.graph_id = graph_id
@@ -338,6 +341,12 @@ class GraphUpdateEvent(Event):
             self.mel_gain = mel_gain
         if volume is not None:
             self.volume = volume
+        if energy_state is not None:
+            self.energy_state = energy_state
+        if drop_now:
+            self.drop_now = True
+        if bass_ratio is not None:
+            self.bass_ratio = bass_ratio
 
 
 class VisualisationUpdateEvent(Event):

@@ -74,11 +74,11 @@ class Flash(Oneshot):
 
     def update(self):
         passed = timeit.default_timer() - self._start
-        if passed <= self._ramp:
+        if self._ramp > 0 and passed <= self._ramp:
             self._weight = passed / self._ramp
         elif passed <= self._hold_end:
             self._weight = 1.0
-        elif passed <= self._fade_end:
+        elif self._fade > 0 and passed <= self._fade_end:
             self._weight = (self._fade_end - passed) / self._fade
         else:
             self._active = False

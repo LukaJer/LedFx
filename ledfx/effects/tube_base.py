@@ -47,6 +47,7 @@ class TubeEffectBase(AudioReactiveEffect, GradientEffect):
         self._high = 0.0
         self._onset = False
         self._flash = 0.0
+        self._energy_state: str = "normal"
         self._last_time = time.monotonic()
         self._phase = 0.0
         self._grid = np.zeros(
@@ -81,6 +82,15 @@ class TubeEffectBase(AudioReactiveEffect, GradientEffect):
         self._mid = max(mid, self._mid * decay)
         self._high = max(high, self._high * decay)
         if data.onset():  # type: ignore[attr-defined]
+            self._onset = True
+            self._flash = 1.0
+        es_fn = getattr(data, "energy_state", None)
+        prev = getattr(self, "_energy_state", "normal")
+        cur = str(es_fn()) if callable(es_fn) else "normal"
+        self._energy_state = cur
+        if cur == "breakdown":
+            self._flash = min(self._flash, 0.35)
+        elif cur == "drop" and prev != "drop":
             self._onset = True
             self._flash = 1.0
 

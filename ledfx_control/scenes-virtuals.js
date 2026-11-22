@@ -81,6 +81,7 @@ function renderScenes(){
     if(typeof syncSceneCycleUI === 'function') syncSceneCycleUI();
   }));
   if(typeof scheduleTubePreview === 'function') scheduleTubePreview();
+  if(typeof syncDropQueueUI === 'function') syncDropQueueUI();
 }
 
 async function loadScenes(){
@@ -106,8 +107,9 @@ const lastDeckScene = {};
 const activePalettePatch = {};
 const sceneActivateTokens = {};
 let cloningVirtualInEditor = false;
-async function activateScene(id, deckId){
+async function activateScene(id, deckId, opts){
   if(guardLock()) return;
+  if(!opts?.forceNow && typeof tryQueueDropScene === 'function' && tryQueueDropScene(id, deckId)) return;
   if(typeof whiteoutOn !== 'undefined' && whiteoutOn){
     whiteoutOn = false;
     whiteoutSnap = null;

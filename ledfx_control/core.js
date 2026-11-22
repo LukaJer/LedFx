@@ -282,6 +282,7 @@ function renderDeckTabs(){
       zoneBar.hidden = true;
     }
   }
+  if(typeof syncHypeUI === 'function') syncHypeUI(false);
 }
 
 function renderLayoutsOverview(){

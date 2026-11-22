@@ -443,112 +443,508 @@ async function setSensitivity(val, zoneOverride, skipRecord){
   await Promise.all(jobs);
 }
 
-// ---- Hits (momentary tools via /api/virtuals_tools) ----
+// ---- Hits (momentary Hold-to-FX pads via /api/virtuals_tools oneshot overlays & safe effect ramps) ----
 const HITS = [
+  {name:'Hold Blackout', kind:'hold-overlay', color:'#000000', cls:'hit-blackout', kbd:'Z', badge:'HOLD'},
+  {name:'Hold Strobe', kind:'strobe', cls:'hit-strobe', kbd:'X', badge:'HOLD'},
+  {name:'Hold Blinder', kind:'hold-overlay', color:'#fff5e4', cls:'hit-blinder', kbd:'C', badge:'HOLD'},
+  {name:'Build Up', kind:'buildup', cls:'hit-build', kbd:'V', badge:'HOLD'},
   {name:'Flash', kind:'oneshot', color:'white', ramp:10, hold:150, fade:300},
-  {name:'Strobe', kind:'strobe'},
-  {name:'Blackout', kind:'hold', color:'#000000'},
-  {name:'Dim', kind:'hold', color:'#202020'},
   {name:'Bloom', kind:'oneshot', color:'white', ramp:400, hold:100, fade:1200},
   {name:'Palette Punch', kind:'punch'},
-  {name:'Build', kind:'build'},
+  {name:'Hold Dim', kind:'hold-dim', cls:'', badge:'HOLD'},
 ];
-const hitSnapshots = {}, hitIntervals = {}, hitPressTokens = {};
+const hitSnapshots = {}, hitIntervals = {}, hitPressTokens = {}, buildUpState = {}, hitHoldPending = {}, activeOverlayHolds = {};
+const FX_SETTINGS_KEY = 'ledfx_fx_pad_settings_v2';
+const FX_SETTINGS_LEGACY_KEY = 'ledfx_fx_pad_settings';
+const DEFAULT_FX_SETTINGS = { strobeColor:'#ffffff', strobeUsePalette:false, strobeRate:'1/4b', strobeFeel:'punch', strobeBri:100, punchAuto:true, punchColor:'#e84a0c', buildBars:4 };
+let fxLegacySeed = null;
+try{
+  const leg = JSON.parse(localStorage.getItem(FX_SETTINGS_LEGACY_KEY) || 'null');
+  if(leg && typeof leg === 'object') fxLegacySeed = { ...DEFAULT_FX_SETTINGS, ...leg };
+}catch(e){}
+const fxPadSettingsMap = (() => {
+  try{
+    const raw = JSON.parse(localStorage.getItem(FX_SETTINGS_KEY) || 'null');
+    if(raw && typeof raw === 'object') return raw;
+  }catch(e){}
+  return {};
+})();
+function fxZoneKey(zoneOverride){
+  return zoneOverride || (typeof activeDeckId !== 'undefined' && activeDeckId) || (typeof mainTargetZone !== 'undefined' && mainTargetZone) || 'main';
+}
+function getFxPadSettings(zoneOverride){
+  const k = fxZoneKey(zoneOverride);
+  if(!fxPadSettingsMap[k]){
+    fxPadSettingsMap[k] = { ...(fxLegacySeed || DEFAULT_FX_SETTINGS) };
+  }else{
+    fxPadSettingsMap[k] = { ...DEFAULT_FX_SETTINGS, ...fxPadSettingsMap[k] };
+  }
+  return fxPadSettingsMap[k];
+}
+function saveFxPadSettings(){
+  try{ localStorage.setItem(FX_SETTINGS_KEY, JSON.stringify(fxPadSettingsMap)); }catch(e){}
+}
+function renderFxSettingsHtml(){
+  return `
+    <div class="fx-set-group">
+      <span class="fx-set-lbl">Strobe</span>
+      <input type="color" data-fx="strobeColor" class="fx-color-in" value="#ffffff" title="Hold Strobe flash color">
+      <button type="button" class="tgl" data-fx="strobeUsePalette" title="Cycle active palette colors on each strobe flash">Palette</button>
+      <select data-fx="strobeRate" title="Hold Strobe trigger rate">
+        <option value="1/2b">1/2 Beat</option>
+        <option value="1/4b">1/4 Beat</option>
+        <option value="1/8b">1/8 Beat</option>
+        <option value="3hz">3 Hz</option>
+        <option value="6hz">6 Hz</option>
+        <option value="10hz">10 Hz</option>
+      </select>
+      <select data-fx="strobeFeel" title="Flash pulse envelope">
+        <option value="sharp">Sharp 16ms</option>
+        <option value="punch">Punch 32ms</option>
+        <option value="wash">Wash 95ms</option>
+      </select>
+      <label class="fx-bri-wrap" title="Hold Strobe brightness">
+        <span>Bri</span>
+        <input type="range" data-fx="strobeBri" min="20" max="100" step="5" value="100">
+        <span class="fx-bri-val" data-fx-val="strobeBri">100%</span>
+      </label>
+    </div>
+    <div class="fx-set-group">
+      <span class="fx-set-lbl">Punch</span>
+      <button type="button" class="tgl on" data-fx="punchAuto" title="Use active palette accent color automatically">Auto Palette</button>
+      <input type="color" data-fx="punchColor" class="fx-color-in" value="#e84a0c" title="Custom Palette Punch color (switches off Auto Palette)">
+      <span class="fx-set-lbl">Build</span>
+      <select data-fx="buildBars" title="Build Up pad duration">
+        <option value="4">4 Bar</option>
+        <option value="8">8 Bar</option>
+      </select>
+    </div>`;
+}
+function syncFxSettingsContainer(el, zoneId){
+  if(!el) return;
+  const s = getFxPadSettings(zoneId);
+  const col = el.querySelector('[data-fx="strobeColor"]');
+  if(col) col.value = s.strobeColor || '#ffffff';
+  const pal = el.querySelector('[data-fx="strobeUsePalette"]');
+  if(pal){
+    pal.classList.toggle('on', !!s.strobeUsePalette);
+    pal.textContent = s.strobeUsePalette ? 'Palette ON' : 'Palette';
+  }
+  const rate = el.querySelector('[data-fx="strobeRate"]');
+  if(rate) rate.value = s.strobeRate || '1/4b';
+  const feel = el.querySelector('[data-fx="strobeFeel"]');
+  if(feel) feel.value = s.strobeFeel || 'punch';
+  const bri = el.querySelector('[data-fx="strobeBri"]');
+  if(bri) bri.value = s.strobeBri ?? 100;
+  const briVal = el.querySelector('[data-fx-val="strobeBri"]');
+  if(briVal) briVal.textContent = (s.strobeBri ?? 100) + '%';
+  const pAuto = el.querySelector('[data-fx="punchAuto"]');
+  if(pAuto){
+    pAuto.classList.toggle('on', !!s.punchAuto);
+    pAuto.textContent = s.punchAuto ? 'Auto Palette' : 'Custom Color';
+  }
+  const pCol = el.querySelector('[data-fx="punchColor"]');
+  if(pCol) pCol.value = s.punchColor || '#e84a0c';
+  const bSel = el.querySelector('[data-fx="buildBars"]');
+  if(bSel) bSel.value = String(s.buildBars || 4);
+}
+function syncAllFxSettingsForZone(zoneId){
+  const zk = fxZoneKey(zoneId);
+  const s = getFxPadSettings(zk);
+  if(zk === fxZoneKey()){
+    syncFxSettingsContainer($('#deckFxSettingsBar'), zk);
+    if($('#buildBarsSel')) $('#buildBarsSel').value = String(s.buildBars || 4);
+  }
+  const box = document.querySelector(`.lprev-fx-bar[data-fx-box="${CSS.escape(zk)}"]`);
+  if(box) syncFxSettingsContainer(box, zk);
+}
+function bindFxSettingsBox(el, zoneId){
+  if(!el) return;
+  syncFxSettingsContainer(el, zoneId);
+  if(el.dataset.fxBound === zoneId) return;
+  el.dataset.fxBound = zoneId;
+  const stop = e => e.stopPropagation();
+  el.addEventListener('click', stop);
+  el.querySelector('[data-fx="strobeColor"]')?.addEventListener('input', e => {
+    e.stopPropagation();
+    const s = getFxPadSettings(zoneId);
+    s.strobeColor = e.target.value;
+    s.strobeUsePalette = false;
+    saveFxPadSettings();
+    syncAllFxSettingsForZone(zoneId);
+  });
+  el.querySelector('[data-fx="strobeUsePalette"]')?.addEventListener('click', e => {
+    e.stopPropagation();
+    const s = getFxPadSettings(zoneId);
+    s.strobeUsePalette = !s.strobeUsePalette;
+    saveFxPadSettings();
+    syncAllFxSettingsForZone(zoneId);
+  });
+  el.querySelector('[data-fx="strobeRate"]')?.addEventListener('change', e => {
+    e.stopPropagation();
+    getFxPadSettings(zoneId).strobeRate = e.target.value;
+    saveFxPadSettings();
+    syncAllFxSettingsForZone(zoneId);
+  });
+  el.querySelector('[data-fx="strobeFeel"]')?.addEventListener('change', e => {
+    e.stopPropagation();
+    getFxPadSettings(zoneId).strobeFeel = e.target.value;
+    saveFxPadSettings();
+    syncAllFxSettingsForZone(zoneId);
+  });
+  el.querySelector('[data-fx="strobeBri"]')?.addEventListener('input', e => {
+    e.stopPropagation();
+    getFxPadSettings(zoneId).strobeBri = Math.max(20, Math.min(100, Number(e.target.value) || 100));
+    saveFxPadSettings();
+    syncAllFxSettingsForZone(zoneId);
+  });
+  el.querySelector('[data-fx="punchAuto"]')?.addEventListener('click', e => {
+    e.stopPropagation();
+    const s = getFxPadSettings(zoneId);
+    s.punchAuto = !s.punchAuto;
+    saveFxPadSettings();
+    syncAllFxSettingsForZone(zoneId);
+  });
+  el.querySelector('[data-fx="punchColor"]')?.addEventListener('input', e => {
+    e.stopPropagation();
+    const s = getFxPadSettings(zoneId);
+    s.punchColor = e.target.value;
+    s.punchAuto = false;
+    saveFxPadSettings();
+    syncAllFxSettingsForZone(zoneId);
+  });
+  el.querySelector('[data-fx="buildBars"]')?.addEventListener('change', e => {
+    e.stopPropagation();
+    getFxPadSettings(zoneId).buildBars = Number(e.target.value) || 4;
+    saveFxPadSettings();
+    syncAllFxSettingsForZone(zoneId);
+  });
+}
+function renderDeckFxSettings(){
+  const bar = $('#deckFxSettingsBar');
+  const zk = fxZoneKey();
+  if($('#buildBarsSel')) $('#buildBarsSel').value = String(getFxPadSettings(zk).buildBars || 4);
+  $('#deckFxSettingsBtn')?.classList.toggle('on', !!(bar && !bar.hidden));
+  if(!bar) return;
+  bar.innerHTML = renderFxSettingsHtml();
+  delete bar.dataset.fxBound;
+  bindFxSettingsBox(bar, zk);
+}
+function getStrobeParams(zoneOverride){
+  const s = getFxPadSettings(zoneOverride);
+  const effBpm = bpm >= 30 ? bpm : 128;
+  const r = s.strobeRate || '1/4b';
+  let ms = 120;
+  if(r === '1/2b') ms = Math.round(30000 / effBpm);
+  else if(r === '1/4b') ms = Math.round(15000 / effBpm);
+  else if(r === '1/8b') ms = Math.round(7500 / effBpm);
+  else if(r === '3hz') ms = 333;
+  else if(r === '6hz') ms = 167;
+  else if(r === '10hz') ms = 100;
+  ms = Math.max(S.guard ? 220 : 65, ms);
+
+  const feel = s.strobeFeel || 'punch';
+  let ramp = 1, hold = 32, fade = 32;
+  if(feel === 'sharp'){ ramp = 1; hold = 16; fade = 16; }
+  else if(feel === 'wash'){ ramp = 5; hold = 65; fade = 95; }
+  if(hold + fade >= ms){
+    hold = Math.max(10, Math.floor(ms * 0.4));
+    fade = Math.max(12, Math.floor(ms * 0.45));
+  }
+  const bri = Math.max(0.2, Math.min(1.0, (Number(s.strobeBri) || 100) / 100));
+  return { ms, ramp, hold, fade, bri };
+}
+$('#deckFxSettingsBtn')?.addEventListener('click', () => {
+  const bar = $('#deckFxSettingsBar');
+  if(!bar) return;
+  bar.hidden = !bar.hidden;
+  renderDeckFxSettings();
+});
+$('#buildBarsSel')?.addEventListener('change', e => {
+  const zk = fxZoneKey();
+  getFxPadSettings(zk).buildBars = Number(e.target.value) || 4;
+  saveFxPadSettings();
+  syncAllFxSettingsForZone(zk);
+});
+renderDeckFxSettings();
 function hitKey(h, zoneOverride){ return `${zoneOverride || 'main'}:${h.name}`; }
+function zoneHoldSet(zoneOverride){
+  const zk = zoneOverride || (activeDeckId || mainTargetZone || 'all') + ':' + S.target;
+  if(!activeOverlayHolds[zk]) activeOverlayHolds[zk] = new Set();
+  return activeOverlayHolds[zk];
+}
 function cancelActiveHits(){
   for(const btn of document.querySelectorAll('.hit-btn.active')){
-    btn.dispatchEvent(new PointerEvent('pointercancel', {bubbles:false}));
+    if(typeof btn._hitRelease === 'function'){
+      btn._hitRelease();
+    }else{
+      btn.classList.remove('active');
+      const prog = btn.querySelector('.hit-prog');
+      if(prog) prog.style.width = '0%';
+    }
   }
   for(const k of Object.keys(hitIntervals)){
     clearInterval(hitIntervals[k]);
     delete hitIntervals[k];
   }
+  for(const k of Object.keys(buildUpState)){
+    delete buildUpState[k];
+  }
 }
 function renderHits(){
-  $('#hits').innerHTML = HITS.map((h,i)=>`<button class="hit-btn" data-i="${i}">${h.name}</button>`).join('');
-  document.querySelectorAll('.hit-btn').forEach(btn=>{
+  $('#hits').innerHTML = HITS.map((h,i)=>`<button type="button" class="hit-btn ${h.cls||''}" data-i="${i}">${h.badge?`<span class="hit-badge">${escHtml(h.badge)}</span>`:''}${h.kbd?`<span class="hit-kbd">${escHtml(h.kbd)}</span>`:''}<span class="hit-lbl">${escHtml(h.name)}</span><span class="hit-prog"></span></button>`).join('');
+  document.querySelectorAll('#hits .hit-btn').forEach(btn=>{
     const h = HITS[btn.dataset.i];
-    btn.addEventListener('pointerdown', ()=>hitDown(h, btn));
-    btn.addEventListener('pointerup', ()=>hitUp(h, btn));
-    btn.addEventListener('pointerleave', ()=>hitUp(h, btn));
+    if(!h) return;
+    btn.addEventListener('pointerdown', e=>{
+      try{ btn.setPointerCapture(e.pointerId); }catch(_){}
+      hitDown(h, btn);
+    });
+    btn.addEventListener('pointerup', e=>{
+      try{ if(btn.hasPointerCapture && btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId); }catch(_){}
+      hitUp(h, btn);
+    });
     btn.addEventListener('pointercancel', ()=>hitUp(h, btn));
+    btn.addEventListener('lostpointercapture', ()=>hitUp(h, btn));
+    btn.addEventListener('pointerleave', e=>{
+      if(!(btn.hasPointerCapture && btn.hasPointerCapture(e.pointerId))) hitUp(h, btn);
+    });
   });
+}
+function activeHitVirtualIds(zoneOverride){
+  return targets(zoneOverride).filter(id => virtualsCache[id]?.active);
 }
 async function tool(body, method, zoneOverride){
   const m = method || (body?.tool === 'oneshot' ? 'POST' : 'PUT');
   if(!zoneOverride && !activeDeckId && !mainTargetZone && S.target==='All') return api('/virtuals_tools', {method:m, body: JSON.stringify(body)});
-  const ids = targets(zoneOverride).filter(id=>virtualsCache[id]?.active || virtualsCache[id]?.effect?.type);
+  const ids = activeHitVirtualIds(zoneOverride);
+  if(!ids.length) return;
   await Promise.all(ids.map(id=>api(`/virtuals_tools/${id}`, {method:m, body: JSON.stringify(body)}).catch(()=>{})));
-}
-async function takeSnapshot(key){
-  let raw;
-  try{ const d = await api('/virtuals'); raw = d.virtuals || d; }catch(e){ raw = virtualsCache; }
-  hitSnapshots[key] = JSON.parse(JSON.stringify(raw || {}));
-}
-async function restoreSnapshot(key, zoneOverride){
-  const snap = hitSnapshots[key];
-  delete hitSnapshots[key];
-  if(!snap) return;
-  const allow = new Set(targets(zoneOverride));
-  const jobs = [];
-  for(const id of Object.keys(snap)){
-    if(!allow.has(id)) continue;
-    const v = snap[id];
-    if(v?.active && v.effect && v.effect.type){
-      jobs.push(api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:v.effect.type, config:v.effect.config||{}})}).catch(()=>{}));
-    }else if(v && !v.active){
-      jobs.push(api(`/virtuals/${id}`, {method:'PUT', body: JSON.stringify({active:false})}).catch(()=>{}));
-    }
-  }
-  await Promise.all(jobs);
 }
 function readHitSpeed(btn){
   const cardSpd = btn?.closest('.lprev-card')?.querySelector('[data-ctl="spd"]');
-  return Number((cardSpd || $('#speedSlider'))?.value || 50) / 100;
+  const el = cardSpd || $('#speedSlider');
+  return Number(el ? el.value : 50) / 100;
+}
+function readHitBri(btn){
+  const cardBri = btn?.closest('.lprev-card')?.querySelector('[data-ctl="bri"]');
+  const el = cardBri || $('#briSlider');
+  return Number(el ? el.value : 80) / 100;
+}
+function syncHitSliders(spd01, bri01, btn, zoneOverride){
+  const spdPct = Math.round(spd01 * 100);
+  const briPct = Math.round(bri01 * 100);
+  const card = btn?.closest('.lprev-card') || (zoneOverride ? document.querySelector(`.lprev-card[data-deck="${CSS.escape(zoneOverride)}"]`) : null);
+  if(card){
+    const spEl = card.querySelector('[data-ctl="spd"]'), spVal = card.querySelector('[data-val="spd"]');
+    if(spEl) spEl.value = spdPct;
+    if(spVal) spVal.textContent = spdPct + '%';
+    const brEl = card.querySelector('[data-ctl="bri"]'), brVal = card.querySelector('[data-val="bri"]');
+    if(brEl) brEl.value = briPct;
+    if(brVal) brVal.textContent = briPct + '%';
+  }
+  if(!zoneOverride || zoneOverride === activeDeckId){
+    if($('#speedSlider')) $('#speedSlider').value = spdPct;
+    if($('#speedVal')) $('#speedVal').textContent = spdPct + '%';
+    if($('#briSlider')) $('#briSlider').value = briPct;
+    if($('#briVal')) $('#briVal').textContent = briPct + '%';
+  }
 }
 async function hitDown(h, btn, zoneOverride){
+  if(!h || !btn || btn.classList.contains('active')) return;
   const key = hitKey(h, zoneOverride);
   const tok = (hitPressTokens[key] = (hitPressTokens[key] || 0) + 1);
   btn.classList.add('active');
+  btn._hitRelease = () => hitUp(h, btn, zoneOverride);
   if(h.kind==='oneshot'||h.kind==='punch'){
     await quantWait(S.qnt);
-    if(hitPressTokens[key] !== tok || !btn.classList.contains('active')) return;
+    if(hitPressTokens[key] !== tok) return;
+    if(!btn.classList.contains('active')){
+      btn.classList.add('active');
+      setTimeout(()=>{ if(hitPressTokens[key] === tok) btn.classList.remove('active'); }, 150);
+    }
   }
   try{
-    if(h.kind==='oneshot'){ const m=INT[S.int]; await tool({tool:'oneshot', color:h.color, ramp:h.ramp, hold:Math.round(h.hold*m), fade:Math.round(h.fade*m)}, undefined, zoneOverride); }
-    else if(h.kind==='punch'){ const c = curPalette.colors[2] || curPalette.colors[curPalette.colors.length - 1] || '#e84a0c'; const m=INT[S.int]; await tool({tool:'oneshot', color:c, ramp:10, hold:Math.round(120*m), fade:Math.round(250*m)}, undefined, zoneOverride); }
-    else if(h.kind==='build'){
-      if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
-      let v = readHitSpeed(btn);
-      hitIntervals[key] = setInterval(()=>{ v=Math.min(1,v+.05); setSpeed(v, zoneOverride, true); },250);
+    if(h.kind==='oneshot'){ const m=INT[S.int]; await tool({tool:'oneshot', color:h.color, ramp:h.ramp, hold:Math.round(h.hold*m), fade:Math.round(h.fade*m)}, 'POST', zoneOverride); }
+    else if(h.kind==='punch'){ const fxs = getFxPadSettings(zoneOverride); const c = fxs.punchAuto ? (curPalette.colors[2] || curPalette.colors[curPalette.colors.length - 1] || '#e84a0c') : (fxs.punchColor || '#e84a0c'); const m=INT[S.int]; await tool({tool:'oneshot', color:c, ramp:10, hold:Math.round(120*m), fade:Math.round(250*m)}, 'POST', zoneOverride); }
+    else if(h.kind==='hold-overlay'){
+      const holdSet = zoneHoldSet(zoneOverride);
+      holdSet.add(key);
+      const p = tool({tool:'oneshot', color:h.color, ramp:1, hold:60000, fade:1, brightness:1.0}, 'POST', zoneOverride).catch(()=>{});
+      hitHoldPending[key] = p;
+      await p;
+      if(hitHoldPending[key] === p) delete hitHoldPending[key];
     }
-    else if(h.kind==='hold'){
-      await takeSnapshot(key);
-      if(hitPressTokens[key] !== tok || !btn.classList.contains('active')){ delete hitSnapshots[key]; return; }
-      const col = h.color === 'black' ? '#000000' : (h.color === 'white' ? '#ffffff' : h.color);
-      const ids = targets(zoneOverride).filter(id => virtualsCache[id]?.active || virtualsCache[id]?.effect?.type);
-      await Promise.all(ids.map(id => api(`/virtuals/${id}/effects`, {method:'POST', body: JSON.stringify({type:'singleColor', config:{color: col, brightness: 1.0}})}).catch(()=>{})));
+    else if(h.kind==='hold-dim'){
+      const ids = activeHitVirtualIds(zoneOverride).filter(id => virtualsCache[id]?.effect?.type);
+      const snap = {};
+      for(const id of ids){
+        const curB = virtualsCache[id]?.effect?.config?.brightness;
+        snap[id] = typeof curB === 'number' ? curB : 1.0;
+      }
+      hitSnapshots[key] = snap;
+      const p = Promise.all(ids.map(id => api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{brightness: 0.15}})}).catch(()=>{})));
+      hitHoldPending[key] = p;
+      await p;
+      if(hitHoldPending[key] === p) delete hitHoldPending[key];
+    }
+    else if(h.kind==='buildup'){
+      if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
+      const bars = Number(getFxPadSettings(zoneOverride).buildBars) || Number($('#buildBarsSel')?.value) || 4;
+      const effBpm = bpm || 128;
+      const totalMs = (60000 / effBpm) * (bars * 4);
+      const ids = activeHitVirtualIds(zoneOverride).filter(id => virtualsCache[id]?.effect?.type);
+      const baseVirt = {};
+      for(const id of ids){
+        const eff = virtualsCache[id].effect;
+        const cfg = eff.config || {};
+        const restoreCfg = {};
+        for(const [k] of SPEED_INFER_KEYS){
+          if(k in cfg) restoreCfg[k] = cfg[k];
+        }
+        if('brightness' in cfg) restoreCfg.brightness = cfg.brightness;
+        baseVirt[id] = { type: eff.type, restoreCfg };
+      }
+      const st = buildUpState[key] = {
+        startAt: Date.now(),
+        totalMs,
+        baseSpd: readHitSpeed(btn),
+        baseBri: readHitBri(btn),
+        baseVirt,
+        pct: 0,
+        zoneOverride,
+        btn,
+        lastPulseAt: 0,
+        dropped: false,
+        busy: false,
+        pending: null,
+      };
+      hitIntervals[key] = setInterval(()=>{
+        if(!btn.classList.contains('active') || hitPressTokens[key] !== tok){
+          clearInterval(hitIntervals[key]);
+          delete hitIntervals[key];
+          return;
+        }
+        const now = Date.now();
+        const pct = Math.min(1, (now - st.startAt) / st.totalMs);
+        st.pct = pct;
+        const prog = btn.querySelector('.hit-prog');
+        if(prog) prog.style.width = (pct * 100).toFixed(1) + '%';
+        if(!st.dropped){
+          const spd = st.baseSpd + (1 - st.baseSpd) * pct;
+          const bri = Math.min(1, st.baseBri + (1 - st.baseBri) * (pct * 0.85));
+          syncHitSliders(spd, bri, btn, zoneOverride);
+          if(!st.busy){
+            st.busy = true;
+            const reqs = Object.entries(st.baseVirt).map(([id, info]) => {
+              const patch = { ...buildSpeedPatch(info.type, spd), brightness: Number(bri.toFixed(4)) };
+              return api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config: patch})}).catch(()=>{});
+            });
+            st.pending = Promise.all(reqs).finally(()=>{ st.busy = false; });
+          }
+          if(pct >= 0.72 && now - st.lastPulseAt >= (S.guard ? 420 : 300)){
+            st.lastPulseAt = now;
+            tool({tool:'oneshot', color:'white', ramp:5, hold:35, fade:80}, 'POST', zoneOverride).catch(()=>{});
+          }
+          if(pct >= 1){
+            st.dropped = true;
+            clearInterval(hitIntervals[key]);
+            delete hitIntervals[key];
+            tool({tool:'oneshot', color:'white', ramp:5, hold:160, fade:450}, 'POST', zoneOverride).catch(()=>{});
+          }
+        }
+      }, 200);
     }
     else if(h.kind==='strobe'){
       if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
-      hitIntervals[key] = setInterval(()=>tool({tool:'oneshot', color:'white', ramp:1, hold:30, fade:30}, undefined, zoneOverride).catch(()=>{}), S.guard?260:110);
+      let stepIdx = 0;
+      const fireStrobe = () => {
+        const fxs = getFxPadSettings(zoneOverride);
+        const sp = getStrobeParams(zoneOverride);
+        const palCols = (curPalette && Array.isArray(curPalette.colors) && curPalette.colors.length) ? curPalette.colors : ['#ffffff'];
+        const col = fxs.strobeUsePalette ? palCols[(stepIdx++) % palCols.length] : (fxs.strobeColor || '#ffffff');
+        tool({tool:'oneshot', color:col, ramp:sp.ramp, hold:sp.hold, fade:sp.fade, brightness:sp.bri}, 'POST', zoneOverride).catch(()=>{});
+      };
+      const sp0 = getStrobeParams(zoneOverride);
+      fireStrobe();
+      hitIntervals[key] = setInterval(fireStrobe, sp0.ms);
     }
   }catch(e){ toast(h.name+' failed: '+e.message, true); }
 }
 async function hitUp(h, btn, zoneOverride){
-  if(!btn.classList.contains('active')) return;
+  if(!btn || !btn.classList.contains('active')) return;
   const key = hitKey(h, zoneOverride);
-  hitPressTokens[key] = (hitPressTokens[key] || 0) + 1;
-  btn.classList.remove('active');
-  if(h.kind==='build'){
-    if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
-    setSpeed(readHitSpeed(btn), zoneOverride, true);
+  if(h.kind !== 'oneshot' && h.kind !== 'punch'){
+    hitPressTokens[key] = (hitPressTokens[key] || 0) + 1;
   }
-  if(h.kind==='hold'){ await restoreSnapshot(key, zoneOverride); }
-  if(h.kind==='strobe'){
+  btn.classList.remove('active');
+  delete btn._hitRelease;
+  const prog = btn.querySelector('.hit-prog');
+  if(prog) prog.style.width = '0%';
+  if(h.kind==='buildup'){
     if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
+    const st = buildUpState[key];
+    delete buildUpState[key];
+    if(st){
+      if(st.pending){ try{ await st.pending; }catch(_){} }
+      if(!st.dropped && st.pct >= 0.25){
+        tool({tool:'oneshot', color:'white', ramp:5, hold:160, fade:450}, 'POST', zoneOverride).catch(()=>{});
+      }
+      syncHitSliders(st.baseSpd, st.baseBri, btn, zoneOverride);
+      await Promise.all(Object.entries(st.baseVirt).map(([id, info]) => {
+        const cfg = Object.keys(info.restoreCfg).length ? info.restoreCfg : { ...buildSpeedPatch(info.type, st.baseSpd), brightness: st.baseBri };
+        return api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config: cfg})}).catch(()=>{});
+      }));
+    }
+  }
+  else if(h.kind==='hold-overlay'){
+    const holdSet = zoneHoldSet(zoneOverride);
+    holdSet.delete(key);
+    if(hitHoldPending[key]){
+      try{ await hitHoldPending[key]; }catch(_){}
+      delete hitHoldPending[key];
+    }
+    if(holdSet.size === 0){
+      await tool({tool:'oneshot'}, 'PUT', zoneOverride).catch(()=>{});
+    }
+  }
+  else if(h.kind==='hold-dim'){
+    const snap = hitSnapshots[key];
+    delete hitSnapshots[key];
+    if(hitHoldPending[key]){
+      try{ await hitHoldPending[key]; }catch(_){}
+      delete hitHoldPending[key];
+    }
+    if(snap){
+      await Promise.all(Object.entries(snap).map(([id, b]) => api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{brightness: b}})}).catch(()=>{})));
+    }
+  }
+  else if(h.kind==='strobe'){
+    if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
+    tool({tool:'oneshot'}, 'PUT', zoneOverride).catch(()=>{});
   }
 }
+
+window.addEventListener('blur', cancelActiveHits);
+document.addEventListener('visibilitychange', () => { if(document.hidden) cancelActiveHits(); });
+document.addEventListener('keydown', e => {
+  if(e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = (e.target?.tagName || '').toUpperCase();
+  if(['INPUT','SELECT','TEXTAREA'].includes(tag)) return;
+  const k = (e.key || '').toLowerCase();
+  const idx = HITS.findIndex(h => h.kbd && h.kbd.toLowerCase() === k);
+  if(idx < 0) return;
+  const btn = document.querySelector(`#hits .hit-btn[data-i="${idx}"]`);
+  if(btn) hitDown(HITS[idx], btn);
+});
+document.addEventListener('keyup', e => {
+  const k = (e.key || '').toLowerCase();
+  const idx = HITS.findIndex(h => h.kbd && h.kbd.toLowerCase() === k);
+  if(idx < 0) return;
+  const btn = document.querySelector(`#hits .hit-btn[data-i="${idx}"]`);
+  if(btn) hitUp(HITS[idx], btn);
+});
 
 renderHits();
 // ---- v3: status, macros, groups, quantize, scene-cycler, tabs, lab, diagnostics ----
@@ -692,7 +1088,11 @@ function connectWS(){
     const agcGain = m.agc_gain ?? m.data?.agc_gain;
     const melGain = m.mel_gain ?? m.data?.mel_gain;
     const audioVol = m.volume ?? m.data?.volume;
-    updateSpectrumData(arr, freqs, { agcGain, melGain, audioVol });
+    const energyState = m.energy_state ?? m.data?.energy_state;
+    const dropNow = Boolean(m.drop_now ?? m.data?.drop_now);
+    const bassRatio = m.bass_ratio ?? m.data?.bass_ratio;
+    updateSpectrumData(arr, freqs, { agcGain, melGain, audioVol, energyState, dropNow, bassRatio });
+    if(typeof handleEnergyTelemetry === 'function') handleEnergyTelemetry({ energyState, dropNow, bassRatio });
   };
   sock.onerror=()=>logCall('websocket error','WS','err',0);
   sock.onclose=()=>{
@@ -1409,6 +1809,7 @@ function stepSceneCycler(){
   if(S.lock || sceneCycleBusy) return;
   let ids = getSceneCycleTargetIds('');
   if(sceneCycleSelected) ids = ids.filter(id => sceneCycleSelected.has(id));
+  if(typeof filterSceneIdsByHype === 'function') ids = filterSceneIdsByHype(ids);
   if(!ids.length) return;
   const rand = !!$('#sceneCycleRand')?.checked;
   sceneCycleIdx = pickNextIdx(ids.length, sceneCycleIdx, rand);
@@ -1420,6 +1821,7 @@ function stepDeckSceneCycler(deckId){
   if(S.lock || scyc.busy || !scyc.on) return;
   let ids = getSceneCycleTargetIds(deckId);
   if(scyc.pool) ids = ids.filter(id => scyc.pool.has(id));
+  if(typeof filterSceneIdsByHype === 'function') ids = filterSceneIdsByHype(ids);
   if(!ids.length) return;
   scyc.idx = pickNextIdx(ids.length, scyc.idx, scyc.rand);
   scyc.busy = true;
@@ -1507,7 +1909,7 @@ $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(
   document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!=='pane-'+b.dataset.t);
   if(b.dataset.t==='diag') $('#log').textContent=callLog.join('\n')||'no calls yet';
   if(b.dataset.t==='eq') requestAnimationFrame(drawSpectrum);
-  if(b.dataset.t==='main'){ renderDeckTabs(); renderScenes(); renderPalettes(); syncPalCycleUI(); syncSceneCycleUI(); syncFullColorUI(); syncMainCtlSliders(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
+  if(b.dataset.t==='main'){ renderDeckTabs(); renderScenes(); renderPalettes(); syncPalCycleUI(); syncSceneCycleUI(); syncFullColorUI(); syncMainCtlSliders(); if(typeof renderDeckFxSettings === 'function') renderDeckFxSettings(); if(typeof scheduleTubePreview === 'function') scheduleTubePreview(); }
   if(b.dataset.t==='scenes'){ if(typeof renderSceneStudio === 'function') renderSceneStudio(); }
   if(b.dataset.t==='layout'){ if(typeof renderLayoutEditorBoxes === 'function') renderLayoutEditorBoxes(); if(typeof scheduleLayoutPreview === 'function') scheduleLayoutPreview(); } });
 $('#resync').addEventListener('click',()=>connect());

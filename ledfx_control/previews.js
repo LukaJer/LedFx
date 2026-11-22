@@ -117,7 +117,7 @@ function scheduleTubePreview(){
   });
 }
 
-const deckOutMode = {}, deckOutSnapshot = {}, deckOutBusy = {};
+const deckOutMode = {}, deckOutSnapshot = {}, deckOutBusy = {}, deckFxOpen = {};
 async function toggleDeckOutMode(deckId, mode, card){
   if(guardLock() || deckOutBusy[deckId]) return;
   deckOutBusy[deckId] = true;
@@ -215,7 +215,7 @@ function drawTubePreview(){
             <div class="name">${escHtml(pal.name)}</div>
           </div>`;
         }).join('');
-        const hitsHtml = HITS.map((h, hi) => `<button class="hit-btn" data-hi="${hi}">${escHtml(h.name)}</button>`).join('');
+        const hitsHtml = HITS.map((h, hi) => `<button type="button" class="hit-btn ${h.cls||''}" data-hi="${hi}">${h.badge?`<span class="hit-badge">${escHtml(h.badge)}</span>`:''}<span class="hit-lbl">${escHtml(h.name)}</span><span class="hit-prog"></span></button>`).join('');
         const macrosHtml = (typeof MACROS !== 'undefined' ? MACROS : []).map((m, mi) => {
           const pal = macroPalette(m);
           const tip = `${pal.name} · Speed ${Math.round(m.sp*100)}% · Sens ${Math.round(m.se*100)}%`;
@@ -297,7 +297,8 @@ function drawTubePreview(){
             <div class="gcard"><label><span>Speed</span><span data-val="spd">${ctl.spd}%</span></label><input type="range" data-ctl="spd" min="0" max="100" value="${ctl.spd}"></div>
             <div class="gcard"><label><span>Sens</span><span data-val="sns">${ctl.sns}%</span></label><input type="range" data-ctl="sns" min="0" max="100" value="${ctl.sns}"></div>
           </div>
-          <div class="lprev-sub">Hits</div>
+          <div class="lprev-sub lprev-sub-row"><span>Hits</span><button type="button" class="btn lprev-fx-gear ${deckFxOpen[id]?'on':''}" data-open-fx-settings title="Configure Strobe, Palette Punch, and Build Up for this layout">FX Settings</button></div>
+          <div class="fx-settings-bar lprev-fx-bar" data-fx-box="${escHtml(id)}" ${deckFxOpen[id]?'':'hidden'}>${typeof renderFxSettingsHtml === 'function' ? renderFxSettingsHtml() : ''}</div>
           <div class="lprev-hits">${hitsHtml}</div>
         </div>`;
       }).join('');
@@ -497,12 +498,35 @@ function drawTubePreview(){
           e.stopPropagation();
           getDeckSceneCycle(deckId).rand = e.target.checked;
         });
+        const fxBox = card.querySelector(`.lprev-fx-bar[data-fx-box="${CSS.escape(deckId)}"]`);
+        if(fxBox && typeof bindFxSettingsBox === 'function') bindFxSettingsBox(fxBox, deckId);
+        card.querySelector('[data-open-fx-settings]')?.addEventListener('click', e => {
+          e.stopPropagation();
+          deckFxOpen[deckId] = !deckFxOpen[deckId];
+          e.currentTarget.classList.toggle('on', !!deckFxOpen[deckId]);
+          if(fxBox){
+            fxBox.hidden = !deckFxOpen[deckId];
+            if(!fxBox.hidden && typeof syncFxSettingsContainer === 'function') syncFxSettingsContainer(fxBox, deckId);
+          }
+        });
         card.querySelectorAll('.lprev-hits .hit-btn').forEach(hb => {
           const h = HITS[Number(hb.dataset.hi)];
-          hb.addEventListener('pointerdown', e => { e.stopPropagation(); hitDown(h, hb, deckId); });
-          hb.addEventListener('pointerup', e => { e.stopPropagation(); hitUp(h, hb, deckId); });
-          hb.addEventListener('pointerleave', () => hitUp(h, hb, deckId));
+          if(!h) return;
+          hb.addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            try{ hb.setPointerCapture(e.pointerId); }catch(_){}
+            hitDown(h, hb, deckId);
+          });
+          hb.addEventListener('pointerup', e => {
+            e.stopPropagation();
+            try{ if(hb.hasPointerCapture && hb.hasPointerCapture(e.pointerId)) hb.releasePointerCapture(e.pointerId); }catch(_){}
+            hitUp(h, hb, deckId);
+          });
           hb.addEventListener('pointercancel', () => hitUp(h, hb, deckId));
+          hb.addEventListener('lostpointercapture', () => hitUp(h, hb, deckId));
+          hb.addEventListener('pointerleave', e => {
+            if(!(hb.hasPointerCapture && hb.hasPointerCapture(e.pointerId))) hitUp(h, hb, deckId);
+          });
         });
       });
     }

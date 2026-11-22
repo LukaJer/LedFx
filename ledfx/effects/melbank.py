@@ -496,6 +496,23 @@ class Melbanks:
         )
         vol_val = self._audio.volume(filtered=True)
         volume = round(float(vol_val), 2) if vol_val is not None else None
+        energy_state_fn = getattr(self._audio, "energy_state", None)
+        energy_state: str | None = None
+        if callable(energy_state_fn):
+            raw_state = energy_state_fn()
+            if raw_state is not None:
+                energy_state = str(raw_state)
+        drop_now_fn = getattr(self._audio, "drop_now", None)
+        drop_now = bool(drop_now_fn()) if callable(drop_now_fn) else False
+        bass_ratio_fn = getattr(self._audio, "bass_ratio", None)
+        bass_ratio: float | None = None
+        if callable(bass_ratio_fn):
+            raw_ratio = bass_ratio_fn()
+            if raw_ratio is not None:
+                try:
+                    bass_ratio = round(float(raw_ratio), 2)
+                except (TypeError, ValueError):
+                    bass_ratio = None
         self._ledfx.events.fire_event(
             GraphUpdateEvent(
                 f"melbank_{i}",
@@ -505,5 +522,8 @@ class Melbanks:
                 agc_gain=agc_gain,
                 mel_gain=mel_gain,
                 volume=volume,
+                energy_state=energy_state,
+                drop_now=drop_now,
+                bass_ratio=bass_ratio,
             )
         )

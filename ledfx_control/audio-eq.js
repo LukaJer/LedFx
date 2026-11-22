@@ -331,16 +331,20 @@ $('#specResetZones')?.addEventListener('click', ()=>{
 let beatZoneAvg = 0, beatPulse = 0, lastBeatPulseAt = 0;
 function updateAgcReadout(telemetry){
   const el = $('#agcReadout');
-  if(!el || !telemetry) return;
+  if(!el || !telemetry || typeof telemetry !== 'object') return;
   const parts = [];
   if(typeof telemetry.agcGain === 'number') parts.push(`AGC ${telemetry.agcGain.toFixed(2)}x`);
   else parts.push(eqState.autogain ? 'AGC 1.00x' : 'AGC off');
   if(typeof telemetry.melGain === 'number') parts.push(`Mel ${telemetry.melGain.toFixed(2)}`);
   if(typeof telemetry.audioVol === 'number') parts.push(`Vol ${telemetry.audioVol.toFixed(2)}`);
-  el.textContent = parts.join(' · ');
+  const isHeld = telemetry.energyState === 'breakdown' && !!eqState.autogain;
+  let txt = parts.join(' · ');
+  if(isHeld) txt += ' · HOLD';
+  el.textContent = txt;
   const gated = typeof telemetry.audioVol === 'number' && telemetry.audioVol <= (eqState.min_volume ?? 0.2);
   el.classList.toggle('gated', gated);
-  el.classList.toggle('active', !gated && !!eqState.autogain);
+  el.classList.toggle('held', isHeld);
+  el.classList.toggle('active', !gated && !!eqState.autogain && !isHeld);
 }
 function updateSpectrumData(mel, freqs, telemetry){
   updateAgcReadout(telemetry);

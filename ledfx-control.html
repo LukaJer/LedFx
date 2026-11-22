@@ -30,10 +30,35 @@
     <button class="stc blackout-big" id="stBlackoutBtn" type="button" title="Toggle Master Blackout (B)"><small>Master</small><b>BLACKOUT</b></button>
     <button class="stc whiteout-big" id="stWhiteoutBtn" type="button" title="Toggle Master Whiteout"><small>Master</small><b>WHITEOUT</b></button>
     <div class="stc"><small>Audio</small><span class="status" id="stAudio">no stream</span></div>
+    <div class="stc energy-pill" id="stEnergyPill" title="Live bass energy detector (short vs long term)"><small>Energy</small><span id="stEnergyVal">NORMAL</span></div>
   </div>
 </div>
 <main>
 <div id="pane-main" class="pane">
+  <div class="section hype-sec" id="hypeSec">
+    <div class="hype-card">
+      <div class="hype-head">
+        <div class="hype-title"><span>Master Hype</span><strong id="hypeVal">55%</strong><span class="hype-tier" id="hypeTier">GROOVE</span><span class="hype-scope" id="hypeScope">All Zones</span></div>
+        <div class="hype-presets">
+          <button type="button" class="btn hype-snap" data-hype="20">Chill</button>
+          <button type="button" class="btn hype-snap" data-hype="55">Groove</button>
+          <button type="button" class="btn hype-snap" data-hype="95">Peak</button>
+        </div>
+      </div>
+      <input type="range" id="hypeSlider" min="0" max="100" value="55">
+      <div class="hype-toggles">
+        <button type="button" class="tgl" id="hypeBriBtn" title="Include master brightness when dragging Master Hype">Scale Bri OFF</button>
+        <button type="button" class="tgl" id="hypeFilterBtn" title="Filter Scene Cycler pool by current Hype tier (Chill / Groove / Peak)">Filter Cycler OFF</button>
+        <button type="button" class="tgl" id="cueDropBtn" title="Wait to switch clicked scene until next detected Drop">Cue on Drop OFF</button>
+        <button type="button" class="tgl" id="autoDropFlashBtn" title="Automatically fire a white accent flash on detected Drop">Drop Flash OFF</button>
+      </div>
+      <div class="drop-queue-bar" id="dropQueueBar" hidden>
+        <span id="dropQueueText">Queued: —</span>
+        <button type="button" class="btn" id="dropQueueFireBtn">Fire Now</button>
+        <button type="button" class="btn" id="dropQueueClearBtn">&times;</button>
+      </div>
+    </div>
+  </div>
   <div class="section" id="tubePreviewSec">
     <div id="multiPreviewGrid" class="multi-previews" hidden></div>
     <canvas id="tubePreviewCanvas"></canvas>
@@ -144,7 +169,19 @@
           <b>TARGET</b> selects which virtual group receives Brightness, Speed, Sensitivity, Palettes, and Hits (<b>All</b> = entire active zone; <b>Accent / Left / Right</b> = virtuals assigned that group in the <b>Virtuals &amp; Tubes</b> tab).
         </div>
       </div>
-      <div class="section"><h2>Hits <span style="text-transform:none;font-weight:400">— hold to trigger, releases spring back</span></h2><div class="hits" id="hits"></div>
+      <div class="section">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <h2 style="margin:0">Hold-to-FX Pads <span style="text-transform:none;font-weight:400">— hold to engage, release to snap back</span></h2>
+          <div class="row2" style="margin:0">
+            <button type="button" class="btn" id="deckFxSettingsBtn" style="padding:4px 8px;font-size:11px" title="Configure Hold Strobe, Palette Punch, and Build Up for this layout">FX Settings</button>
+            <select id="buildBarsSel" title="Duration for BPM-synced Build Up hold pad" style="background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:4px 8px;border-radius:7px;font-size:11px">
+              <option value="4" selected>4 Bar Build</option>
+              <option value="8">8 Bar Build</option>
+            </select>
+          </div>
+        </div>
+        <div class="fx-settings-bar" id="deckFxSettingsBar" style="margin-bottom:10px" hidden></div>
+        <div class="hits" id="hits"></div>
         <div class="ctl">
           <div class="grp">QNT <div class="seg" data-k="qnt"><button class="on">Now</button><button>Bar</button><button>Phrase</button></div></div>
           <div class="grp">INT <div class="seg" data-k="int"><button>Soft</button><button class="on">Normal</button><button>Peak</button></div></div>
@@ -154,7 +191,7 @@
         </div>
         <div class="status" style="margin-top:8px;line-height:1.45;font-size:11px">
           <b>Target</b> filters which virtuals respond to sliders, palettes, and hits (<b>All / Accent / Left / Right</b> inside the active <b>Control Zone</b>).
-          <b>Hits</b> are momentary performance triggers (Flash/Punch fire oneshots; Hold Blackout/Whiteout, Strobe, and Build Up run while held and restore prior effects on release).
+          <b>Hold-to-FX Pads</b> run while held and snap back on release — shortcuts: <b>Z</b> Hold Blackout, <b>X</b> Hold Strobe, <b>C</b> Hold Blinder, <b>V</b> BPM Build Up (plus Flash, Bloom, Palette Punch, and Hold Dim).
         </div>
       </div>
     </div>
@@ -289,6 +326,7 @@
         <select id="audioDevSel" title="Audio Input Device" style="max-width:240px"><option value="">Audio input…</option></select>
         <span class="spec-meta" id="specMeta">waiting for audio…</span>
         <span class="agc-readout" id="agcReadout" title="Live AGC multiplier, Melbank gain, and filtered volume vs Min Vol">AGC — · Mel — · Vol —</span>
+        <span class="energy-badge" id="eqEnergyBadge">NORMAL · 1.00x</span>
         <button class="tgl on" id="specPeakBtn">Peak Hold</button>
         <button class="btn" id="specResetPeaks">Reset Peaks</button>
         <button class="btn" id="specResetZones" title="Reset Beat, Bass, Mid, and High frequency zones to defaults">Reset Zones</button>
@@ -556,5 +594,6 @@
 <script defer src="ledfx_control/performance.js"></script>
 <script defer src="ledfx_control/audio-eq.js"></script>
 <script defer src="ledfx_control/previews.js"></script>
+<script defer src="ledfx_control/hype-drop.js"></script>
 </body>
 </html>
