@@ -199,6 +199,7 @@ $('#cueDropBtn')?.addEventListener('click', () => {
   hypeState.cueOnDrop = !hypeState.cueOnDrop;
   saveHypeState();
   syncHypeTogglesUI();
+  if(!hypeState.cueOnDrop) clearDropQueue();
   toast(hypeState.cueOnDrop ? 'Cue on Drop ON — clicked scenes wait for next Drop' : 'Cue on Drop OFF');
 });
 
@@ -318,6 +319,21 @@ function handleEnergyTelemetry(telemetry){
   }
   lastDropActive = isDrop;
 }
+
+async function resetEnergyBaseline(){
+  try{
+    await api('/audio/energy/reset', { method: 'POST' });
+    lastDropActive = false;
+    lastDropHandledAt = 0;
+    handleEnergyTelemetry({ energyState: 'normal', dropNow: false, bassRatio: 1.0 });
+    if(typeof toast === 'function') toast('Energy baseline reset');
+  }catch(e){
+    if(typeof toast === 'function') toast('Energy reset failed: ' + e.message, true);
+  }
+}
+
+$('#resetEnergyBtn')?.addEventListener('click', resetEnergyBaseline);
+$('#eqResetEnergyBtn')?.addEventListener('click', resetEnergyBaseline);
 
 syncHypeUI(false);
 syncDropQueueUI();

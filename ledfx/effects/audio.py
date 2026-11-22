@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import math
 import queue
@@ -1329,6 +1330,8 @@ class AudioAnalysisSource(AudioInputSource):
         self.beat_power_history = deque(maxlen=self.beat_power_history_len)
 
         # drop & breakdown envelope detector
+        if not hasattr(self, "_energy_lock"):
+            self._energy_lock = threading.Lock()
         self._energy_short: float = 0.0
         self._energy_long: float = 0.0
         self._energy_state: str = "normal"  # "normal" | "breakdown" | "drop"
@@ -1338,6 +1341,12 @@ class AudioAnalysisSource(AudioInputSource):
         self._energy_last_ts: float = time.monotonic()
         self._bass_ratio: float = 1.0
         self._breakdown_hold = False
+
+    def _get_energy_lock(self) -> contextlib.AbstractContextManager[object]:
+        lock: contextlib.AbstractContextManager[object] | None = getattr(
+            self, "_energy_lock", None
+        )
+        return lock if lock is not None else contextlib.nullcontext()
 
     def _update_beat_freq_indexes(self) -> None:
         beat_min_hz = min(self._config.beat_min_freq, self._config.beat_max_freq - 10)
@@ -1460,7 +1469,8 @@ class AudioAnalysisSource(AudioInputSource):
         tempo = getattr(self, "_tempo", None)
         if tempo is None:
             return None
-        if self.volume(filtered=True) <= self._config.min_volume:
+        vol = self.volume(filtered=True)
+        if vol is None or vol <= self._config.min_volume:
             return self._stable_bpm
         now = time.monotonic()
         if now - self._bpm_last_sample_ts < 0.25:
@@ -1545,80 +1555,109 @@ class AudioAnalysisSource(AudioInputSource):
             return False
 
     def _update_energy_envelope(self, now: float | None = None) -> None:
-        cur_now = time.monotonic() if now is None else now
-        dt = min(0.2, max(0.001, cur_now - self._energy_last_ts))
-        self._energy_last_ts = cur_now
+        with self._get_energy_lock():
+            cur_now = time.monotonic() if now is None else now
+            dt = min(0.2, max(0.001, cur_now - self._energy_last_ts))
+            self._energy_last_ts = cur_now
 
-        vol = self.volume(filtered=True)
-        melbank = self.melbanks.melbanks[0][
-            self.beat_min_mel_index : self.beat_max_mel_index
-        ]
-        bass = float(np.mean(melbank)) if len(melbank) > 0 else 0.0
+            vol = self.volume(filtered=True)
+            melbank = self.melbanks.melbanks[0][
+                self.beat_min_mel_index : self.beat_max_mel_index
+            ]
+            # Undo MelbankProcessor's per-frame mel_gain normalization so quiet
+            # breakdowns aren't scaled back up to 1.0 when mel_gain decays.
+            procs = getattr(self.melbanks, "melbank_processors", None)
+            mel_gain = 1.0
+            if procs:
+                mg = getattr(getattr(procs[0], "mel_gain", None), "value", None)
+                if mg is not None:
+                    mel_gain = max(1e-6, float(mg))
+            bass = (float(np.mean(melbank)) * mel_gain) if len(melbank) > 0 else 0.0
 
-        if vol is None or vol <= self._config.min_volume:
-            self._energy_short *= math.exp(-dt / 1.0)
-            self._energy_long *= math.exp(-dt / 20.0)
-            self._breakdown_hold = False
-            self._breakdown_since = 0.0
-            if cur_now >= self._drop_until:
-                self._energy_state = "normal"
-            self._bass_ratio = min(
+            if vol is None or vol <= self._config.min_volume:
+                self._energy_short *= math.exp(-dt / 1.0)
+                self._energy_long *= math.exp(-dt / 20.0)
+                self._breakdown_hold = False
+                self._breakdown_since = 0.0
+                if cur_now >= self._drop_until:
+                    self._energy_state = "normal"
+                self._bass_ratio = min(
+                    4.0, max(0.0, self._energy_short / max(1e-4, self._energy_long))
+                )
+                return
+
+            alpha_short = 1.0 - math.exp(-dt / 1.0)
+            alpha_long = 1.0 - math.exp(-dt / 12.0)
+            self._energy_short += alpha_short * (bass - self._energy_short)
+            if self._energy_state != "breakdown":
+                self._energy_long += alpha_long * (bass - self._energy_long)
+
+            ratio = min(
                 4.0, max(0.0, self._energy_short / max(1e-4, self._energy_long))
             )
-            return
+            self._bass_ratio = ratio
 
-        alpha_short = 1.0 - math.exp(-dt / 1.0)
-        alpha_long = 1.0 - math.exp(-dt / 12.0)
-        self._energy_short += alpha_short * (bass - self._energy_short)
-        if self._energy_state != "breakdown":
-            self._energy_long += alpha_long * (bass - self._energy_long)
-
-        ratio = min(
-            4.0, max(0.0, self._energy_short / max(1e-4, self._energy_long))
-        )
-        self._bass_ratio = ratio
-
-        if cur_now < self._drop_until:
-            self._energy_state = "drop"
-            self._breakdown_hold = False
-        elif self._energy_state == "breakdown":
-            if bass >= max(0.12, self._energy_long * 0.85) or ratio >= 0.90:
-                if cur_now >= self._drop_cooldown_until:
-                    self._energy_state = "drop"
-                    self._drop_until = cur_now + 1.2
-                    self._drop_cooldown_until = cur_now + 4.0
-                else:
-                    self._energy_state = "normal"
-                self._breakdown_since = 0.0
+            if cur_now < self._drop_until:
+                self._energy_state = "drop"
                 self._breakdown_hold = False
-                self._energy_short = max(self._energy_short, bass)
-            elif self._breakdown_since > 0.0 and (cur_now - self._breakdown_since) > 45.0:
-                self._energy_state = "normal"
-                self._breakdown_hold = False
-                self._breakdown_since = 0.0
-        else:
-            if self._energy_long >= 0.08 and ratio < 0.35:
-                if self._breakdown_since == 0.0:
-                    self._breakdown_since = cur_now
-                if cur_now - self._breakdown_since >= 2.5:
-                    self._energy_state = "breakdown"
-                    self._breakdown_hold = True
-                else:
+            elif self._energy_state == "breakdown":
+                if bass >= max(0.02, self._energy_long * 0.85) or ratio >= 0.90:
+                    if cur_now >= self._drop_cooldown_until:
+                        self._energy_state = "drop"
+                        self._drop_until = cur_now + 1.2
+                        self._drop_cooldown_until = cur_now + 4.0
+                    else:
+                        self._energy_state = "normal"
+                    self._breakdown_since = 0.0
+                    self._breakdown_hold = False
+                    self._energy_short = max(self._energy_short, bass)
+                elif (
+                    self._breakdown_since > 0.0
+                    and (cur_now - self._breakdown_since) > 45.0
+                ):
                     self._energy_state = "normal"
                     self._breakdown_hold = False
+                    self._breakdown_since = 0.0
+                    self._energy_long = self._energy_short
             else:
-                self._breakdown_since = 0.0
-                self._energy_state = "normal"
-                self._breakdown_hold = False
+                if self._energy_long >= 0.01 and ratio < 0.35:
+                    if self._breakdown_since == 0.0:
+                        self._breakdown_since = cur_now
+                    if cur_now - self._breakdown_since >= 2.5:
+                        self._energy_state = "breakdown"
+                        self._breakdown_hold = True
+                    else:
+                        self._energy_state = "normal"
+                        self._breakdown_hold = False
+                else:
+                    self._breakdown_since = 0.0
+                    self._energy_state = "normal"
+                    self._breakdown_hold = False
 
     def energy_state(self) -> str:
-        return self._energy_state
+        with self._get_energy_lock():
+            return self._energy_state
 
     def drop_now(self) -> bool:
-        return self._energy_state == "drop"
+        with self._get_energy_lock():
+            return self._energy_state == "drop"
 
     def bass_ratio(self) -> float:
-        return round(float(self._bass_ratio), 2)
+        with self._get_energy_lock():
+            return round(float(self._bass_ratio), 2)
+
+    def reset_energy_envelope(self) -> None:
+        """Reset short/long bass energy envelopes and drop/breakdown state."""
+        with self._get_energy_lock():
+            self._energy_short = 0.0
+            self._energy_long = 0.0
+            self._energy_state = "normal"
+            self._breakdown_since = 0.0
+            self._drop_until = 0.0
+            self._drop_cooldown_until = 0.0
+            self._energy_last_ts = time.monotonic()
+            self._bass_ratio = 1.0
+            self._breakdown_hold = False
 
     def freq_power(self):
         # hard coded this bc i'm tired and it'll run faster

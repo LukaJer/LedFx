@@ -30,7 +30,7 @@
     <button class="stc blackout-big" id="stBlackoutBtn" type="button" title="Toggle Master Blackout (B)"><small>Master</small><b>BLACKOUT</b></button>
     <button class="stc whiteout-big" id="stWhiteoutBtn" type="button" title="Toggle Master Whiteout"><small>Master</small><b>WHITEOUT</b></button>
     <div class="stc"><small>Audio</small><span class="status" id="stAudio">no stream</span></div>
-    <div class="stc energy-pill" id="stEnergyPill" title="Live bass energy detector (short vs long term)"><small>Energy</small><span id="stEnergyVal">NORMAL</span></div>
+    <div class="stc energy-pill" id="stEnergyPill" title="Live bass energy detector (short vs long term)"><small>Energy</small><span id="stEnergyVal">NORMAL</span><button type="button" class="energy-rst-btn" id="resetEnergyBtn" title="Reset Energy baseline (e.g. after changing EQ or gain)">&#x21BA;</button></div>
   </div>
 </div>
 <main>
@@ -330,6 +330,7 @@
         <button class="tgl on" id="specPeakBtn">Peak Hold</button>
         <button class="btn" id="specResetPeaks">Reset Peaks</button>
         <button class="btn" id="specResetZones" title="Reset Beat, Bass, Mid, and High frequency zones to defaults">Reset Zones</button>
+        <button class="btn" id="eqResetEnergyBtn" title="Reset Drop/Breakdown energy baseline (e.g. after EQ or gain change)">Reset Energy</button>
       </div>
     </div>
     <div class="audio-strip audio-gain-strip">

@@ -115,7 +115,7 @@ async function activateScene(id, deckId, opts){
     whiteoutSnap = null;
     if(typeof syncWhiteoutUI === 'function') syncWhiteoutUI();
   }
-  const targetDeck = deckId || activeDeckId || '';
+  const targetDeck = opts?.globalScope ? '' : (deckId || activeDeckId || '');
   const scopeKey = targetDeck || '__global__';
   const tok = (sceneActivateTokens[scopeKey] = (sceneActivateTokens[scopeKey] || 0) + 1);
   for(const vid of Object.keys(scenesCache[id]?.virtuals || {})) delete activePalettePatch[vid];
@@ -353,7 +353,6 @@ function buildEffectFieldsHtml(vid, type, mergedCfg){
     const def = schemaProps[k] || {};
     const val = mergedCfg[k];
     const isGrad = k === 'gradient' || def.format === 'gradient' || (typeof val === 'string' && val.includes('gradient('));
-    const isColor = !isGrad && (k.includes('color') || (typeof val === 'string' && /^#[0-9a-f]{6}$/i.test(val)));
     if(isGrad){
       const curGrad = String(val || '');
       const matchedPreset = Object.keys(LEDFX_GRADIENTS).find(pn => pn === curGrad || LEDFX_GRADIENTS[pn] === curGrad) || '';
@@ -370,16 +369,6 @@ function buildEffectFieldsHtml(vid, type, mergedCfg){
           <button type="button" class="btn" data-se-grad-rev style="padding:6px 10px;font-size:12px">Reverse</button>
           <button type="button" class="btn" data-se-grad-reset style="padding:6px 10px;font-size:12px" title="Reset gradient to original">Reset</button>
           <input type="text" data-se-input value="${escHtml(curGrad)}" style="flex:1;min-width:160px;font-size:11px" />
-        </div>
-      </div>`;
-    }
-    if(isColor){
-      const hex = /^#[0-9a-f]{6}$/i.test(String(val)) ? String(val) : '#ffffff';
-      return `<div class="se-field" data-vid="${escHtml(vid)}" data-key="${escHtml(k)}">
-        <label><span>${escHtml(k)}</span></label>
-        <div class="se-color-row">
-          <input type="color" data-se-input value="${escHtml(hex)}" />
-          <span class="se-color-hex">${escHtml(hex)}</span>
         </div>
       </div>`;
     }
@@ -403,6 +392,17 @@ function buildEffectFieldsHtml(vid, type, mergedCfg){
       return `<div class="se-field" data-vid="${escHtml(vid)}" data-key="${escHtml(k)}">
         <label><span>${escHtml(k)}</span><span data-se-val>${escHtml(numVal)}</span></label>
         <input type="range" data-se-input data-num="${def.type==='integer'?'int':'float'}" min="${min}" max="${max}" step="${step}" value="${numVal}" />
+      </div>`;
+    }
+    const isColor = !isGrad && (def.format === 'color' || (typeof val === 'string' && (k.includes('color') || /^#[0-9a-f]{6}$/i.test(val))));
+    if(isColor){
+      const hex = /^#[0-9a-f]{6}$/i.test(String(val)) ? String(val) : '#ffffff';
+      return `<div class="se-field" data-vid="${escHtml(vid)}" data-key="${escHtml(k)}">
+        <label><span>${escHtml(k)}</span></label>
+        <div class="se-color-row">
+          <input type="color" data-se-input value="${escHtml(hex)}" />
+          <span class="se-color-hex">${escHtml(hex)}</span>
+        </div>
       </div>`;
     }
     return `<div class="se-field" data-vid="${escHtml(vid)}" data-key="${escHtml(k)}">
@@ -780,12 +780,14 @@ function renderSceneEditor(sceneId){
     sec.hidden = true;
     editingSceneId = '';
     sceneDraftVirtuals = {};
+    sceneReplacedVirtuals = new Set();
     return;
   }
   if(!sceneId || !scenesCache[sceneId]){
     sec.hidden = false;
     editingSceneId = '';
     sceneDraftVirtuals = {};
+    sceneReplacedVirtuals = new Set();
     if(titleEl) titleEl.textContent = '';
     body.innerHTML = '<div class="empty">Select a scene above to adjust its effect &amp; mapping settings.</div>';
     return;
@@ -795,6 +797,8 @@ function renderSceneEditor(sceneId){
   if(!entries.length){
     sec.hidden = false;
     editingSceneId = sceneId;
+    sceneDraftVirtuals = {};
+    sceneReplacedVirtuals = new Set();
     if(titleEl) titleEl.textContent = `— ${s.name || sceneId}`;
     body.innerHTML = '<div class="empty">This scene has no active effects to edit.</div>';
     return;

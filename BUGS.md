@@ -1,6 +1,6 @@
 # BUGS.md
 
-Known bugs and review findings for the fork additions (DJ controller, physical layouts, 5-band EQ & autogain, auto-reconnect toggle, and tube-native effects). Reviewed at commit `4f4b440d` (+ uncommitted `ledfx_control/performance.js` and `config/config.json`). Keep this file up to date: add new findings, move fixed items to "Fixed".
+Known bugs and review findings for the fork additions (DJ controller, physical layouts, 5-band EQ & autogain, auto-reconnect toggle, and tube-native effects). Reviewed at commit `74e45b96` (+ `ledfx/api/audio_energy.py` and uncommitted drop-detector/reset fixes). Keep this file up to date: add new findings, move fixed items to "Fixed".
 
 Severity: **H** = high (crash, race, data/state corruption, silent breakage), **M** = medium (real user-visible breakage), **L** = low (edge case / hardening / static checks). Feature TODOs live in [TODO.md](TODO.md).
 
@@ -47,6 +47,58 @@ Severity: **H** = high (crash, race, data/state corruption, silent breakage), **
   - `loadEffectSliders()` (`:1223, 1231`) uses float step `(max - min) / 100 || 0.01` on `integer` fields and does not update `virtualsCache[id].effect.config[key]`.
 - **Fix:** Support 3-digit hex / CSS color names in `parseGradientStops()`, guard `Number.isFinite` in `readStopsFromDOM()`, redraw `.se-grad-canvas` when shown/resized, preserve dirty Studio drafts on tab switch, refresh `#stSceneSel` in `saveStudioScene()`, and use `step=1` for `integer` sliders.
 
+### M22. `Flash.apply()` fails on integer pixel arrays (`force_frame` dtype)
+- **Where:** `ledfx/effects/oneshots/oneshot.py:87-90`, `ledfx/virtuals.py:778`.
+- **Problem:** `Flash.apply()` executes `np.multiply(seg, 1 - self._weight, seg)`, which raises `numpy._core._exceptions._UFuncOutputCastingError` when `seg` has an integer dtype (such as `Virtual.force_frame()` creating `np.full(..., color)` with `dtype=int64`) and `self._weight` is a float.
+- **Fix:** Guard non-floating `seg` dtypes in `Flash.apply()` (and use `dtype=np.float64` in `Virtual.force_frame()`).
+
+### M23. `NaN`/`inf` bass values permanently poison drop/breakdown energy envelopes
+- **Where:** `ledfx/effects/audio.py:1564, 1580-1582`.
+- **Problem:** `_update_energy_envelope()` computes `bass = (float(np.mean(melbank)) * mel_gain) if len(melbank) > 0 else 0.0` without checking `math.isfinite()` on `melbank` or `mel_gain`. A single `NaN`/`inf` frame permanently latches `_energy_short` and `_energy_long` to `NaN` until reset.
+- **Fix:** Validate `mel_gain` and `bass` with `math.isfinite()` (falling back to `0.0`) before updating the energy envelopes.
+
+### M24. Multi-deck card `Palette Punch` and `Hold Strobe` (Palette ON) ignore deck palette
+- **Where:** `ledfx_control/performance.js:770, 865`.
+- **Problem:** Both `.lprev-card` `Palette Punch` and `Hold Strobe` (when `Palette` is enabled) read the global `curPalette` instead of `getDeckCycle(zoneOverride)?.pal`, flashing the wrong deck's palette whenever another deck was edited last.
+- **Fix:** Resolve `(zoneOverride && getDeckCycle(zoneOverride)?.pal) || (activeDeckId && getDeckCycle(activeDeckId)?.pal) || curPalette`.
+
+### M25. Master Hype bypasses per-deck Blackout/Whiteout in All Zones, ignores Perform-Lock, clobbers manual `INT`, and Drop Flash fires over Blackout
+- **Where:** `ledfx_control/hype-drop.js:91-97, 147-182, 315-317`.
+- **Problem:**
+  - In All Zones (`z === undefined`), `applyHypeToDevices()` skips `deckOutMode` checks and dims decks in `Whiteout`.
+  - `#hypeSlider` and `.hype-snap` mutate `hypeState`, `S.int`, and sliders even when `S.lock` is ON, and `syncHypeUI(false)` on tab switch (`renderDeckTabs()`) overwrites manual `S.int` selections.
+  - `autoDropFlash` fires `tool({tool:'oneshot', color:'white', ...})` whenever `autoDropFlash && !S.lock`, overriding `blackoutOn`, `deckOutMode === 'black'`, and active `Hold Blackout` overlays.
+- **Fix:** Check `guardLock()` before mutating Hype UI state, skip virtuals belonging to decks in `deckOutMode` during global Hype apply, only sync `S.int` when the Hype value changes, and gate `autoDropFlash` against `blackoutOn`, blacked-out decks, and active hold overlays.
+
+### M26. `Cue on Drop` / `activateScene()` deck-scope race, optimistic state before API success, and missing `renderSceneEditor`/`syncDropQueueUI` resets
+- **Where:** `ledfx_control/scenes-virtuals.js:5-10, 29-32, 84, 110-152`, `ledfx_control/hype-drop.js:250-263, 309-313`, `ledfx_control/previews.js:174-305`.
+- **Problem:**
+  - Calling `activateScene(id)` from `#scenes` or hotkeys on a deck tab passes `deckId === undefined`, so `tryQueueDropScene` stores `deckId: ''`; switching decks before Drop / `Fire Now` resolves `targetDeck` against the new deck and corrupts `lastDeckScene[targetDeck]`.
+  - Across `await quantWait`, `await api('/scenes')`, and `await loadVirtuals()`, `activateScene()` checks `activeDeckId` instead of `targetDeck === activeDeckId`, rendering a prior deck's scene into the new deck's editor/HUD, and updates `lastDeckScene`, `#stScene`, and `.cur` before `api('/scenes')` succeeds.
+  - `renderScenes()` early-returns on empty/no-match without calling `renderSceneEditor('')` and `syncDropQueueUI()`, and `drawTubePreview()` rebuilds `.lprev-card .lprev-scenes` without syncing `.drop-queued` state.
+- **Fix:** Capture `targetDeck = deckId || activeDeckId || ''` before `tryQueueDropScene`, guard post-`await` HUD/editor updates on `targetDeck === activeDeckId`, defer active UI/state updates until `api('/scenes')` succeeds, and call `renderSceneEditor('')` / `syncDropQueueUI()` on `renderScenes()` early returns and `multiGrid` rebuilds.
+
+### M27. Stale `multiPreviewKey` on `loadLayouts()`, Main/Deck slider desync, sticky `deckOutMode`, and unreachable `#mainZoneBar` in multi-layout Main view
+- **Where:** `ledfx_control/previews.js:120-159, 170-173`, `ledfx_control/performance.js:204-227, 474, 1194-1195`, `ledfx_control/hype-drop.js:68-70`, `ledfx_control/core.js:267`, `ledfx-control.html:66-68`.
+- **Problem:**
+  - `multiPreviewKey` omits layout `devices`/`virtuals`/`grid_cells` (`loadLayouts()` never resets it), keeping stale multi-deck card layouts after layout edits.
+  - Deck-tab slider and Macro updates do not sync `.lprev-card` `[data-ctl]` DOM inputs, and `activateScene()` never clears `deckOutMode[targetDeck]`, leaving Blackout/Whiteout buttons `.on` after loading a new scene.
+  - `#mainZoneBar` sits inside `#deckGridMain`, which is hidden whenever enabled layouts exist, making `mainTargetZone` unreachable in multi-layout Main view.
+- **Fix:** Reset `multiPreviewKey = ''` in `loadLayouts()`, sync `.lprev-card` sliders from slider/Macro handlers, clear `deckOutMode[targetDeck]` in `activateScene()`, and move `#mainZoneBar` outside `#deckGridMain`.
+
+### M28. `Z`/`X`/`C`/`V` and `1`–`9` hotkeys fire when target panes/grids are hidden or target is `contenteditable`
+- **Where:** `ledfx_control/performance.js:931-947`, `ledfx_control/audio-eq.js:917-920`, `ledfx-control.html:66, 184`.
+- **Problem:** `Z`/`X`/`C`/`V` `keydown`/`keyup` trigger `#hits .hit-btn` even when `#deckGridMain` (multi-layout Main view) or `#pane-main` (non-Main tabs) is hidden and do not check `e.target?.isContentEditable`; similarly, `1`–`9` hotkeys in `audio-eq.js` activate `#scenes .scene` buttons when `#pane-main` or `#mainScenesSec` is hidden.
+- **Fix:** Gate `Z`/`X`/`C`/`V` on visible `#pane-main` and `#deckGridMain` plus `!e.target?.isContentEditable`, and gate `1`–`9` on `!$('#pane-main')?.hidden && !$('#mainScenesSec')?.hidden`.
+
+### M29. Minimal / Deep House Pack `scene_tags`/virtual conflicts and test validation gaps
+- **Where:** `config/config.json:3870-3888, 4399-4435, 4997-5015`, `tests/test_house_pack_scenes.py:96-133`.
+- **Problem:**
+  - `deep-house-duo` (`config/config.json:4402`) includes `"all"` in `scene_tags`, causing `sceneMatchesLayoutFor()` to show it on unrelated `libelle` and `single` layout cards despite only targeting `back-pillars` and `front-pillars`.
+  - `front-minimal-afterglow` and `back-minimal-afterglow` activate `front-matrix`/`back-matrix` without stopping `front-pillars`/`back-pillars`, leaving both virtuals driving overlapping physical tubes (`wledbb06`–`09`); `config["virtuals"]` also has duplicate entries for `wledbb06`–`09`.
+  - `tests/test_house_pack_scenes.py` validates `effect_cls.Config` directly without `Scene.model_validate`, does not assert `rows > 1` on `front-matrix`/`back-matrix` for `plasma2d`, does not check `layout_profiles` membership (`front`/`back`), and does not verify unique virtual IDs in `config.json`.
+- **Fix:** Remove `all` from `deep-house-duo` `scene_tags`, stop `*-pillars` in `*-minimal-afterglow`, deduplicate `wledbb06`–`09` in `config/config.json`, and add `Scene.model_validate`, `rows > 1`, `layout_profiles`, and unique-virtual-ID assertions to `tests/test_house_pack_scenes.py`.
+
 ### Low
 
 ### L3. 5-band EQ silently disables itself on a size mismatch
@@ -55,9 +107,9 @@ Severity: **H** = high (crash, race, data/state corruption, silent breakage), **
 - **Fix:** Log once (lazy `%s`) on mismatch or rebuild the curve to match `len(self._frequency_domain.norm)`.
 
 ### L4. DJ controller: unescaped HTML, selectors, and CSS `style` attribute injection
-- **Where:** `ledfx_control/scenes-virtuals.js:40, 946, 1172-1188, 1226`, `ledfx_control/core.js:90-105`, `ledfx_control/previews.js:189, 257`.
-- **Problem:** `virtualCard()` (`scenes-virtuals.js:1172-1182`) and `loadEffectSliders()` (`:1226`) still insert virtual IDs, names, effect types, and schema keys into `innerHTML` without `escHtml()` (and `wireVirtual()` `:1188` skips `CSS.escape(id)`). `sceneSegmentStyle()` (`core.js:94`) only checks prefix `/^(#|rgb|hsl|linear-gradient|radial-gradient)/i`, allowing `;` / `"` style-attribute injection via `eff.config` colors/gradients.
-- **Fix:** Escape all dynamic text/attributes with `escHtml()`, use `CSS.escape(id)` in selectors, and sanitize/escape `sceneSegmentStyle()` outputs.
+- **Where:** `ledfx_control/scenes-virtuals.js:40, 946, 1172-1188, 1226`, `ledfx_control/core.js:90-105`, `ledfx_control/performance.js:74, 1231`, `ledfx_control/previews.js:189, 199, 214, 222, 257`.
+- **Problem:** `virtualCard()` (`scenes-virtuals.js:1172-1182`) and `loadEffectSliders()` (`:1226`) still insert virtual IDs, names, effect types, and schema keys into `innerHTML` without `escHtml()` (and `wireVirtual()` `:1188` skips `CSS.escape(id)`). `sceneSegmentStyle()` (`core.js:94`) only checks prefix `/^(#|rgb|hsl|linear-gradient|radial-gradient)/i`, allowing `;` / `"` style-attribute injection via `eff.config` colors/gradients, and `performance.js:74, 1231` and `previews.js:199, 214, 222` interpolate `st` / `pal.colors` into `style="..."` unescaped.
+- **Fix:** Escape all dynamic text/attributes with `escHtml()`, use `CSS.escape(id)` in selectors, and sanitize/escape `sceneSegmentStyle()` and `pal.colors` outputs.
 
 ### L5. DJ controller: `ws://` / `http://` hardcoded
 - **Where:** `ledfx_control/core.js:20, 44`, `ledfx_control/performance.js:535`.
@@ -78,6 +130,26 @@ Severity: **H** = high (crash, race, data/state corruption, silent breakage), **
 - **Where:** `ledfx/effects/tube_base.py:58-62, 100-101`, `ledfx/effects/tube_tiktok.py:110`, `ledfx/effects/gradient.py:139`, `ledfx/effects/tube_*.py`.
 - **Problem:** `TubeEffectBase._compute_grid(0)` returns `(1, 1, 1)`, causing `self.pixels.reshape(...)` `ValueError` in `TubeTikTokEffect` (`:110`) and `ZeroDivisionError` in `GradientEffect.roll_gradient()` (`:139`) when `pixel_count == 0`. `TubeEffectBase._flash *= 0.84` (`tube_base.py:101`) is frame-rate-dependent rather than `dt`-scaled, and `_phase` grows unboundedly in `tube_beat_pulse.py`, `tube_tiktok.py`, `tube_wave.py`, `tube_vortex.py`, `tube_strobe_helix.py`, `tube_lighthouse.py`, `tube_helix.py`, and `tube_gate.py`.
 - **Fix:** Guard `pixel_count <= 0`, convert `_flash` decay to exponential `dt`-based attenuation, and wrap `_phase` modulo `1.0` / `2π`.
+
+### L13. Melbank telemetry `NaN` / `proc` bounds / 1-frame drop lag & `detected_bpm` `NaN` confidence bypass
+- **Where:** `ledfx/effects/melbank.py:486-498, 513, 519-520`, `ledfx/effects/audio.py:1255-1259, 1474`.
+- **Problem:** `send_melbank_event()` checks `0 <= i < len(self.melbank_processors)` for `proc` (`:487-491`), yet indexes `melbanks_filtered[i]` / `melbank_processors[i]` unconditionally (`:519-520`), and passes unguarded `round(float(...), 2)` `NaN` floats through `jsonutil.dumps` (breaking browser `JSON.parse()`). In `AudioAnalysisSource.__init__()`, `self.subscribe(self.melbanks)` runs before `self.subscribe(self._update_energy_envelope)`, causing `GraphUpdateEvent` telemetry to lag by 1 frame, and `conf < 0.12` in `detected_bpm()` (`:1474`) evaluates `False` when `conf` is `NaN`.
+- **Fix:** Return early when `proc is None`, gate telemetry floats with `math.isfinite()`, emit melbank graph events after `_update_energy_envelope()`, and replace `conf < 0.12` with `not (conf >= 0.12)`.
+
+### L14. Pyrefly diagnostics on `aubio.digital_filter` and `tests/test_oneshot_hits.py` + missing `audio_energy` test coverage
+- **Where:** `ledfx/effects/audio.py:1427, 1433`, `tests/test_oneshot_hits.py:23, 27, 28, 41`, `ledfx/api/audio_energy.py`.
+- **Problem:** `tools/pyrefly_check.py --error-stale-baseline` reports `No attribute digital_filter in module aubio` in `audio.py:1427, 1433`, plus `implicit-any-lambda`, `Virtual._id`, and `VirtualConfig` diagnostics in `tests/test_oneshot_hits.py` (where `:41` also compares `(8, 3)` against `(1, 3)`, masking shape bugs via broadcasting). `ledfx/api/audio_energy.py` (`POST /api/audio/energy/reset`) also lacks dedicated endpoint test coverage.
+- **Fix:** Type/ignore `aubio.digital_filter` cleanly in `audio.py`, fix annotations and full-shape `(8, 3)` assertions in `tests/test_oneshot_hits.py`, and add a dedicated `AudioEnergyResetEndpoint` test.
+
+### L15. EQ `beat_min_freq >= 20` clamp, `BASS %` label overlap, `setGridPreset` active-device filter, and Blackout OFF `virtualsCache` sync
+- **Where:** `ledfx_control/audio-eq.js:524, 656-663, 847-854, 1183-1195`.
+- **Problem:** Dragging `beat_min_freq` does not clamp to `>= 20` when `beat_max_freq < 30`; `Math.max(zw, x1 - lx0) > 58` allows `BASS %` to overlap `BEAT`; `setGridPreset()` places all `getTubeDevices()` without filtering `getUsedActiveDevices(layoutEditingId)`, producing layout-conflict errors on Save; and Blackout OFF restores backend brightness without syncing `virtualsCache[id].effect.config.brightness`.
+- **Fix:** Clamp `beat_min_freq >= 20` and check `(x1 - lx0) > 58`, filter `setGridPreset()` like `renderStageGrid()`, and update `virtualsCache` brightness on Blackout OFF.
+
+### L16. Sequential slider/palette `PUT` loops, un-debounced pure color input, dead DOM selectors, 3-px planar `decodeVisPixels` bug, and `NaN` grid keys
+- **Where:** `ledfx_control/performance.js:151, 157-169, 406-421, 1007, 1409-1410, 1920-1922`, `ledfx_control/previews.js:100-109, 533, 546, 683`.
+- **Problem:** `applyPalette()`, `setSpeed()`, and `setZoneBrightness()` await per-virtual `api()` calls sequentially without cancellation tokens; `openPureColorPopover()` calls `applyPalette()` on every `input` drag event without debouncing; `#previewLiveBtn`, `#previewMeta`, `#stPal`, `#stVirt`, and `#stMode` do not exist in `ledfx-control.html`; `decodeVisPixels()` (`px[0].length !== 3`) mis-decodes 3-pixel planar frames; and `renderTubeCanvas()` does not skip non-finite `[rr, cc]` coordinates from malformed `grid_cells` keys.
+- **Fix:** Use `Promise.all` with request tokens, debounce `cust` `input` in `openPureColorPopover()`, remove dead selectors, fix `decodeVisPixels` planar detection, and skip non-finite `[rr, cc]` in `renderTubeCanvas()`.
 
 ## Open (Upstream / Core Codebase)
 
@@ -121,6 +193,7 @@ Remaining open findings from the full-codebase review (`28ad9d51`, excluding ite
 
 ## Fixed
 - **Fork / DJ Controller, Tube Effects & Audio:**
+  - **`H12`–`H21` (`ledfx/effects/audio.py`, `ledfx/virtuals.py`, `ledfx_control/performance.js`, `ledfx_control/scenes-virtuals.js`, `ledfx_control/hype-drop.js`):** Guarded `None` volume in `detected_bpm()` (`H12`); synchronized `_update_energy_envelope()`, `reset_energy_envelope()`, `energy_state()`, `drop_now()`, and `bass_ratio()` with `_energy_lock` (`H13`); copied `seg` in `Virtual._flush_simple_segments()` `copy` mode when `_oneshots` is active, checked `oneshot.active` across flush paths, and locked `Virtuals.clear_oneshots()` and `Virtual.force_frame()` with `float64` pixels (`H14`); captured Hold-to-FX zone/targets on `hitDown()`, normalized `zoneHoldSet` keys across cards/main/keyboard holds, and cancelled holds on `#tabs` switches (`H15`); guarded `Hold Strobe` `PUT` clear on `zoneHoldSet(...).size === 0` so active `Hold Blackout`/`Hold Blinder` overlays remain (`H16`); synced `virtualsCache[id].effect.config` on slider/hold `PUT`s (`H17`); isolated global Palette/Scene Cycler JS state from Deck tab DOM overwrites and passed explicit global scope (`H18`); passed `{ forceNow: true }` from Scene Cyclers and called `clearDropQueue()` when toggling `Cue on Drop` OFF (`H19`); prioritized `boolean`/`enum`/`number`/`integer` schema checks before `isColor` in `buildEffectFieldsHtml()` (`H20`); and cleared `sceneDraftVirtuals`/`sceneReplacedVirtuals` in all early-return paths of `renderSceneEditor()`, including empty scenes (`H21`).
   - **`M3`, `M7`, `M19`, `L1`, `L2`, `L12` (`ledfx/scenes.py`, `ledfx/api/scenes.py`, `ledfx/api/device.py`, `ledfx/core.py`, `ledfx/effects/tube_kick_strobe.py`, `ledfx-control.html`, `ledfx_control/*`):** Tracked `active_scene_id` on `Scenes.activate()` and exposed it on `GET /api/scenes` (`M3`); hid unused `TubeKickStrobeEffect` inherited keys via `HIDDEN_KEYS` (`M7`); required `virt?.active` in `getTubePixelsFromVirtuals` and added `mapping === 'copy'` handling in both tube/layout previews (`M19`); returned `online` from `POST /api/devices/{id}` and surfaced offline status in UI (`L1`); re-armed `resolve_address()` for offline `_requested` devices when `auto_reconnect_devices` is re-enabled (`L2`); removed duplicate `#mainZoneBar`, defined `--warn`, fixed per-deck `Rotate Colors` fallback to deck scene colors, pruned deleted `hiddenScenes`, and preserved `sceneDraftVirtuals` on `.cyc-pick` clicks (`L12`).
   - **`H2`, `H3`, `H4` (`ledfx/api/layouts.py`, `tests/test_layouts.py`):** Added `SafeMode` (`ensure_writable()`) and non-blocking `request_save()` across `POST`/`PUT`/`DELETE`, defaulted `snapshot=False` when updating an existing layout by `id`, and added rollback in `PUT` on partial virtual failures.
   - **`H8`, `H9`, `H10`, `H11` (`ledfx_control/scenes-virtuals.js`, `ledfx_control/performance.js`):** Preserved `sceneDraftVirtuals` across virtual cloning (`H8`); cleared `activePalettePatch` on save and patched color inputs in-place on `applyPalette()` (`H9`); preserved `stop`/`forceblack`/`ignore` virtual entries in Scene Studio (`H10`); added per-scope monotonic tokens in `activateScene()` and avoided overwriting global `lastScene` on deck-card clicks (`H11`, completing `L6`).

@@ -775,9 +775,12 @@ class Virtual:
         Force all pixels in device to color
         Use for pre-clearing in calibration scenarios
         """
-        self.assembled_frame = np.full((self.effective_pixel_count, 3), color)
-        self.flush(self.assembled_frame)
-        self._fire_update_event()
+        with self.lock:
+            self.assembled_frame = np.full(
+                (self.effective_pixel_count, 3), color, dtype=np.float64
+            )
+            self.flush(self.assembled_frame)
+            self._fire_update_event()
 
     def _fire_update_event(self, frame=None):
         if frame is None:
@@ -1109,8 +1112,9 @@ class Virtual:
                         # Where we override segment
                         if self._oneshots:
                             seg = seg.copy()
-                            for oneshot in self._oneshots:
-                                oneshot.apply(seg, start, stop)
+                            for oneshot in tuple(self._oneshots):
+                                if oneshot.active:
+                                    oneshot.apply(seg, start, stop)
                         data.append((seg, device_start, device_end))
                 elif self._config.mapping == "copy":
                     for (
@@ -1131,8 +1135,11 @@ class Virtual:
                         seg = self._effective_to_physical_pixels(
                             seg, target_physical_len
                         )
-                        for oneshot in self._oneshots:
-                            oneshot.apply(seg, start, stop)
+                        if self._oneshots:
+                            seg = seg.copy()
+                            for oneshot in tuple(self._oneshots):
+                                if oneshot.active:
+                                    oneshot.apply(seg, start, stop)
                         data.append((seg, device_start, device_end))
                 device.update_pixels(self.id, data)
 
@@ -1154,10 +1161,12 @@ class Virtual:
 
                     # Apply oneshots to the entire device pixel set
                     # Virtual range spans from min to max of src_indices
-                    for oneshot in self._oneshots:
+                    if self._oneshots:
                         virtual_start = int(src_indices.min())
                         virtual_end = int(src_indices.max())
-                        oneshot.apply(seg, virtual_start, virtual_end)
+                        for oneshot in tuple(self._oneshots):
+                            if oneshot.active:
+                                oneshot.apply(seg, virtual_start, virtual_end)
 
                     # Use new scatter mode: send pixels with dst indices
                     data = [(seg, dst_indices)]
@@ -2391,10 +2400,11 @@ class Virtuals:
         )
         found = False
         for virtual in virtuals:
-            for oneshot in virtual.oneshots:
-                if isinstance(oneshot, Flash):
-                    oneshot.active = False
-                    found = True
+            with virtual.lock:
+                for oneshot in tuple(virtual.oneshots):
+                    if isinstance(oneshot, Flash):
+                        oneshot.active = False
+                        found = True
         return found
 
     def force_color(self, virtual_id: VirtualIdStr | None, color: str) -> None:

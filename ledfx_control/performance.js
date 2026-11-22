@@ -146,7 +146,7 @@ function buildColorPatch(effType, effConfig, colors, opts){
 async function applyPalette(p, quiet, zoneOverride){
   if(!quiet && guardLock()) return;
   if(quiet && S.lock) return;
-  const targetZone = zoneOverride || activeDeckId || '';
+  const targetZone = zoneOverride !== undefined ? zoneOverride : (activeDeckId || '');
   if(targetZone) getDeckCycle(targetZone).pal = p;
   curPalette=p; if($('#stPal')) $('#stPal').textContent=p.name;
   syncPaletteDisplay();
@@ -399,6 +399,13 @@ async function restoreSceneCtl(sceneId, deckId){
   if(mem.sns !== undefined) await setSensitivity(snsPct / 100, deckId, true);
 }
 
+function patchVirtualConfigCache(id, patch){
+  const eff = virtualsCache[id]?.effect;
+  if(!eff || !patch || typeof patch !== 'object') return;
+  if(!eff.config || typeof eff.config !== 'object') eff.config = {};
+  Object.assign(eff.config, patch);
+}
+
 async function setSpeed(val, zoneOverride, skipRecord){
   const z = zoneOverride || activeDeckId || '';
   if(z) getDeckCardCtl(z).spd = Math.round(val * 100);
@@ -408,16 +415,23 @@ async function setSpeed(val, zoneOverride, skipRecord){
     if(!v?.effect?.type) continue;
     const patch = buildSpeedPatch(v.effect.type, val);
     if(!Object.keys(patch).length) continue;
-    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})}); }catch(e){}
+    try{
+      await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})});
+      patchVirtualConfigCache(id, patch);
+    }catch(e){}
   }
 }
 async function setZoneBrightness(val, zoneOverride){
   const z = zoneOverride || activeDeckId || '';
   if(z) getDeckCardCtl(z).bri = Math.round(val * 100);
+  const patch = {brightness:val};
   for(const id of targets(zoneOverride)){
     const v = virtualsCache[id];
     if(!v?.effect?.type) continue;
-    try{ await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{brightness:val}})}); }catch(e){}
+    try{
+      await api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})});
+      patchVirtualConfigCache(id, patch);
+    }catch(e){}
   }
 }
 async function setSensitivity(val, zoneOverride, skipRecord){
@@ -437,7 +451,7 @@ async function setSensitivity(val, zoneOverride, skipRecord){
     if(!v?.effect?.type) continue;
     const patch = buildSensPatch(v.effect.type, val);
     if(Object.keys(patch).length){
-      jobs.push(api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})}).catch(()=>{}));
+      jobs.push(api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:patch})}).then(()=>{ patchVirtualConfigCache(id, patch); }).catch(()=>{}));
     }
   }
   await Promise.all(jobs);
@@ -454,7 +468,7 @@ const HITS = [
   {name:'Palette Punch', kind:'punch'},
   {name:'Hold Dim', kind:'hold-dim', cls:'', badge:'HOLD'},
 ];
-const hitSnapshots = {}, hitIntervals = {}, hitPressTokens = {}, buildUpState = {}, hitHoldPending = {}, activeOverlayHolds = {};
+const hitSnapshots = {}, hitIntervals = {}, hitPressTokens = {}, buildUpState = {}, hitHoldPending = {}, activeOverlayHolds = {}, activeHoldMeta = {};
 const FX_SETTINGS_KEY = 'ledfx_fx_pad_settings_v2';
 const FX_SETTINGS_LEGACY_KEY = 'ledfx_fx_pad_settings';
 const DEFAULT_FX_SETTINGS = { strobeColor:'#ffffff', strobeUsePalette:false, strobeRate:'1/4b', strobeFeel:'punch', strobeBri:100, punchAuto:true, punchColor:'#e84a0c', buildBars:4 };
@@ -668,9 +682,17 @@ $('#buildBarsSel')?.addEventListener('change', e => {
   syncAllFxSettingsForZone(zk);
 });
 renderDeckFxSettings();
+function resolveHitZone(zoneOverride){
+  return zoneOverride !== undefined ? zoneOverride : (activeDeckId || mainTargetZone || '');
+}
+function zoneHoldKey(effZone, effTarget){
+  return `${effZone || 'all'}:${effTarget || 'All'}`;
+}
 function hitKey(h, zoneOverride){ return `${zoneOverride || 'main'}:${h.name}`; }
-function zoneHoldSet(zoneOverride){
-  const zk = zoneOverride || (activeDeckId || mainTargetZone || 'all') + ':' + S.target;
+function zoneHoldSet(keyOrZone){
+  const zk = (typeof keyOrZone === 'string' && keyOrZone.includes(':'))
+    ? keyOrZone
+    : zoneHoldKey(resolveHitZone(keyOrZone), S.target);
   if(!activeOverlayHolds[zk]) activeOverlayHolds[zk] = new Set();
   return activeOverlayHolds[zk];
 }
@@ -690,6 +712,9 @@ function cancelActiveHits(){
   }
   for(const k of Object.keys(buildUpState)){
     delete buildUpState[k];
+  }
+  for(const k of Object.keys(activeHoldMeta)){
+    delete activeHoldMeta[k];
   }
 }
 function renderHits(){
@@ -715,10 +740,17 @@ function renderHits(){
 function activeHitVirtualIds(zoneOverride){
   return targets(zoneOverride).filter(id => virtualsCache[id]?.active);
 }
-async function tool(body, method, zoneOverride){
+async function tool(body, method, zoneOverride, explicitIds){
   const m = method || (body?.tool === 'oneshot' ? 'POST' : 'PUT');
-  if(!zoneOverride && !activeDeckId && !mainTargetZone && S.target==='All') return api('/virtuals_tools', {method:m, body: JSON.stringify(body)});
-  const ids = activeHitVirtualIds(zoneOverride);
+  if(Array.isArray(explicitIds)){
+    if(!explicitIds.length) return;
+    await Promise.all(explicitIds.map(id=>api(`/virtuals_tools/${id}`, {method:m, body: JSON.stringify(body)}).catch(()=>{})));
+    return;
+  }
+  if(explicitIds === null) return api('/virtuals_tools', {method:m, body: JSON.stringify(body)});
+  const effZone = resolveHitZone(zoneOverride);
+  if(!effZone && S.target==='All') return api('/virtuals_tools', {method:m, body: JSON.stringify(body)});
+  const ids = activeHitVirtualIds(effZone);
   if(!ids.length) return;
   await Promise.all(ids.map(id=>api(`/virtuals_tools/${id}`, {method:m, body: JSON.stringify(body)}).catch(()=>{})));
 }
@@ -755,6 +787,12 @@ async function hitDown(h, btn, zoneOverride){
   if(!h || !btn || btn.classList.contains('active')) return;
   const key = hitKey(h, zoneOverride);
   const tok = (hitPressTokens[key] = (hitPressTokens[key] || 0) + 1);
+  const effZone = resolveHitZone(zoneOverride);
+  const effTarget = S.target || 'All';
+  const holdKey = zoneHoldKey(effZone, effTarget);
+  const useGlobalAll = !effZone && effTarget === 'All';
+  const capturedIds = useGlobalAll ? null : activeHitVirtualIds(effZone);
+  const meta = { effZone, effTarget, holdKey, useGlobalAll, ids: capturedIds || [] };
   btn.classList.add('active');
   btn._hitRelease = () => hitUp(h, btn, zoneOverride);
   if(h.kind==='oneshot'||h.kind==='punch'){
@@ -766,35 +804,42 @@ async function hitDown(h, btn, zoneOverride){
     }
   }
   try{
-    if(h.kind==='oneshot'){ const m=INT[S.int]; await tool({tool:'oneshot', color:h.color, ramp:h.ramp, hold:Math.round(h.hold*m), fade:Math.round(h.fade*m)}, 'POST', zoneOverride); }
-    else if(h.kind==='punch'){ const fxs = getFxPadSettings(zoneOverride); const c = fxs.punchAuto ? (curPalette.colors[2] || curPalette.colors[curPalette.colors.length - 1] || '#e84a0c') : (fxs.punchColor || '#e84a0c'); const m=INT[S.int]; await tool({tool:'oneshot', color:c, ramp:10, hold:Math.round(120*m), fade:Math.round(250*m)}, 'POST', zoneOverride); }
+    if(h.kind==='oneshot'){ const m=INT[S.int]; await tool({tool:'oneshot', color:h.color, ramp:h.ramp, hold:Math.round(h.hold*m), fade:Math.round(h.fade*m)}, 'POST', meta.effZone, meta.useGlobalAll ? null : meta.ids); }
+    else if(h.kind==='punch'){ const fxs = getFxPadSettings(meta.effZone); const c = fxs.punchAuto ? (curPalette.colors[2] || curPalette.colors[curPalette.colors.length - 1] || '#e84a0c') : (fxs.punchColor || '#e84a0c'); const m=INT[S.int]; await tool({tool:'oneshot', color:c, ramp:10, hold:Math.round(120*m), fade:Math.round(250*m)}, 'POST', meta.effZone, meta.useGlobalAll ? null : meta.ids); }
     else if(h.kind==='hold-overlay'){
-      const holdSet = zoneHoldSet(zoneOverride);
+      activeHoldMeta[key] = meta;
+      const holdSet = zoneHoldSet(meta.holdKey);
       holdSet.add(key);
-      const p = tool({tool:'oneshot', color:h.color, ramp:1, hold:60000, fade:1, brightness:1.0}, 'POST', zoneOverride).catch(()=>{});
+      const p = tool({tool:'oneshot', color:h.color, ramp:1, hold:60000, fade:1, brightness:1.0}, 'POST', meta.effZone, meta.useGlobalAll ? null : meta.ids).catch(()=>{});
       hitHoldPending[key] = p;
       await p;
       if(hitHoldPending[key] === p) delete hitHoldPending[key];
     }
     else if(h.kind==='hold-dim'){
-      const ids = activeHitVirtualIds(zoneOverride).filter(id => virtualsCache[id]?.effect?.type);
+      activeHoldMeta[key] = meta;
+      const ids = activeHitVirtualIds(meta.effZone).filter(id => virtualsCache[id]?.effect?.type);
       const snap = {};
       for(const id of ids){
         const curB = virtualsCache[id]?.effect?.config?.brightness;
         snap[id] = typeof curB === 'number' ? curB : 1.0;
       }
       hitSnapshots[key] = snap;
-      const p = Promise.all(ids.map(id => api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{brightness: 0.15}})}).catch(()=>{})));
+      const p = Promise.all(ids.map(id =>
+        api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{brightness: 0.15}})})
+          .then(()=>{ patchVirtualConfigCache(id, {brightness: 0.15}); })
+          .catch(()=>{})
+      ));
       hitHoldPending[key] = p;
       await p;
       if(hitHoldPending[key] === p) delete hitHoldPending[key];
     }
     else if(h.kind==='buildup'){
+      activeHoldMeta[key] = meta;
       if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
-      const bars = Number(getFxPadSettings(zoneOverride).buildBars) || Number($('#buildBarsSel')?.value) || 4;
+      const bars = Number(getFxPadSettings(meta.effZone).buildBars) || Number($('#buildBarsSel')?.value) || 4;
       const effBpm = bpm || 128;
       const totalMs = (60000 / effBpm) * (bars * 4);
-      const ids = activeHitVirtualIds(zoneOverride).filter(id => virtualsCache[id]?.effect?.type);
+      const ids = activeHitVirtualIds(meta.effZone).filter(id => virtualsCache[id]?.effect?.type);
       const baseVirt = {};
       for(const id of ids){
         const eff = virtualsCache[id].effect;
@@ -813,7 +858,7 @@ async function hitDown(h, btn, zoneOverride){
         baseBri: readHitBri(btn),
         baseVirt,
         pct: 0,
-        zoneOverride,
+        zoneOverride: meta.effZone,
         btn,
         lastPulseAt: 0,
         dropped: false,
@@ -834,39 +879,42 @@ async function hitDown(h, btn, zoneOverride){
         if(!st.dropped){
           const spd = st.baseSpd + (1 - st.baseSpd) * pct;
           const bri = Math.min(1, st.baseBri + (1 - st.baseBri) * (pct * 0.85));
-          syncHitSliders(spd, bri, btn, zoneOverride);
+          syncHitSliders(spd, bri, btn, meta.effZone);
           if(!st.busy){
             st.busy = true;
             const reqs = Object.entries(st.baseVirt).map(([id, info]) => {
               const patch = { ...buildSpeedPatch(info.type, spd), brightness: Number(bri.toFixed(4)) };
-              return api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config: patch})}).catch(()=>{});
+              return api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config: patch})})
+                .then(()=>{ patchVirtualConfigCache(id, patch); })
+                .catch(()=>{});
             });
             st.pending = Promise.all(reqs).finally(()=>{ st.busy = false; });
           }
           if(pct >= 0.72 && now - st.lastPulseAt >= (S.guard ? 420 : 300)){
             st.lastPulseAt = now;
-            tool({tool:'oneshot', color:'white', ramp:5, hold:35, fade:80}, 'POST', zoneOverride).catch(()=>{});
+            tool({tool:'oneshot', color:'white', ramp:5, hold:35, fade:80}, 'POST', meta.effZone, meta.useGlobalAll ? null : meta.ids).catch(()=>{});
           }
           if(pct >= 1){
             st.dropped = true;
             clearInterval(hitIntervals[key]);
             delete hitIntervals[key];
-            tool({tool:'oneshot', color:'white', ramp:5, hold:160, fade:450}, 'POST', zoneOverride).catch(()=>{});
+            tool({tool:'oneshot', color:'white', ramp:5, hold:160, fade:450}, 'POST', meta.effZone, meta.useGlobalAll ? null : meta.ids).catch(()=>{});
           }
         }
       }, 200);
     }
     else if(h.kind==='strobe'){
+      activeHoldMeta[key] = meta;
       if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
       let stepIdx = 0;
       const fireStrobe = () => {
-        const fxs = getFxPadSettings(zoneOverride);
-        const sp = getStrobeParams(zoneOverride);
+        const fxs = getFxPadSettings(meta.effZone);
+        const sp = getStrobeParams(meta.effZone);
         const palCols = (curPalette && Array.isArray(curPalette.colors) && curPalette.colors.length) ? curPalette.colors : ['#ffffff'];
         const col = fxs.strobeUsePalette ? palCols[(stepIdx++) % palCols.length] : (fxs.strobeColor || '#ffffff');
-        tool({tool:'oneshot', color:col, ramp:sp.ramp, hold:sp.hold, fade:sp.fade, brightness:sp.bri}, 'POST', zoneOverride).catch(()=>{});
+        tool({tool:'oneshot', color:col, ramp:sp.ramp, hold:sp.hold, fade:sp.fade, brightness:sp.bri}, 'POST', meta.effZone, meta.useGlobalAll ? null : meta.ids).catch(()=>{});
       };
-      const sp0 = getStrobeParams(zoneOverride);
+      const sp0 = getStrobeParams(meta.effZone);
       fireStrobe();
       hitIntervals[key] = setInterval(fireStrobe, sp0.ms);
     }
@@ -875,6 +923,19 @@ async function hitDown(h, btn, zoneOverride){
 async function hitUp(h, btn, zoneOverride){
   if(!btn || !btn.classList.contains('active')) return;
   const key = hitKey(h, zoneOverride);
+  const meta = activeHoldMeta[key] || (() => {
+    const effZone = resolveHitZone(zoneOverride);
+    const effTarget = S.target || 'All';
+    const useGlobalAll = !effZone && effTarget === 'All';
+    return {
+      effZone,
+      effTarget,
+      holdKey: zoneHoldKey(effZone, effTarget),
+      useGlobalAll,
+      ids: useGlobalAll ? [] : activeHitVirtualIds(effZone),
+    };
+  })();
+  delete activeHoldMeta[key];
   if(h.kind !== 'oneshot' && h.kind !== 'punch'){
     hitPressTokens[key] = (hitPressTokens[key] || 0) + 1;
   }
@@ -889,24 +950,26 @@ async function hitUp(h, btn, zoneOverride){
     if(st){
       if(st.pending){ try{ await st.pending; }catch(_){} }
       if(!st.dropped && st.pct >= 0.25){
-        tool({tool:'oneshot', color:'white', ramp:5, hold:160, fade:450}, 'POST', zoneOverride).catch(()=>{});
+        tool({tool:'oneshot', color:'white', ramp:5, hold:160, fade:450}, 'POST', meta.effZone, meta.useGlobalAll ? null : meta.ids).catch(()=>{});
       }
-      syncHitSliders(st.baseSpd, st.baseBri, btn, zoneOverride);
+      syncHitSliders(st.baseSpd, st.baseBri, btn, meta.effZone);
       await Promise.all(Object.entries(st.baseVirt).map(([id, info]) => {
         const cfg = Object.keys(info.restoreCfg).length ? info.restoreCfg : { ...buildSpeedPatch(info.type, st.baseSpd), brightness: st.baseBri };
-        return api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config: cfg})}).catch(()=>{});
+        return api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config: cfg})})
+          .then(()=>{ patchVirtualConfigCache(id, cfg); })
+          .catch(()=>{});
       }));
     }
   }
   else if(h.kind==='hold-overlay'){
-    const holdSet = zoneHoldSet(zoneOverride);
+    const holdSet = zoneHoldSet(meta.holdKey);
     holdSet.delete(key);
     if(hitHoldPending[key]){
       try{ await hitHoldPending[key]; }catch(_){}
       delete hitHoldPending[key];
     }
     if(holdSet.size === 0){
-      await tool({tool:'oneshot'}, 'PUT', zoneOverride).catch(()=>{});
+      await tool({tool:'oneshot'}, 'PUT', meta.effZone, meta.useGlobalAll ? null : meta.ids).catch(()=>{});
     }
   }
   else if(h.kind==='hold-dim'){
@@ -917,12 +980,18 @@ async function hitUp(h, btn, zoneOverride){
       delete hitHoldPending[key];
     }
     if(snap){
-      await Promise.all(Object.entries(snap).map(([id, b]) => api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{brightness: b}})}).catch(()=>{})));
+      await Promise.all(Object.entries(snap).map(([id, b]) =>
+        api(`/virtuals/${id}/effects`, {method:'PUT', body: JSON.stringify({config:{brightness: b}})})
+          .then(()=>{ patchVirtualConfigCache(id, {brightness: b}); })
+          .catch(()=>{})
+      ));
     }
   }
   else if(h.kind==='strobe'){
     if(hitIntervals[key]){ clearInterval(hitIntervals[key]); delete hitIntervals[key]; }
-    tool({tool:'oneshot'}, 'PUT', zoneOverride).catch(()=>{});
+    if(zoneHoldSet(meta.holdKey).size === 0){
+      tool({tool:'oneshot'}, 'PUT', meta.effZone, meta.useGlobalAll ? null : meta.ids).catch(()=>{});
+    }
   }
 }
 
@@ -1192,7 +1261,8 @@ $('#bpmDn').addEventListener('click',()=>{ autoBpm=false; syncBpmModeUI(); bpm =
 $('#bpmUp').addEventListener('click',()=>{ autoBpm=false; syncBpmModeUI(); bpm = Math.min(240, (bpm || 120) + 1); updateStatus(); });
 // brightness
 let briT; $('#briSlider').addEventListener('input',e=>{ $('#briVal').textContent=e.target.value+'%'; clearTimeout(briT); briT=setTimeout(async()=>{
-  for(const id of targets()){ if(!virtualsCache[id].active) continue; try{ await api(`/virtuals/${id}/effects`,{method:'PUT',body:JSON.stringify({config:{brightness:e.target.value/100}})}); }catch(err){} } },150); });
+  const patch = {brightness:e.target.value/100};
+  for(const id of targets()){ if(!virtualsCache[id].active) continue; try{ await api(`/virtuals/${id}/effects`,{method:'PUT',body:JSON.stringify({config:patch})}); patchVirtualConfigCache(id, patch); }catch(err){} } },150); });
 // groups
 $('#virtuals').addEventListener('change',e=>{ if(e.target.dataset.role==='group'){ const id=e.target.closest('.vcard').dataset.id; groups[id]=e.target.value; localStorage.setItem('ledfx_groups',JSON.stringify(groups)); } });
 // macros
@@ -1572,7 +1642,7 @@ $('#labSave').addEventListener('click', () => {
 renderLabSavedPalettes();
 
 // ---- Palette Color Cycler ----
-let palCycleOn = false, palCycleIdx = 0, palCycleNextAt = 0, palCycleBusy = false, palBassAvg = 0.05, palLastPeakAt = 0;
+let palCycleOn = false, palCycleMode = 'bpm_pal', palCycleDiv = 1, palCycleRand = false, palCycleIdx = 0, palCycleNextAt = 0, palCycleBusy = false, palBassAvg = 0.05, palLastPeakAt = 0;
 const deckCycleState = {};
 function getDeckCycle(deckId){
   if(!deckCycleState[deckId]){
@@ -1615,7 +1685,7 @@ function stepDeckPalCycler(deckId){
 function checkAudioPeakCycler(lvls){
   if(!HOST || !Array.isArray(lvls) || !lvls.length) return;
   const anyDeckAudio = Object.values(deckCycleState).some(dc => dc.on && dc.mode.startsWith('audio_'));
-  const globalAudio = palCycleOn && ($('#palCycleMode')?.value || '').startsWith('audio_');
+  const globalAudio = palCycleOn && palCycleMode.startsWith('audio_');
   if(!globalAudio && !anyDeckAudio) return;
   const bins = Math.min(10, lvls.length);
   let sum = 0;
@@ -1642,14 +1712,13 @@ function syncPalCycleUI(){
   if(!btn) return;
   const dc = activeDeckId ? getDeckCycle(activeDeckId) : null;
   const on = dc ? dc.on : palCycleOn;
-  const mode = dc ? dc.mode : ($('#palCycleMode')?.value || 'bpm_pal');
-  const div = dc ? dc.div : (Number($('#palCycleDiv')?.value) || 1);
+  const mode = dc ? dc.mode : palCycleMode;
+  const div = dc ? dc.div : palCycleDiv;
+  const rand = dc ? !!dc.rand : palCycleRand;
   const pool = dc ? dc.pool : palCycleSelected;
-  if(dc){
-    if($('#palCycleMode')) $('#palCycleMode').value = mode;
-    if($('#palCycleDiv')) $('#palCycleDiv').value = String(div);
-    if($('#palCycleRand')) $('#palCycleRand').checked = !!dc.rand;
-  }
+  if($('#palCycleMode')) $('#palCycleMode').value = mode;
+  if($('#palCycleDiv')) $('#palCycleDiv').value = String(div);
+  if($('#palCycleRand')) $('#palCycleRand').checked = rand;
   btn.classList.toggle('on', on);
   btn.textContent = on ? 'Cycle ON' : 'Cycle OFF';
   const info = $('#palCycleInfo');
@@ -1664,7 +1733,7 @@ function syncPalCycleUI(){
 }
 function stepPalCycler(){
   if(palCycleBusy || !palCycleOn || S.lock || !HOST) return;
-  const mode = $('#palCycleMode').value;
+  const mode = palCycleMode;
   let nextPal;
   if(mode.endsWith('_rot')){
     const cols = [...(curPalette?.colors || PALETTES[0].colors)];
@@ -1673,11 +1742,11 @@ function stepPalCycler(){
   }else{
     const pool = PALETTES.filter(p => palCycleSelected.has(p.name));
     if(!pool.length) return;
-    palCycleIdx = pickNextIdx(pool.length, palCycleIdx, !!$('#palCycleRand')?.checked);
+    palCycleIdx = pickNextIdx(pool.length, palCycleIdx, palCycleRand);
     nextPal = pool[palCycleIdx];
   }
   palCycleBusy = true;
-  applyPalette(nextPal, true).finally(() => { palCycleBusy = false; });
+  applyPalette(nextPal, true, '').finally(() => { palCycleBusy = false; });
 }
 $('#palPoolAllBtn')?.addEventListener('click', () => {
   if(activeDeckId){
@@ -1713,6 +1782,7 @@ $('#palCycleBtn')?.addEventListener('click', () => {
 });
 $('#palCycleMode')?.addEventListener('change', e => {
   if(activeDeckId){ getDeckCycle(activeDeckId).mode = e.target.value; multiPreviewKey = ''; }
+  else{ palCycleMode = e.target.value; }
   syncPalCycleUI();
 });
 $('#palCycleDiv')?.addEventListener('change', e => {
@@ -1722,12 +1792,14 @@ $('#palCycleDiv')?.addEventListener('change', e => {
     dc.nextAt = Date.now();
     multiPreviewKey = '';
   }else{
+    palCycleDiv = Number(e.target.value) || 1;
     palCycleNextAt = Date.now();
   }
   syncPalCycleUI();
 });
 $('#palCycleRand')?.addEventListener('change', e => {
   if(activeDeckId){ getDeckCycle(activeDeckId).rand = e.target.checked; multiPreviewKey = ''; }
+  else{ palCycleRand = e.target.checked; }
 });
 
 let sceneCycleSelected = null;
@@ -1739,7 +1811,7 @@ function saveSceneCyclePool(){
   if(!sceneCycleSelected) return;
   try{ localStorage.setItem('ledfx_scene_cycle_pool', JSON.stringify([...sceneCycleSelected])); }catch(e){}
 }
-let sceneCycleOn = false, sceneCycleIdx = 0, sceneCycleNextAt = 0, sceneCycleBusy = false;
+let sceneCycleOn = false, sceneCycleDiv = '16b', sceneCycleRand = false, sceneCycleIdx = 0, sceneCycleNextAt = 0, sceneCycleBusy = false;
 const deckSceneCycleState = {};
 function getDeckSceneCycle(deckId){
   if(!deckSceneCycleState[deckId]){
@@ -1763,14 +1835,12 @@ function getSceneCycleTargetIds(deckId){
 function syncSceneCycleUI(){
   const scyc = activeDeckId ? getDeckSceneCycle(activeDeckId) : null;
   const on = scyc ? scyc.on : sceneCycleOn;
-  const div = scyc ? scyc.div : ($('#sceneCycleDiv')?.value || '16b');
-  const rand = scyc ? !!scyc.rand : !!$('#sceneCycleRand')?.checked;
+  const div = scyc ? scyc.div : sceneCycleDiv;
+  const rand = scyc ? !!scyc.rand : sceneCycleRand;
   const pool = scyc ? scyc.pool : sceneCycleSelected;
   const nextAt = scyc ? scyc.nextAt : sceneCycleNextAt;
-  if(scyc){
-    if($('#sceneCycleDiv')) $('#sceneCycleDiv').value = div;
-    if($('#sceneCycleRand')) $('#sceneCycleRand').checked = rand;
-  }
+  if($('#sceneCycleDiv')) $('#sceneCycleDiv').value = div;
+  if($('#sceneCycleRand')) $('#sceneCycleRand').checked = rand;
   const btn = $('#sceneCycleBtn');
   if(btn){
     btn.classList.toggle('on', on);
@@ -1801,7 +1871,7 @@ function toggleSceneCycle(){
     multiPreviewKey = '';
   }else{
     sceneCycleOn = !sceneCycleOn;
-    sceneCycleNextAt = Date.now() + sceneIntervalMs($('#sceneCycleDiv')?.value);
+    sceneCycleNextAt = Date.now() + sceneIntervalMs(sceneCycleDiv);
   }
   syncSceneCycleUI();
 }
@@ -1811,10 +1881,9 @@ function stepSceneCycler(){
   if(sceneCycleSelected) ids = ids.filter(id => sceneCycleSelected.has(id));
   if(typeof filterSceneIdsByHype === 'function') ids = filterSceneIdsByHype(ids);
   if(!ids.length) return;
-  const rand = !!$('#sceneCycleRand')?.checked;
-  sceneCycleIdx = pickNextIdx(ids.length, sceneCycleIdx, rand);
+  sceneCycleIdx = pickNextIdx(ids.length, sceneCycleIdx, sceneCycleRand);
   sceneCycleBusy = true;
-  Promise.resolve(activateScene(ids[sceneCycleIdx])).finally(() => { sceneCycleBusy = false; });
+  Promise.resolve(activateScene(ids[sceneCycleIdx], '', { forceNow: true, globalScope: true })).finally(() => { sceneCycleBusy = false; });
 }
 function stepDeckSceneCycler(deckId){
   const scyc = getDeckSceneCycle(deckId);
@@ -1825,7 +1894,7 @@ function stepDeckSceneCycler(deckId){
   if(!ids.length) return;
   scyc.idx = pickNextIdx(ids.length, scyc.idx, scyc.rand);
   scyc.busy = true;
-  Promise.resolve(activateScene(ids[scyc.idx], deckId)).finally(() => { scyc.busy = false; });
+  Promise.resolve(activateScene(ids[scyc.idx], deckId, { forceNow: true })).finally(() => { scyc.busy = false; });
 }
 $('#sceneCycleBtn')?.addEventListener('click', toggleSceneCycle);
 $('#sceneCycleDiv')?.addEventListener('change', e => {
@@ -1835,12 +1904,14 @@ $('#sceneCycleDiv')?.addEventListener('change', e => {
     scyc.nextAt = Date.now() + sceneIntervalMs(scyc.div);
     multiPreviewKey = '';
   }else{
-    sceneCycleNextAt = Date.now() + sceneIntervalMs(e.target.value);
+    sceneCycleDiv = e.target.value || '16b';
+    sceneCycleNextAt = Date.now() + sceneIntervalMs(sceneCycleDiv);
   }
   syncSceneCycleUI();
 });
 $('#sceneCycleRand')?.addEventListener('change', e => {
   if(activeDeckId){ getDeckSceneCycle(activeDeckId).rand = e.target.checked; multiPreviewKey = ''; }
+  else{ sceneCycleRand = e.target.checked; }
 });
 $('#scenePoolAllBtn')?.addEventListener('click', () => {
   if(activeDeckId){
@@ -1869,10 +1940,10 @@ setInterval(() => {
   if(!HOST) return;
   const now = Date.now();
   if(palCycleOn){
-    const mode = $('#palCycleMode').value;
+    const mode = palCycleMode;
     if(mode.startsWith('bpm')){
       const effBpm = bpm || 120;
-      const div = Number($('#palCycleDiv').value) || 1;
+      const div = Number(palCycleDiv) || 1;
       const intervalMs = (60000 / effBpm) * div;
       if(now >= palCycleNextAt){
         palCycleNextAt = now + intervalMs;
@@ -1890,7 +1961,7 @@ setInterval(() => {
     }
   }
   if(sceneCycleOn && now >= sceneCycleNextAt){
-    sceneCycleNextAt = now + sceneIntervalMs($('#sceneCycleDiv')?.value);
+    sceneCycleNextAt = now + sceneIntervalMs(sceneCycleDiv);
     stepSceneCycler();
     syncSceneCycleUI();
   }
@@ -1904,6 +1975,7 @@ setInterval(() => {
 }, 50);
 // tabs
 $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
+  cancelActiveHits();
   if(b.dataset.t==='main') activeDeckId = b.dataset.deck || '';
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!=='pane-'+b.dataset.t);

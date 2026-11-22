@@ -344,6 +344,8 @@
   .agc-readout.held{color:#7dd3fc;border-color:rgba(56,189,248,.45);background:rgba(56,189,248,.1)}
   .energy-pill{gap:7px;transition:border-color .15s,background .15s,color .15s}
   .energy-pill span{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text);font-variant-numeric:tabular-nums}
+  .energy-rst-btn{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:1px 6px;font-size:12px;line-height:1.2;cursor:pointer;transition:border-color .15s,color .15s}
+  .energy-rst-btn:hover{border-color:var(--amber);color:var(--amber)}
   .energy-pill.is-breakdown,.energy-badge.is-breakdown{border-color:rgba(56,189,248,.55);background:rgba(56,189,248,.12);color:#7dd3fc}
   .energy-pill.is-breakdown span{color:#bae6fd}
   .energy-pill.is-drop,.energy-badge.is-drop{border-color:rgba(255,122,61,.85);background:rgba(255,122,61,.2);color:#fed7aa;box-shadow:0 0 12px rgba(255,122,61,.28)}

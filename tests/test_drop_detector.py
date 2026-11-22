@@ -1,5 +1,9 @@
 """Unit tests for the envelope-driven drop and breakdown detector."""
 
+import asyncio
+import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import override
 from unittest.mock import MagicMock
@@ -8,6 +12,7 @@ import aubio
 import numpy as np
 import pytest
 
+from ledfx.api.audio_energy import AudioEnergyResetEndpoint
 from ledfx.configuration.models import AudioConfig
 from ledfx.effects.audio import AudioAnalysisSource, AudioInputSource
 from ledfx.effects.math import ExpFilter
@@ -295,6 +300,35 @@ def test_ambient_breakdown_timeout_resets_after_45s():
     assert src._breakdown_hold is False
     assert src._breakdown_since == 0.0
 
+    # Staying at ambient level after timeout should remain normal (baseline adapted)
+    _step_bass(src, 0.01, entered_since + 45.05, 3.5)
+    assert src.energy_state() == "normal"
+
+
+def test_mel_gain_normalization_does_not_mask_breakdown():
+    t = 100.0
+    src = _make_analysis_source(start_ts=t)
+    proc0 = src.melbanks.melbank_processors[0]
+
+    # Groove with mel_gain = 2.0 and normalized bass = 0.5 (raw bass = 1.0)
+    proc0.mel_gain.value = 2.0
+    t = _step_bass(src, 0.5, t, 20.0)
+    assert src.energy_state() == "normal"
+
+    # Breakdown: mel_gain decays to 0.2 so normalized melbanks[0] stays 0.5 (raw = 0.1)
+    proc0.mel_gain.value = 0.2
+    t = _step_bass(src, 0.5, t, 5.0)
+    assert src.energy_state() == "breakdown"
+    assert src._breakdown_hold is True
+
+    src.reset_energy_envelope()
+    assert src.energy_state() == "normal"
+    assert src.drop_now() is False
+    assert src._breakdown_hold is False
+    assert src._energy_short == 0.0
+    assert src._energy_long == 0.0
+    assert src.bass_ratio() == 1.0
+
 
 def test_graph_update_event_and_melbank_forward_drop_fields():
     melbank_arr = np.zeros(8, dtype=np.float64)
@@ -386,3 +420,72 @@ def test_tube_effect_base_breakdown_damps_and_drop_boosts():
     effect.audio_data_updated(_make_data("drop", onset=False))
     assert effect._onset is False
     assert effect._flash == pytest.approx(0.2)
+
+
+def test_detected_bpm_returns_stable_when_volume_is_none():
+    src = _make_analysis_source()
+    src._volume_filter.value = None
+    src._stable_bpm = 128.0
+
+    assert src.detected_bpm() == 128.0
+
+
+def test_audio_energy_reset_endpoint_and_concurrent_envelope_updates():
+    t = 100.0
+    src = _make_analysis_source(start_ts=t)
+    t = _step_bass(src, 0.6, t, 20.0)
+    t = _step_bass(src, 0.01, t, 4.0)
+    assert src.energy_state() == "breakdown"
+
+    ledfx = fake_ledfx()
+    ledfx.audio = src
+    endpoint = AudioEnergyResetEndpoint(ledfx)
+    resp = asyncio.run(endpoint.post())
+    assert resp.status == 200
+    assert resp.text is not None
+    assert json.loads(resp.text)["status"] == "success"
+    assert src.energy_state() == "normal"
+    assert src.drop_now() is False
+    assert src.bass_ratio() == 1.0
+
+    # Also safe when no active audio source is present
+    ledfx_no_audio = fake_ledfx()
+    ledfx_no_audio.audio = None
+    resp_empty = asyncio.run(AudioEnergyResetEndpoint(ledfx_no_audio).post())
+    assert resp_empty.status == 200
+
+    # Concurrent updates, reads, and resets under _energy_lock
+    barrier = threading.Barrier(3)
+
+    def _updater() -> None:
+        barrier.wait(timeout=5.0)
+        src.melbanks.melbanks[0][:] = 0.5
+        for i in range(200):
+            src._update_energy_envelope(now=200.0 + i * 0.05)
+
+    def _resetter() -> None:
+        barrier.wait(timeout=5.0)
+        for _ in range(100):
+            src.reset_energy_envelope()
+
+    def _reader() -> None:
+        barrier.wait(timeout=5.0)
+        for _ in range(200):
+            assert src.energy_state() in {"normal", "breakdown", "drop"}
+            assert isinstance(src.drop_now(), bool)
+            ratio = src.bass_ratio()
+            assert 0.0 <= ratio <= 4.0
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = [
+            pool.submit(_updater),
+            pool.submit(_resetter),
+            pool.submit(_reader),
+        ]
+        for fut in futures:
+            fut.result(timeout=10.0)
+
+    src.reset_energy_envelope()
+    assert src.energy_state() == "normal"
+    assert src.drop_now() is False
+    assert src.bass_ratio() == 1.0
